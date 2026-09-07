@@ -1,0 +1,20 @@
+<svg role="img" aria-labelledby="sodapop-favicon-title sodapop-favicon-description" width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+<title id="sodapop-favicon-title">Sodapop favicon</title>
+<desc id="sodapop-favicon-description">Simplified small-size mark for browser tabs. Use the SVG or the 16/32-pixel PNGs.</desc>
+    <defs>
+        <linearGradient id="sodapop-favicon-brand" x1="0" y1="0" x2="1" y2="0.2">
+            <stop offset="0" stop-color="#fb7185"/>
+            <stop offset="1" stop-color="#c084fc"/>
+        </linearGradient>
+    </defs>
+    <path fill="#09090b" stroke="none" d="M 14 0 L 50 0 C 57.731987 0 64 6.2680135 64 14 L 64 50 C 64 57.731987 57.731987 64 50 64 L 14 64 C 6.2680135 64 0 57.731987 0 50 L 0 14 C -0 6.2680135 6.2680135 0 14 0 Z"/>
+    <path fill="url(#sodapop-favicon-brand)" stroke="none" d="M 25 22 L 40 22 C 44.418278 22 48 25.581722 48 30 L 48 47 C 48 51.418278 44.418278 55 40 55 L 25 55 C 20.581722 55 17 51.418278 17 47 L 17 30 C 17 25.581722 20.581722 22 25 22 Z"/>
+    <path fill="#dce4ed" stroke="none" d="M 48 23 C 48 25.485281 41.060413 27.500002 32.5 27.500002 C 23.939587 27.500002 17 25.485281 17 23 C 17 20.514719 23.939587 18.5 32.5 18.5 C 41.060413 18.5 48 20.514719 48 23 Z"/>
+    <g transform="matrix(0.9396926 0.34202015 -0.34202015 0.9396926 9.474103 -11.73031)">
+        <path fill="#dce4ed" stroke="none" d="M 38.5 12 L 38.5 12 C 40.432995 12 42 13.567003 42 15.5 L 42 22.499998 C 42 24.432997 40.432995 26 38.5 26 L 38.5 26 C 36.567005 26 35 24.432997 35 22.499998 L 35 15.5 C 35 13.567003 36.567005 12 38.5 12 Z"/>
+    </g>
+    <path fill="none" stroke="#292035" stroke-width="2.8" stroke-linecap="round" d="M 24 36 Q 27 32 30 36"/>
+    <path fill="#292035" stroke="none" d="M 41.4 35.5 C 41.4 36.13652 41.147144 36.74697 40.69706 37.19706 C 40.24697 37.647144 39.63652 37.9 39 37.9 C 38.36348 37.9 37.75303 37.647144 37.30294 37.19706 C 36.852856 36.74697 36.6 36.13652 36.6 35.5 C 36.6 34.86348 36.852856 34.25303 37.30294 33.80294 C 37.75303 33.352856 38.36348 33.1 39 33.1 C 39.63652 33.1 40.24697 33.352856 40.69706 33.80294 C 41.147144 34.25303 41.4 34.86348 41.4 35.5 Z"/>
+    <path fill="none" stroke="#292035" stroke-width="2.8" stroke-linecap="round" d="M 29 43 Q 33 48 37 43"/>
+    <path fill="#67e8f9" stroke="none" d="M 28 13 C 28 14.656855 26.656855 16 25 16 C 23.343145 16 22 14.656855 22 13 C 22 11.343145 23.343145 10 25 10 C 26.656855 10 28 11.343145 28 13 Z"/>
+</svg>

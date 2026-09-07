@@ -1,0 +1,60 @@
+<svg role="img" aria-labelledby="sodapop-logo-title sodapop-logo-description" width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<title id="sodapop-logo-title">Sodapop logo</title>
+<desc id="sodapop-logo-description">Transparent primary can mark for avatars, stickers, and general branding.</desc>
+    <defs>
+        <linearGradient id="sodapop-logo-can-body" x1="0" y1="0.15" x2="1" y2="0.75">
+            <stop offset="0" stop-color="#fda4af"/>
+            <stop offset="0.25" stop-color="#fb7185"/>
+            <stop offset="0.66" stop-color="#c084fc"/>
+            <stop offset="1" stop-color="#8350be"/>
+        </linearGradient>
+        <linearGradient id="sodapop-logo-can-edge" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#67e8f9" stop-opacity="0.85"/>
+            <stop offset="0.52" stop-color="#67e8f9" stop-opacity="0.08"/>
+            <stop offset="1" stop-color="#67e8f9" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="sodapop-logo-rim" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f4f4f5"/>
+            <stop offset="0.5" stop-color="#bcc3d0"/>
+            <stop offset="1" stop-color="#70748a"/>
+        </linearGradient>
+        <linearGradient id="sodapop-logo-silver" x1="0.12" y1="0" x2="0.85" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="0.3" stop-color="#dce4ed"/>
+            <stop offset="0.58" stop-color="#9292a3"/>
+            <stop offset="0.81" stop-color="#e8edf3"/>
+            <stop offset="1" stop-color="#a5a7ba"/>
+        </linearGradient>
+        <linearGradient id="sodapop-logo-tab" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="0.45" stop-color="#dce4ed"/>
+            <stop offset="1" stop-color="#9b9eb3"/>
+        </linearGradient>
+    </defs>
+    <g transform="matrix(2 0 0 2 0 0)">
+        <g transform="matrix(0.99254614 -0.12186934 0.12186934 0.99254614 -30.265322 33.166367)">
+            <path fill="url(#sodapop-logo-can-body)" stroke="#392648" stroke-width="5" d="M 148 159 Q 153 131 254 130 Q 355 131 364 158 L 368 365 Q 368 410 258 414 Q 148 411 145 373 Z"/>
+            <path fill="url(#sodapop-logo-can-edge)" stroke="none" d="M 151 168 Q 165 157 190 166 L 186 375 Q 169 383 155 369 Z"/>
+            <path fill="none" stroke="#ffffff" stroke-opacity="0.5" stroke-width="5" stroke-linecap="round" d="M 164 193 L 164 278"/>
+            <path fill="url(#sodapop-logo-rim)" stroke="#392648" stroke-width="4" d="M 151 375 Q 251 416 364 373 L 357 394 Q 255 432 158 395 Z"/>
+            <path fill="url(#sodapop-logo-rim)" stroke="#392648" stroke-width="4" d="M 146 148 Q 150 182 255 185 Q 361 183 366 151 L 366 144 L 146 144 Z"/>
+            <path fill="url(#sodapop-logo-silver)" stroke="#392648" stroke-width="5" d="M 365 147 C 365 164.67311 316.19904 179 256 179 C 195.80096 179 147 164.67311 147 147 C 147 129.32689 195.80096 115 256 115 C 316.19904 115 365 129.32689 365 147 Z"/>
+            <path fill="none" stroke="#ffffff" stroke-opacity="0.65" stroke-width="2" d="M 349 147 C 349 159.70255 307.3625 170 256 170 C 204.63751 170 163 159.70255 163 147 C 163 134.29745 204.63751 124 256 124 C 307.3625 124 349 134.29745 349 147 Z"/>
+            <path fill="#292035" stroke="none" d="M 268 149 C 268 154.52284 257.70255 159 245 159 C 232.29745 159 222 154.52284 222 149 C 222 143.47716 232.29745 139 245 139 C 257.70255 139 268 143.47716 268 149 Z"/>
+            <g transform="matrix(0.8829476 0.46947157 -0.46947157 0.8829476 92.86451 -120.459206)">
+                <path fill="url(#sodapop-logo-tab)" stroke="#474355" stroke-width="4" d="M 289 82 L 293 82 C 302.38885 82 310 89.61116 310 99 L 310 138 C 310 147.38884 302.38885 155 293 155 L 289 155 C 279.61115 155 272 147.38884 272 138 L 272 99 C 272 89.61116 279.61115 82 289 82 Z"/>
+                <path fill="#262034" stroke="none" d="M 291 94 L 291 94 C 295.97055 94 300 98.029434 300 103 L 300 110 C 300 114.970566 295.97055 119 291 119 L 291 119 C 286.02945 119 282 114.970566 282 110 L 282 103 C 282 98.029434 286.02945 94 291 94 Z"/>
+                <path fill="#9292a3" stroke="none" d="M 297 139 C 297 141.20914 294.31372 143 291 143 C 287.68628 143 285 141.20914 285 139 C 285 136.79086 287.68628 135 291 135 C 294.31372 135 297 136.79086 297 139 Z"/>
+            </g>
+            <path fill="none" stroke="#292035" stroke-width="10" stroke-linecap="round" d="M 212 253 Q 227 236 243 253"/>
+            <path fill="#292035" stroke="none" d="M 309 254 C 309 262.83655 303.6274 270 297 270 C 290.3726 270 285 262.83655 285 254 C 285 245.16344 290.3726 238 297 238 C 303.6274 238 309 245.16344 309 254 Z"/>
+            <path fill="#ffffff" stroke="none" d="M 303 249 C 303 251.20914 301.65686 253 300 253 C 298.34314 253 297 251.20914 297 249 C 297 246.79086 298.34314 245 300 245 C 301.65686 245 303 246.79086 303 249 Z"/>
+            <path fill="none" stroke="#292035" stroke-width="10" stroke-linecap="round" d="M 235 294 Q 259 328 283 294"/>
+            <path fill="#ffffff" fill-opacity="0.22" stroke="none" d="M 214 282 C 214 285.31372 209.07513 288 203 288 C 196.92487 288 192 285.31372 192 282 C 192 278.68628 196.92487 276 203 276 C 209.07513 276 214 278.68628 214 282 Z"/>
+            <path fill="#ffffff" fill-opacity="0.18" stroke="none" d="M 327 283 C 327 286.31372 322.07513 289 316 289 C 309.92487 289 305 286.31372 305 283 C 305 279.68628 309.92487 277 316 277 C 322.07513 277 327 279.68628 327 283 Z"/>
+            <path fill="none" stroke="#f4f4f5" stroke-opacity="0.88" stroke-width="5" stroke-linecap="round" d="M 237 345 L 230 356 M 256 345 L 249 356 M 275 345 L 268 356"/>
+            <path fill="none" stroke="#67e8f9" stroke-width="4" d="M 223 104 C 223 108.970566 218.97057 113 214 113 C 209.02943 113 205 108.970566 205 104 C 205 99.029434 209.02943 95 214 95 C 218.97057 95 223 99.029434 223 104 Z"/>
+            <path fill="#fb7185" stroke="none" d="M 242 66 C 242 69.86599 238.866 73 235 73 C 231.134 73 228 69.86599 228 66 C 228 62.134007 231.134 59 235 59 C 238.866 59 242 62.134007 242 66 Z"/>
+        </g>
+    </g>
+</svg>

@@ -1,0 +1,189 @@
+{
+  "brand": "Sodapop",
+  "website": "https://sodapop.sh",
+  "created": "2026-09-06",
+  "palette": {
+    "ink": "#09090B",
+    "panel": "#111116",
+    "raised": "#1A1A22",
+    "border": "#30303D",
+    "white": "#F4F4F5",
+    "muted": "#9292A3",
+    "pink": "#FB7185",
+    "purple": "#C084FC",
+    "cyan": "#67E8F9"
+  },
+  "style": "Original polished vector interpretation of the existing terminal soda-can mascot.",
+  "typography": "Lettering outlined from locally licensed Avenir Next; utility labels outlined from Menlo. No font files are included.",
+  "guidance": {
+    "oauth": "Use sodapop-oauth.png and badge background #09090B. Keep the supplied breathing room for circular crops.",
+    "repository": "Use sodapop-repo-social.png for the repository social preview. Use sodapop-banner.svg or .png for a README.",
+    "landing": "Use the transparent mascot and the matching light/dark lockup. Use sodapop-og.png as the social-sharing card.",
+    "editing": "The SVGs are self-contained vector masters with outlined text: no scripts, linked images, or external fonts.",
+    "affiliation": "Sodapop is independent. These assets do not contain GitHub, Copilot, or Charm logos."
+  },
+  "references": {
+    "oauth": "https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-a-custom-badge-for-your-oauth-app",
+    "repository": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview"
+  },
+  "assets": [
+    {
+      "name": "sodapop-logo",
+      "title": "Sodapop logo",
+      "use": "Transparent primary can mark for avatars, stickers, and general branding.",
+      "width": 1024,
+      "height": 1024,
+      "transparent": true,
+      "svg": "sodapop-logo.svg",
+      "png": "sodapop-logo.png",
+      "pngBytes": 219076
+    },
+    {
+      "name": "sodapop-oauth",
+      "title": "Sodapop OAuth application icon",
+      "use": "Upload this PNG as the GitHub OAuth app logo. Set badge background to #09090B.",
+      "width": 512,
+      "height": 512,
+      "transparent": false,
+      "svg": "sodapop-oauth.svg",
+      "png": "sodapop-oauth.png",
+      "pngBytes": 128341
+    },
+    {
+      "name": "sodapop-mascot",
+      "title": "Sodapop mascot",
+      "use": "Transparent full character for the landing-page hero, documentation, and stickers.",
+      "width": 1200,
+      "height": 1200,
+      "transparent": true,
+      "svg": "sodapop-mascot.svg",
+      "png": "sodapop-mascot.png",
+      "pngBytes": 316498,
+      "webp": "sodapop-mascot.webp",
+      "webpBytes": 89058
+    },
+    {
+      "name": "sodapop-main",
+      "title": "Sodapop main brand image",
+      "use": "Square main image for announcements, media, and brand introductions.",
+      "width": 1600,
+      "height": 1600,
+      "transparent": false,
+      "svg": "sodapop-main.svg",
+      "png": "sodapop-main.png",
+      "pngBytes": 607572,
+      "webp": "sodapop-main.webp",
+      "webpBytes": 169696
+    },
+    {
+      "name": "sodapop-banner",
+      "title": "Sodapop wide banner",
+      "use": "Wide repository README header, website masthead, or presentation banner.",
+      "width": 2400,
+      "height": 800,
+      "transparent": false,
+      "svg": "sodapop-banner.svg",
+      "png": "sodapop-banner.png",
+      "pngBytes": 404069,
+      "webp": "sodapop-banner.webp",
+      "webpBytes": 123212
+    },
+    {
+      "name": "sodapop-repo-social",
+      "title": "Sodapop repository social preview",
+      "use": "Upload this PNG in GitHub repository Settings > Social preview.",
+      "width": 1280,
+      "height": 640,
+      "transparent": false,
+      "svg": "sodapop-repo-social.svg",
+      "png": "sodapop-repo-social.png",
+      "pngBytes": 234537
+    },
+    {
+      "name": "sodapop-og",
+      "title": "Sodapop landing-page social card",
+      "use": "Landing-page Open Graph and social-sharing card.",
+      "width": 1200,
+      "height": 630,
+      "transparent": false,
+      "svg": "sodapop-og.svg",
+      "png": "sodapop-og.png",
+      "pngBytes": 215754
+    },
+    {
+      "name": "sodapop-lockup-on-dark",
+      "title": "Sodapop horizontal logo for dark surfaces",
+      "use": "Transparent can-and-wordmark lockup. Use on dark backgrounds.",
+      "width": 1280,
+      "height": 320,
+      "transparent": true,
+      "svg": "sodapop-lockup-on-dark.svg",
+      "png": "sodapop-lockup-on-dark.png",
+      "pngBytes": 56610
+    },
+    {
+      "name": "sodapop-lockup-on-light",
+      "title": "Sodapop horizontal logo for light surfaces",
+      "use": "Transparent can-and-wordmark lockup. Use on light backgrounds.",
+      "width": 1280,
+      "height": 320,
+      "transparent": true,
+      "svg": "sodapop-lockup-on-light.svg",
+      "png": "sodapop-lockup-on-light.png",
+      "pngBytes": 56449
+    },
+    {
+      "name": "sodapop-wordmark",
+      "title": "Sodapop gradient wordmark",
+      "use": "Standalone gradient lettering for headings and brand layouts.",
+      "width": 1200,
+      "height": 340,
+      "transparent": true,
+      "svg": "sodapop-wordmark.svg",
+      "png": "sodapop-wordmark.png",
+      "pngBytes": 61617
+    },
+    {
+      "name": "sodapop-favicon",
+      "title": "Sodapop favicon",
+      "use": "Simplified small-size mark for browser tabs. Use the SVG or the 16/32-pixel PNGs.",
+      "width": 64,
+      "height": 64,
+      "transparent": true,
+      "svg": "sodapop-favicon.svg",
+      "png": "sodapop-favicon.png",
+      "pngBytes": 2517
+    },
+    {
+      "name": "favicon-16.png",
+      "width": 16,
+      "height": 16,
+      "png": "favicon-16.png",
+      "pngBytes": 555
+    },
+    {
+      "name": "favicon-32.png",
+      "width": 32,
+      "height": 32,
+      "png": "favicon-32.png",
+      "pngBytes": 1178
+    },
+    {
+      "name": "apple-touch-icon.png",
+      "width": 180,
+      "height": 180,
+      "png": "apple-touch-icon.png",
+      "pngBytes": 28354
+    },
+    {
+      "name": "favicon.ico",
+      "use": "Multi-resolution browser favicon.",
+      "sizes": [
+        16,
+        32,
+        64
+      ],
+      "file": "favicon.ico"
+    }
+  ]
+}

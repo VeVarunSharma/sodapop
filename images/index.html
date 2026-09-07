@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Sodapop / Brand assets</title>
+  <link rel="icon" type="image/svg+xml" href="sodapop-favicon.svg">
+  <style>
+    :root { color-scheme: dark; --ink: #09090b; --panel: #111116; --line: #30303d; --text: #f4f4f5; --muted: #b2b2c1; --pink: #fb7185; --purple: #c084fc; --cyan: #67e8f9; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--ink); color: var(--text); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(1260px, 100% - 64px); margin: 0 auto; padding: 44px 0 72px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+    header img { width: 180px; height: 45px; object-fit: contain; }
+    .eyebrow { color: var(--cyan); font: 12px/1.5 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { font-size: clamp(36px, 6vw, 76px); line-height: 1.05; letter-spacing: -.06em; margin: 42px 0 22px; }
+    h1 span { background: linear-gradient(95deg, var(--pink), var(--purple)); color: transparent; background-clip: text; }
+    h2 { font-size: 27px; letter-spacing: -.025em; margin: 46px 0 20px; }
+    h3 { margin: 0 0 8px; font-size: 19px; line-height: 1.35; }
+    p { margin: 0 0 18px; }
+    .intro { max-width: 810px; color: var(--muted); font-size: 19px; }
+    .subtle, .meta { color: var(--muted); }
+    .meta { font-size: 13px; font-family: ui-monospace, monospace; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .card { border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--panel); min-width: 0; }
+    .preview { padding: 24px; min-height: 260px; display: flex; align-items: center; justify-content: center; }
+    .preview img { max-width: 100%; height: auto; display: block; }
+    .preview.icon img { width: 236px; height: 236px; }
+    .preview.crop img { border-radius: 50%; }
+    .preview.hero { padding: 0; }
+    .preview.hero img { width: 100%; }
+    .preview.mascot { background-color: #f7f7fa; background-image: linear-gradient(45deg, #e8e8ef 25%, transparent 25%), linear-gradient(-45deg, #e8e8ef 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e8e8ef 75%), linear-gradient(-45deg, transparent 75%, #e8e8ef 75%); background-size: 28px 28px; background-position: 0 0, 0 14px, 14px -14px, -14px 0; }
+    .preview.mascot img { width: 100%; }
+    .preview.lockup { min-height: 178px; }
+    .light { background: #f7f7fa; }
+    .content { padding: 24px; border-top: 1px solid var(--line); }
+    .content p { color: var(--muted); margin-bottom: 16px; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+    a { color: var(--cyan); text-underline-offset: 3px; }
+    a:hover { color: var(--text); }
+    .links a { font-size: 13px; font-weight: 650; padding: 8px 13px; border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--text); }
+    .links a:first-child { border-color: #624261; background: #251b2d; color: #efc0f5; }
+    a:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+    .full { grid-column: 1 / -1; }
+    .swatches { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+    .swatch { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 13px; }
+    .swatch i { display: block; height: 62px; background: var(--color); }
+    .swatch div { padding: 12px; }
+    code { color: #edc7f5; font: .86em/1.5 ui-monospace, SFMono-Regular, monospace; overflow-wrap: anywhere; }
+    .notes { margin-top: 24px; padding: 26px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+    .notes p:last-child { margin-bottom: 0; }
+    .icons { display: flex; flex-wrap: wrap; align-items: end; gap: 42px; padding: 30px; }
+    .icons div { display: grid; justify-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+    .icons img { object-fit: contain; }
+    details { margin-top: 24px; }
+    summary { cursor: pointer; color: var(--cyan); }
+    details p { margin: 14px 0; color: var(--muted); }
+    footer { margin-top: 50px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+    @media (max-width: 760px) {
+      main { width: calc(100% - 32px); padding-top: 24px; }
+      header { align-items: start; }
+      header .eyebrow { max-width: 110px; text-align: right; }
+      .grid { grid-template-columns: 1fr; gap: 18px; }
+      .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .preview { min-height: 220px; }
+      .preview.lockup { min-height: 128px; padding: 16px; }
+      .content { padding: 20px; }
+      .intro { font-size: 17px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="sodapop-lockup-on-dark.svg" alt="Sodapop" width="1280" height="320">
+    <div class="eyebrow">Brand assets / 01</div>
+  </header>
+  <h1>A little more <span>pop.</span></h1>
+  <p class="intro">One friendly can. A consistent identity everywhere. These original vector assets carry Sodapop's smiling mascot, raised silver pull tab, pink-to-purple gradient, cyan details, and quiet terminal-inspired accents beyond the CLI.</p>
+
+  <h2>Start with these</h2>
+  <div class="grid">
+    <article class="card">
+      <div class="preview icon crop"><img src="sodapop-oauth.png" alt="Sodapop OAuth icon shown inside a circular crop" width="512" height="512"></div>
+      <div class="content">
+        <h3>OAuth application logo</h3>
+        <p>The small-size can mark on the brand's dark background. Shown here with a circular mask; the downloaded file is square with room for cropping.</p>
+        <div class="meta">512 x 512 / opaque PNG</div>
+        <div class="links"><a href="sodapop-oauth.png" download>Download OAuth PNG</a><a href="sodapop-oauth.svg" download>SVG master</a></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="preview icon light"><img src="sodapop-logo.png" alt="Transparent Sodapop can logo on a light background" width="1024" height="1024"></div>
+      <div class="content">
+        <h3>Primary logo / transparent</h3>
+        <p>The same can-and-smile symbol without a background or tiny lettering. Use it for avatars, stickers, product marks, or your own compositions.</p>
+        <div class="meta">1024 x 1024 / transparent PNG + SVG</div>
+        <div class="links"><a href="sodapop-logo.png" download>Download logo PNG</a><a href="sodapop-logo.svg" download>SVG master</a></div>
+      </div>
+    </article>
+    <article class="card full">
+      <div class="preview hero"><img src="sodapop-repo-social.png" alt="Sodapop repository preview with gradient wordmark and waving mascot" width="1280" height="640"></div>
+      <div class="content">
+        <h3>Repository social preview</h3>
+        <p>The ready-to-upload image for GitHub repository settings. The background is intentionally opaque so it stays readable wherever the repository link is shared.</p>
+        <div class="meta">1280 x 640 / GitHub social preview</div>
+        <div class="links"><a href="sodapop-repo-social.png" download>Download repository PNG</a><a href="sodapop-repo-social.svg" download>SVG master</a></div>
+      </div>
+    </article>
+  </div>
+
+  <h2>The full character</h2>
+  <div class="grid">
+    <article class="card">
+      <div class="preview hero"><img src="sodapop-main.png" alt="Main Sodapop brand poster with its waving soda-can mascot" width="1600" height="1600" loading="lazy"></div>
+      <div class="content">
+        <h3>Main brand image</h3>
+        <p>The complete square composition: mascot, wordmark, tagline, and subtle gradient atmosphere.</p>
+        <div class="meta">1600 x 1600 / announcements and media</div>
+        <div class="links"><a href="sodapop-main.png" download>PNG</a><a href="sodapop-main.svg" download>SVG</a><a href="sodapop-main.webp" download>Lossless WebP</a></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="preview mascot"><img src="sodapop-mascot.png" alt="Transparent smiling Sodapop mascot with silver pull tab and cyan waving hand" width="1200" height="1200" loading="lazy"></div>
+      <div class="content">
+        <h3>Landing-page hero mascot</h3>
+        <p>The full character on transparency, with no headline or background baked in. The checkerboard is only a preview.</p>
+        <div class="meta">1200 x 1200 / transparent PNG + SVG + WebP</div>
+        <div class="links"><a href="sodapop-mascot.png" download>PNG</a><a href="sodapop-mascot.svg" download>SVG</a><a href="sodapop-mascot.webp" download>Lossless WebP</a></div>
+      </div>
+    </article>
+    <article class="card full">
+      <div class="preview hero"><img src="sodapop-banner.png" alt="Wide Sodapop banner with wordmark on the left and mascot on the right" width="2400" height="800" loading="lazy"></div>
+      <div class="content">
+        <h3>Wide brand banner</h3>
+        <p>For a repository README header, website masthead, or a wider promotional layout. Keep its 3:1 aspect ratio rather than stretching it.</p>
+        <div class="meta">2400 x 800 / wide-format branding</div>
+        <div class="links"><a href="sodapop-banner.png" download>PNG</a><a href="sodapop-banner.svg" download>SVG</a><a href="sodapop-banner.webp" download>Lossless WebP</a></div>
+      </div>
+    </article>
+  </div>
+
+  <h2>Website-ready details</h2>
+  <div class="grid">
+    <article class="card">
+      <div class="preview lockup"><img src="sodapop-lockup-on-dark.svg" alt="White Sodapop wordmark and colored can logo for dark surfaces" width="1280" height="320" loading="lazy"></div>
+      <div class="content">
+        <h3>Logo lockup / on dark</h3>
+        <p>White lettering and a colored can. Transparent background.</p>
+        <div class="links"><a href="sodapop-lockup-on-dark.svg" download>SVG</a><a href="sodapop-lockup-on-dark.png" download>PNG</a></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="preview lockup light"><img src="sodapop-lockup-on-light.svg" alt="Dark Sodapop wordmark and colored can logo for light surfaces" width="1280" height="320" loading="lazy"></div>
+      <div class="content">
+        <h3>Logo lockup / on light</h3>
+        <p>Dark lettering and a colored can. Transparent background.</p>
+        <div class="links"><a href="sodapop-lockup-on-light.svg" download>SVG</a><a href="sodapop-lockup-on-light.png" download>PNG</a></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="preview lockup"><img src="sodapop-wordmark.svg" alt="Pink-to-purple Sodapop wordmark" width="1200" height="340" loading="lazy"></div>
+      <div class="content">
+        <h3>Gradient wordmark</h3>
+        <p>Just the lettering, for layouts that already feature the mascot. Use the solid dark lockup for stronger contrast on white.</p>
+        <div class="links"><a href="sodapop-wordmark.svg" download>SVG</a><a href="sodapop-wordmark.png" download>PNG</a></div>
+      </div>
+    </article>
+    <article class="card">
+      <div class="icons">
+        <div><img src="favicon-16.png" alt="16-pixel favicon" width="16" height="16"><span>16 px</span></div>
+        <div><img src="favicon-32.png" alt="32-pixel favicon" width="32" height="32"><span>32 px</span></div>
+        <div><img src="sodapop-favicon.svg" alt="Scalable simplified favicon" width="64" height="64"><span>SVG</span></div>
+        <div><img src="apple-touch-icon.png" alt="Sodapop touch icon" width="96" height="96"><span>Touch icon</span></div>
+      </div>
+      <div class="content">
+        <h3>Browser and touch icons</h3>
+        <p>A simplified drawing for tiny browser tabs, plus the larger application mark for home-screen shortcuts.</p>
+        <div class="links"><a href="sodapop-favicon.svg" download>SVG favicon</a><a href="favicon.ico" download>ICO</a><a href="favicon-16.png" download>16 px</a><a href="favicon-32.png" download>32 px</a><a href="apple-touch-icon.png" download>180 px touch icon</a></div>
+      </div>
+    </article>
+    <article class="card full">
+      <div class="preview hero"><img src="sodapop-og.png" alt="Sodapop social-sharing card for the landing page" width="1200" height="630" loading="lazy"></div>
+      <div class="content">
+        <h3>Landing-page social card</h3>
+        <p>A separate 1200 x 630 composition for Open Graph metadata. This is an image asset, not a change to the deployed website.</p>
+        <div class="links"><a href="sodapop-og.png" download>Open Graph PNG</a><a href="sodapop-og.svg" download>SVG master</a></div>
+      </div>
+    </article>
+  </div>
+
+  <h2>Brand palette</h2>
+  <div class="swatches">
+    <div class="swatch" style="--color:#FB7185"><i></i><div>Rose<br><code>#FB7185</code></div></div>
+    <div class="swatch" style="--color:#C084FC"><i></i><div>Purple<br><code>#C084FC</code></div></div>
+    <div class="swatch" style="--color:#67E8F9"><i></i><div>Cyan<br><code>#67E8F9</code></div></div>
+    <div class="swatch" style="--color:#09090B"><i></i><div>Ink<br><code>#09090B</code></div></div>
+    <div class="swatch" style="--color:#111116"><i></i><div>Panel<br><code>#111116</code></div></div>
+    <div class="swatch" style="--color:#F4F4F5"><i></i><div>Off-white<br><code>#F4F4F5</code></div></div>
+  </div>
+  <div class="notes">
+    <h3>Where each file goes</h3>
+    <p><strong>OAuth app:</strong> upload <code>sodapop-oauth.png</code> under Application logo and set Badge background color to <code>#09090B</code>. The PNG is 512 x 512 and below GitHub's 1 MB upload limit. <a href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-a-custom-badge-for-your-oauth-app" rel="noreferrer" target="_blank">GitHub's badge guidance</a>.</p>
+    <p><strong>Repository:</strong> use <code>sodapop-repo-social.png</code> in Settings &gt; Social preview. It is 1280 x 640 and below 1 MB. Use <code>sodapop-banner.svg</code> for a README header instead. <a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview" rel="noreferrer" target="_blank">GitHub's preview guidance</a>.</p>
+    <p><strong>Landing page:</strong> use the transparent mascot, the appropriate light/dark logo lockup, and the favicon set. Point social metadata to the published absolute URL of <code>sodapop-og.png</code>; uploading this folder alone does not configure the page.</p>
+    <p><strong>Keep the identity intact:</strong> preserve proportions, retain the icon's breathing room, and use cyan as an accent rather than replacing the primary pink/purple gradient. This is Sodapop's own artwork, not an official GitHub, Copilot, or Charm badge.</p>
+  </div>
+  <details>
+    <summary>Editable sources and export information</summary>
+    <p>Every SVG is a self-contained vector master with outlined lettering. It needs no fonts, scripts, remote images, or network connection to display. The PNGs are ready for upload; the WebP files are lossless web exports. <a href="brand-assets.json">The asset manifest</a> includes dimensions, palette values, and file sizes.</p>
+    <p>Optional regeneration sources are in <code>source/build.cjs</code> and <code>source/finish.py</code>. The artwork exporter uses <code>@resvg/resvg-js@2.6.2</code> with locally licensed Avenir Next and Menlo font files supplied as arguments. The finalizer uses Pillow for WebP and ICO output. These tools are separate from the Go application; no font files or renderer dependencies are bundled here.</p>
+  </details>
+  <footer>Sodapop / Original vector brand set / September 2026. This gallery previews the artwork files included in the repository.</footer>
+</main>
+</body>
+</html>
