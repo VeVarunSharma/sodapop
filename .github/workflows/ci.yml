@@ -59,6 +59,7 @@ jobs:
       - name: Vet
         run: go vet ./...
       - name: Check formatting
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           unformatted="$(find cmd internal scripts -type f -name '*.go' ! -name 'zcopilot*.go' -print0 | xargs -0 gofmt -l)"

@@ -61,6 +61,7 @@ func TestCIKeepsWindowsTestsToPortableAndNativePackages(t *testing.T) {
 		"./internal/integration ./internal/runtimebundle ./internal/securefs ./internal/ui/logo",
 		"./scripts/installcheck ./scripts/windows",
 		"go build ./cmd/sodapop",
+		"- name: Check formatting\n        if: runner.os != 'Windows'",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("Windows CI is missing %q", required)
