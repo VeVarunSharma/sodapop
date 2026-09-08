@@ -49,6 +49,30 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 	}
 }
 
+func TestCIKeepsWindowsTestsToPortableAndNativePackages(t *testing.T) {
+	data, err := os.ReadFile("../.github/workflows/ci.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"windows-2025",
+		"go test -race ./internal/app ./internal/auth ./internal/commands ./internal/config",
+		"./internal/integration ./internal/runtimebundle ./internal/securefs ./internal/ui/logo",
+		"./scripts/installcheck ./scripts/windows",
+		"go build ./cmd/sodapop",
+	} {
+		if !strings.Contains(text, required) {
+			t.Errorf("Windows CI is missing %q", required)
+		}
+	}
+	for _, unsupported := range []string{"go test -race ./internal/...", "./scripts/releasectl"} {
+		if strings.Contains(text, unsupported) {
+			t.Errorf("Windows CI unexpectedly runs unsupported scope %q", unsupported)
+		}
+	}
+}
+
 func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 	data, err := os.ReadFile("../.github/workflows/publish-channels.yml")
 	if err != nil {
