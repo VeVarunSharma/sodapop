@@ -1,0 +1,52 @@
+@import "@fontsource-variable/nunito-sans";
+
+:root {
+  --sp-cream: #fffaf2;
+  --sp-panel: #ffffff;
+  --sp-text: #25212d;
+  --sp-muted: #61596b;
+  --sp-line: #dfd7e6;
+  --sp-pink: #fb7185;
+  --sp-purple: #c084fc;
+  --sp-cyan: #67e8f9;
+  --sp-violet: #6c38a5;
+  --sp-lilac: #eee4fb;
+  --sp-rose: #ffe6ec;
+  --sp-aqua: #ddf6f3;
+  --sp-code: #18141e;
+  --sp-focus: #6c38a5;
+  --sp-shadow: 0 12px 35px #3323410a;
+  --sp-font: "Nunito Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --sp-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-family: var(--sp-font);
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --sp-cream: #17131d;
+  --sp-panel: #221c2b;
+  --sp-text: #fbf5ff;
+  --sp-muted: #c1b6ca;
+  --sp-line: #493c57;
+  --sp-violet: #dcbbff;
+  --sp-lilac: #342441;
+  --sp-rose: #3b222f;
+  --sp-aqua: #1d3436;
+  --sp-code: #100d15;
+  --sp-focus: #c084fc;
+  --sp-shadow: 0 12px 35px #0002;
+  color-scheme: dark;
+}
+
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after {
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+  }
+}

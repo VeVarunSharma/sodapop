@@ -1,0 +1,31 @@
+{
+  "name": "@sodapop-sh/linux-arm64",
+  "version": "0.0.0-development",
+  "description": "Sodapop native executable for Linux arm64",
+  "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",
+  "private": true,
+  "homepage": "https://sodapop.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VeVarunSharma/sodapop.git"
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/sodapop",
+    "LICENSE",
+    "LICENSES/",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

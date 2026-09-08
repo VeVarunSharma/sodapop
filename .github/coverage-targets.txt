@@ -1,0 +1,4 @@
+# Handwritten statement coverage floors.
+internal/app 75.0
+internal/engine 85.0
+internal/runtimebundle 85.0

@@ -1,0 +1,132 @@
+name: Verify per-user Windows installers
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Current published numeric version, without v
+        type: string
+        required: true
+      previous_version:
+        description: Earlier published numeric version for the upgrade test
+        type: string
+        required: true
+      runner_labels:
+        description: JSON labels for a disposable, non-elevated Windows x64 runner
+        type: string
+        default: '["self-hosted","Windows","X64","sodapop-disposable"]'
+      accept_wix_terms:
+        description: I have reviewed and accept the WiX 7 EULA/maintenance terms for this build
+        type: boolean
+        default: false
+      test_winget:
+        description: Also test WinGet (already installed; LocalManifestFiles already enabled)
+        type: boolean
+        default: false
+      test_scoop:
+        description: Also test Scoop (already provisioned in this disposable user profile)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    runs-on: ${{ fromJSON(inputs.runner_labels) }}
+    environment: windows-installation-tests
+    env:
+      VERSION: ${{ inputs.version }}
+      PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      ACCEPT_WIX: ${{ inputs.accept_wix_terms }}
+      TEST_WINGET: ${{ inputs.test_winget }}
+      TEST_SCOOP: ${{ inputs.test_scoop }}
+      SODAPOP_WINDOWS_DISPOSABLE: '1'
+      SODAPOP_LIVE_QUALIFY: '0'
+      SODAPOP_RUNTIME_SMOKE: '0'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require an appropriate user, version pair, and explicit WiX acceptance
+        shell: pwsh
+        run: |
+          . ./scripts/windows/Common.ps1
+          Assert-DisposableRunner
+          if ($env:ACCEPT_WIX -cne 'true') { throw 'WiX terms must be reviewed and accepted explicitly.' }
+          foreach ($version in @($env:VERSION, $env:PREVIOUS_VERSION)) {
+            if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+              throw 'MSI tests require numeric three-component versions without v or prerelease labels.'
+            }
+          }
+          if ([version] $env:PREVIOUS_VERSION -ge [version] $env:VERSION) { throw 'Previous version must be older.' }
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build native helpers and restore the pinned local installer tool
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path bin -Force | Out-Null
+          go build -o ./bin/releasectl.exe ./scripts/releasectl
+          if ($LASTEXITCODE -ne 0) { throw 'releasectl build failed.' }
+          go build -o ./bin/windowsctl.exe ./scripts/windows
+          if ($LASTEXITCODE -ne 0) { throw 'windowsctl build failed.' }
+          "SODAPOP_RELEASECTL=$((Resolve-Path ./bin/releasectl.exe).Path)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          "SODAPOP_WINDOWSCTL=$((Resolve-Path ./bin/windowsctl.exe).Path)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          & ./scripts/windows/Restore-Wix.ps1
+      - name: Verify public inputs and build two explicitly unsigned MSI test containers
+        shell: pwsh
+        run: |
+          . ./scripts/windows/Common.ps1
+          foreach ($pair in @(@('previous', $env:PREVIOUS_VERSION), @('current', $env:VERSION))) {
+            $directory = Join-Path $env:RUNNER_TEMP "release-$($pair[0])"
+            $manifest = Join-Path $directory "sodapop-$($pair[1])-manifest.json"
+            Invoke-Checked gh @('release', 'verify', "v$($pair[1])", '--repo', $env:GITHUB_REPOSITORY)
+            Invoke-Checked gh @('release', 'download', "v$($pair[1])", '--repo', $env:GITHUB_REPOSITORY,
+              '--dir', $directory, '--pattern', "sodapop-$($pair[1])-windows-amd64.zip",
+              '--pattern', "sodapop-$($pair[1])-windows-amd64.zip.sha256",
+              '--pattern', "sodapop-$($pair[1])-manifest.json")
+            Invoke-Checked gh @('release', 'verify-asset', "v$($pair[1])", $manifest, '--repo', $env:GITHUB_REPOSITORY)
+            & ./scripts/windows/Build-Msi.ps1 -ReleaseDir $directory -Manifest $manifest `
+              -OutputDir "$env:RUNNER_TEMP/msi-$($pair[0])" -UnsignedCandidate -WixEulaAccepted
+          }
+      - name: Install, repair, upgrade, and uninstall without administrator privileges
+        shell: pwsh
+        run: |
+          & ./scripts/windows/Test-Native.ps1 `
+            -ReleaseDir "$env:RUNNER_TEMP/release-current" `
+            -Manifest "$env:RUNNER_TEMP/release-current/sodapop-$env:VERSION-manifest.json" `
+            -OutputDir "$env:RUNNER_TEMP/msi-evidence" -MsiLifecycle -AllowUnsignedCandidate `
+            -Msi "$env:RUNNER_TEMP/msi-current/sodapop-$env:VERSION-windows-amd64-unsigned.msi" `
+            -MsiMetadata "$env:RUNNER_TEMP/msi-current/msi-candidate.json" `
+            -PreviousReleaseDir "$env:RUNNER_TEMP/release-previous" `
+            -PreviousManifest "$env:RUNNER_TEMP/release-previous/sodapop-$env:PREVIOUS_VERSION-manifest.json" `
+            -PreviousMsi "$env:RUNNER_TEMP/msi-previous/sodapop-$env:PREVIOUS_VERSION-windows-amd64-unsigned.msi" `
+            -PreviousMsiMetadata "$env:RUNNER_TEMP/msi-previous/msi-candidate.json"
+      - name: Exercise explicitly selected Windows package-manager channels
+        if: inputs.test_winget || inputs.test_scoop
+        shell: pwsh
+        run: |
+          $options = @{
+            ReleaseDir = "$env:RUNNER_TEMP/release-current"
+            Manifest = "$env:RUNNER_TEMP/release-current/sodapop-$env:VERSION-manifest.json"
+            OutputDir = "$env:RUNNER_TEMP/channel-evidence"
+          }
+          if ($env:TEST_WINGET -ceq 'true') { $options.ValidateWinGet = $true; $options.InstallWinGet = $true }
+          if ($env:TEST_SCOOP -ceq 'true') { $options.TestScoop = $true }
+          & ./scripts/windows/Test-Channels.ps1 @options
+      - name: Retain evidence, not unsigned installer downloads
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-evidence
+          path: |
+            ${{ runner.temp }}/msi-evidence
+            ${{ runner.temp }}/channel-evidence
+          retention-days: 7
+          if-no-files-found: warn

@@ -1,0 +1,24 @@
+{
+  "name": "@sodapop-sh/windows-amd64",
+  "version": "0.0.0-development",
+  "description": "Sodapop native executable for Windows amd64",
+  "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",
+  "private": true,
+  "homepage": "https://sodapop.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VeVarunSharma/sodapop.git"
+  },
+  "os": ["win32"],
+  "cpu": ["x64"],
+  "files": [
+    "bin/sodapop.exe",
+    "LICENSE",
+    "LICENSES/",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

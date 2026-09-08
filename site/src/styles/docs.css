@@ -1,0 +1,40 @@
+@layer base, starlight, theme, components, utilities;
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./tokens.css";
+
+@theme {
+  --font-sans: "Nunito Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --color-accent-50: #fcf7ff;
+  --color-accent-100: #f5eaff;
+  --color-accent-200: #e8ceff;
+  --color-accent-300: #d5a9fb;
+  --color-accent-400: #c084fc;
+  --color-accent-500: #9c5cce;
+  --color-accent-600: #8244b6;
+  --color-accent-700: #6c38a5;
+  --color-accent-800: #54247c;
+  --color-accent-900: #3d2052;
+  --color-accent-950: #271332;
+}
+
+:root {
+  --sl-font: var(--sp-font);
+  --sl-font-mono: var(--sp-mono);
+  --sl-content-width: 47rem;
+  --sl-color-text-accent: var(--sp-violet);
+  --sl-color-bg: var(--sp-cream);
+  --sl-color-bg-nav: var(--sp-cream);
+  --sl-color-bg-sidebar: var(--sp-cream);
+}
+.site-title img { min-width: 150px; }
+.site-title { max-width: 200px; }
+.content-panel h1 { letter-spacing: -.04em; }
+.sidebar-content a { border-radius: .6rem; }
+.sl-markdown-content a { text-underline-offset: .2em; }
+.sl-markdown-content img { border-radius: 1rem; }
+.sl-markdown-content :is(pre, table) { max-width: 100%; }
+.sl-link-card { border-radius: 1rem; box-shadow: var(--sp-shadow); }
+:focus-visible { outline: 3px solid var(--sp-focus); outline-offset: 3px; }

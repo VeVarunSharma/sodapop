@@ -1,0 +1,14 @@
+{
+  "name": "sodapop-npm-packaging",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Build and test the Sodapop npm distribution",
+  "scripts": {
+    "build": "node scripts/build-packages.mjs",
+    "test": "node --test test/launcher.test.mjs test/build-packages.test.mjs test/install-command.test.mjs",
+    "test:install": "node scripts/test-install.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

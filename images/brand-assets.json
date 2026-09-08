@@ -28,6 +28,27 @@
   },
   "assets": [
     {
+      "name": "sodapop-title",
+      "title": "Sodapop animated title",
+      "use": "Looping README title using the original wordmark and mascot. Use the PNG for reduced motion.",
+      "width": 1000,
+      "height": 560,
+      "transparent": false,
+      "gif": "sodapop-title.gif",
+      "png": "sodapop-title.png",
+      "gifBytes": 1052474,
+      "pngBytes": 179230,
+      "frames": 80,
+      "durationMs": 4000,
+      "loop": true,
+      "source": "source/animate.py",
+      "inputs": [
+        "sodapop-wordmark.png",
+        "sodapop-mascot.png"
+      ],
+      "typography": "Existing outlined wordmark; Pillow's embedded font for the secondary caption. No external fonts."
+    },
+    {
       "name": "sodapop-logo",
       "title": "Sodapop logo",
       "use": "Transparent primary can mark for avatars, stickers, and general branding.",

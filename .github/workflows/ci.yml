@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  SODAPOP_LIVE_QUALIFY: '0'
+  SODAPOP_RUNTIME_SMOKE: '0'
+
+jobs:
+  coverage:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Download dependencies
+        run: go mod download
+      - name: Enforce coverage ratchet
+        run: make coverage
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Download dependencies
+        run: go mod download
+      - name: Test
+        if: runner.os != 'Windows'
+        run: go test -race ./...
+      - name: Test Windows
+        if: runner.os == 'Windows'
+        run: go test -race ./internal/app ./internal/auth ./internal/commands ./internal/config ./internal/integration ./internal/runtimebundle ./internal/securefs ./internal/ui/logo ./scripts/installcheck ./scripts/windows
+      - name: Build Windows command
+        if: runner.os == 'Windows'
+        run: go build ./cmd/sodapop
+      - name: Vet
+        run: go vet ./...
+      - name: Check formatting
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          unformatted="$(find cmd internal scripts -type f -name '*.go' ! -name 'zcopilot*.go' -print0 | xargs -0 gofmt -l)"
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
+  distribution:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test release and package-manager contracts
+        run: make distribution-test

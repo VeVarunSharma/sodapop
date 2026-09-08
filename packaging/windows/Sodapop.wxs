@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Sodapop" Manufacturer="VeVarunSharma"
+           Version="$(Version)" ProductCode="$(ProductCode)"
+           UpgradeCode="972F78B3-B6A5-5422-AABD-CA10FE7E6241"
+           Language="1033" Scope="perUser" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Sodapop is already installed."
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPURLINFOABOUT" Value="https://sodapop.sh" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/VeVarunSharma/sodapop/issues" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="SodapopPrograms" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Sodapop">
+          <Component Id="UserPath" Guid="E12736E7-56AB-50AA-9730-83738CFD0625">
+            <RegistryValue Root="HKCU" Key="Software\Sodapop\Installer"
+                           Name="UserPath" Type="integer" Value="1" KeyPath="yes" />
+            <Environment Id="SodapopUserPath" Name="PATH" Value="[INSTALLFOLDER]"
+                         Action="set" Part="last" System="no" Permanent="no" />
+            <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+            <RemoveFolder Id="RemoveEmptyProgramsFolder" Directory="SodapopPrograms" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Sodapop" Title="Sodapop" Level="1">
+      <ComponentRef Id="UserPath" />
+      <ComponentGroupRef Id="Payload" />
+    </Feature>
+  </Package>
+</Wix>

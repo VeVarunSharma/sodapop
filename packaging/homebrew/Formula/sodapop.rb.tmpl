@@ -1,0 +1,61 @@
+class Sodapop < Formula
+  desc "Terminal coding companion powered by the GitHub Copilot SDK"
+  homepage "https://sodapop.sh"
+  version "@VERSION@"
+  license all_of: ["MIT", :cannot_represent]
+
+  on_macos do
+    if Hardware::CPU.arm?
+      url "@RELEASE_BASE@/sodapop-@VERSION@-darwin-arm64.tar.gz"
+      sha256 "@DARWIN_ARM64_SHA256@"
+    else
+      url "@RELEASE_BASE@/sodapop-@VERSION@-darwin-amd64.tar.gz"
+      sha256 "@DARWIN_AMD64_SHA256@"
+    end
+  end
+
+  on_linux do
+    if Hardware::CPU.arm?
+      url "@RELEASE_BASE@/sodapop-@VERSION@-linux-arm64.tar.gz"
+      sha256 "@LINUX_ARM64_SHA256@"
+    else
+      url "@RELEASE_BASE@/sodapop-@VERSION@-linux-amd64.tar.gz"
+      sha256 "@LINUX_AMD64_SHA256@"
+    end
+  end
+
+  def install
+    bin.install "sodapop"
+    pkgshare.install "LICENSE", "THIRD_PARTY_NOTICES.md", "LICENSES"
+  end
+
+  test do
+    ENV["HOME"] = testpath
+    ENV["XDG_CONFIG_HOME"] = (testpath/"config").to_s
+    ENV["XDG_STATE_HOME"] = (testpath/"state").to_s
+    ENV["XDG_CACHE_HOME"] = (testpath/"cache").to_s
+    ENV["SODAPOP_LIVE_QUALIFY"] = "0"
+    ENV["SODAPOP_RUNTIME_SMOKE"] = "0"
+
+    assert_path_exists pkgshare/"LICENSE"
+    assert_path_exists pkgshare/"THIRD_PARTY_NOTICES.md"
+    assert_path_exists pkgshare/"LICENSES"/"copilot-runtime.license"
+    assert_predicate Dir[pkgshare/"LICENSES"/"**"/"*"].reject { |path| File.directory?(path) || path.end_with?("/copilot-runtime.license") }, :any?
+
+    assert_equal <<~EOS, shell_output("#{bin}/sodapop --version")
+      sodapop @VERSION@
+      Copilot SDK @COPILOT_SDK_VERSION@ / runtime @COPILOT_RUNTIME_VERSION@
+    EOS
+
+    help = shell_output("#{bin}/sodapop --help")
+    assert_includes help, "Usage: sodapop [options]"
+    assert_includes help, "Commands: /help /login /logout /model /clear /resume /compact /plan /diff /theme /exit"
+    assert_includes help, "-check-runtime"
+    assert_includes help, "-version"
+    assert_includes help, "-help"
+    assert_includes help, "-no-color"
+
+    assert_match(/^Copilot @COPILOT_RUNTIME_VERSION@ \(protocol /,
+                 shell_output("#{bin}/sodapop --check-runtime"))
+  end
+end

@@ -1,0 +1,94 @@
+---
+import { Play, Square } from 'lucide-react';
+import { withBase } from '../../lib/urls';
+
+interface Props {
+  name: 'overview' | 'commands' | 'themes' | 'diff';
+  title: string;
+  caption?: string;
+  eager?: boolean;
+}
+const { name, title, caption = 'A real, local UI recording. Signed out; no AI responses are simulated.', eager = false } = Astro.props;
+const width = name === 'overview' ? 1440 : 1040;
+const height = name === 'overview' ? 810 : 650;
+const poster = withBase(`assets/demos/${name}.webp`);
+---
+<figure class:list={['demo-figure', { 'overview-frame': name === 'overview' }]}>
+  <sodapop-demo data-animation={withBase(`assets/demos/${name}.gif`)} data-poster={poster} data-title={title}>
+    <div class="demo-toolbar">
+      <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="demo-title">{title}</span>
+      <button type="button" class="demo-play" aria-label={`Play ${title} demo`} aria-pressed="false">
+        <Play className="play-demo-icon" size={13} aria-hidden="true" />
+        <Square className="stop-demo-icon" size={12} aria-hidden="true" />
+        <span data-demo-label>Play demo</span>
+      </button>
+    </div>
+    <img src={poster} alt={`${title}: the Sodapop terminal interface`} width={width} height={height} loading={eager ? 'eager' : 'lazy'} decoding="async" />
+    <span class="sr-only" data-demo-status role="status"></span>
+  </sodapop-demo>
+  <figcaption>{caption}</figcaption>
+</figure>
+<script>
+  class SodapopDemo extends HTMLElement {
+    private image!: HTMLImageElement;
+    private button!: HTMLButtonElement;
+    private poster = '';
+    private animation = '';
+    private demoTitle = '';
+    private playing = false;
+    private observer?: IntersectionObserver;
+    private onVisibility = () => { if (document.hidden) this.stop(); };
+    private onMotion = () => { if (document.documentElement.dataset.motion === 'off') this.stop(); };
+
+    connectedCallback() {
+      const image = this.querySelector('img');
+      const button = this.querySelector('button');
+      if (!image || !button || !this.dataset.poster || !this.dataset.animation || !this.dataset.title) {
+        throw new Error('The demo is missing its image, control, or source metadata');
+      }
+      this.image = image;
+      this.button = button;
+      this.poster = this.dataset.poster;
+      this.animation = this.dataset.animation;
+      this.demoTitle = this.dataset.title;
+      button.addEventListener('click', () => this.playing ? this.stop() : this.play());
+      image.addEventListener('error', () => this.stop('The recording could not load. Showing the still image.'));
+      document.addEventListener('visibilitychange', this.onVisibility);
+      window.addEventListener('sodapop:motionchange', this.onMotion);
+      this.observer = new IntersectionObserver((entries) => {
+        if (!entries[0].isIntersecting) this.stop();
+      });
+      this.observer.observe(this);
+    }
+
+    disconnectedCallback() {
+      this.observer?.disconnect();
+      document.removeEventListener('visibilitychange', this.onVisibility);
+      window.removeEventListener('sodapop:motionchange', this.onMotion);
+    }
+
+    private play() {
+      this.playing = true;
+      this.image.src = this.animation;
+      this.update('Playing the recorded demonstration.');
+    }
+
+    private stop(message = 'Showing the still image.') {
+      this.playing = false;
+      if (this.image.getAttribute('src') !== this.poster) this.image.src = this.poster;
+      this.update(message);
+    }
+
+    private update(message: string) {
+      this.dataset.playing = String(this.playing);
+      this.button.setAttribute('aria-pressed', String(this.playing));
+      this.button.setAttribute('aria-label', `${this.playing ? 'Stop' : 'Play'} ${this.demoTitle} demo`);
+      const label = this.querySelector('[data-demo-label]');
+      const status = this.querySelector('[data-demo-status]');
+      if (label) label.textContent = this.playing ? 'Stop demo' : 'Play demo';
+      if (status) status.textContent = message;
+    }
+  }
+  if (!customElements.get('sodapop-demo')) customElements.define('sodapop-demo', SodapopDemo);
+</script>

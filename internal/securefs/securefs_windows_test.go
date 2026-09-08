@@ -1,0 +1,86 @@
+//go:build windows
+
+package securefs
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"golang.org/x/sys/windows"
+)
+
+func TestWindowsPrivacyRejectsAccessForEveryone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record")
+	if err := os.WriteFile(path, []byte("fixture"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	everyone, err := windows.CreateWellKnownSid(windows.WinWorldSid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acl, err := windows.ACLFromEntries([]windows.EXPLICIT_ACCESS{
+		allowEntry(everyone, windows.TRUSTEE_IS_WELL_KNOWN_GROUP, windows.NO_INHERITANCE),
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := windows.SetNamedSecurityInfo(
+		path,
+		windows.SE_FILE_OBJECT,
+		windows.DACL_SECURITY_INFORMATION|windows.PROTECTED_DACL_SECURITY_INFORMATION,
+		nil,
+		nil,
+		acl,
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	private, err := IsPrivateRegularFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if private {
+		t.Fatal("file readable by Everyone was accepted as private")
+	}
+}
+
+func TestWindowsProtectFileSetsCurrentUserOwner(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ProtectFile(file); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	descriptor, err := windows.GetNamedSecurityInfo(
+		path,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, _, _, err := privatePrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner == nil || !owner.Equals(user) {
+		t.Fatal("protected file is not owned by the current user")
+	}
+}
