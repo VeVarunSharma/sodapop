@@ -151,7 +151,7 @@ on the repository before using this workflow.
 
 Configure protected `npm-publish` and `homebrew-publish` environments with required
 reviewers. Creating a workflow that names an environment does not configure those
-reviewers. Confirm ownership of every `@sodapop` package, perform initial registry
+reviewers. Confirm ownership of every `@sodapop-sh` package, perform initial registry
 bootstrap if necessary, and authorize this exact workflow/environment as a trusted
 publisher. The pinned npm publishing CLI supports OIDC; no npm write token is
 stored in source. `SODAPOP_NPM_PUBLISH_ENABLED=true` is an explicit owner switch,

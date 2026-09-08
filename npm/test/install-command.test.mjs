@@ -68,7 +68,7 @@ test("registry mode starts with an isolated empty prefix/cache and forces unauth
   assert.equal(sandbox.env.NPM_CONFIG_REGISTRY, publicRegistry);
   assert.equal(sandbox.env.NPM_CONFIG_OFFLINE, "false");
   assert.equal(sandbox.env.NPM_CONFIG_IGNORE_SCRIPTS, "true");
-  assert.equal(readFileSync(sandbox.env.NPM_CONFIG_USERCONFIG, "utf8"), `@sodapop:registry=${publicRegistry}\n`);
+  assert.equal(readFileSync(sandbox.env.NPM_CONFIG_USERCONFIG, "utf8"), `@sodapop-sh:registry=${publicRegistry}\n`);
   assert.equal(readFileSync(sandbox.env.NPM_CONFIG_GLOBALCONFIG, "utf8"), "");
   assert.equal(JSON.parse(readFileSync(path.join(sandbox.work, "package.json"), "utf8")).private, true);
   for (const key of ["NODE_AUTH_TOKEN", "NPM_TOKEN", "GH_TOKEN", "GITHUB_TOKEN", "NODE_PATH", "HTTPS_PROXY"]) {
@@ -88,7 +88,7 @@ test("injected npm subprocess installs only the exact CLI spec from the public r
     assert.equal(args[0], sandbox.npm);
     assert.deepEqual(args.slice(1, 7), [
       "install", "--global", "--prefix", sandbox.prefix,
-      calls === 1 ? "--include=optional" : "--omit=optional", "@sodapop/cli@1.2.3"
+      calls === 1 ? "--include=optional" : "--omit=optional", "@sodapop-sh/cli@1.2.3"
     ]);
     assert.equal(args.at(-2), "--registry");
     assert.equal(args.at(-1), publicRegistry);
@@ -96,7 +96,7 @@ test("injected npm subprocess installs only the exact CLI spec from the public r
     assert.ok(args.includes("--offline=false"));
     assert.ok(args.includes("--prefer-online"));
     assert.ok(!args.includes("--offline"));
-    assert.ok(!args.some((arg) => arg.endsWith(".tgz") || /^@sodapop\/(darwin|linux|windows)-/.test(arg)));
+    assert.ok(!args.some((arg) => arg.endsWith(".tgz") || /^@sodapop-sh\/(darwin|linux|windows)-/.test(arg)));
     assert.equal(options.cwd, sandbox.work);
     assert.equal(options.env, sandbox.env);
     mkdirSync(path.dirname(globalShim(sandbox)), { recursive: true });
@@ -112,7 +112,7 @@ test("injected npm subprocess installs only the exact CLI spec from the public r
 test("public install fails on unpublished namespace, npm errors, and missing shim without fallback", (t) => {
   const sandbox = sandboxFixture(t, true);
   for (const result of [
-    { status: 1, stdout: "", stderr: "E404 @sodapop/cli is not published" },
+    { status: 1, stdout: "", stderr: "E404 @sodapop-sh/cli is not published" },
     { status: null, error: new Error("npm is unavailable") },
     { status: null, signal: "SIGTERM" }
   ]) {
@@ -148,10 +148,10 @@ test("local mode remains offline and cannot accidentally install from the regist
 
 test("registry hash gate rejects changed bytes, versions, missing optional packages and outside-prefix resolution", (t) => {
   const sandbox = sandboxFixture(t, true);
-  const cli = globalPackage(sandbox, "@sodapop/cli");
+  const cli = globalPackage(sandbox, "@sodapop-sh/cli");
   const payload = path.join(cli, "node_modules", ...host.package.split("/"));
   mkdirSync(path.join(payload, "bin"), { recursive: true });
-  writeJSON(path.join(cli, "package.json"), { name: "@sodapop/cli", version: "1.2.3" });
+  writeJSON(path.join(cli, "package.json"), { name: "@sodapop-sh/cli", version: "1.2.3" });
   writeJSON(path.join(payload, "package.json"), { name: host.package, version: "1.2.3" });
   const binary = path.join(payload, "bin", host.binary);
   const bytes = Buffer.from("unexecuted hash-gate fixture, not a native Sodapop binary");

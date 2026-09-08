@@ -84,7 +84,7 @@ export function releaseFixture(t, tools, runners, options = {}) {
 }
 
 export function launcherFixture(root, binary, target = host) {
-  const cli = path.join(root, "node_modules/@sodapop/cli");
+  const cli = path.join(root, "node_modules/@sodapop-sh/cli");
   const platformRoot = path.join(root, "node_modules", ...target.package.split("/"));
   for (const entry of ["bin/sodapop.js", "lib/launcher.js"]) {
     mkdirSync(path.dirname(path.join(cli, entry)), { recursive: true });
@@ -101,7 +101,7 @@ export function launcherFixture(root, binary, target = host) {
   };
   const binding = { schema_version: 1, version, commit: "a".repeat(40), ...pins };
   const cliMetadata = {
-    name: "@sodapop/cli", version, optionalDependencies: { [target.package]: version },
+    name: "@sodapop-sh/cli", version, optionalDependencies: { [target.package]: version },
     sodapop: { ...binding, artifacts: [artifact] }
   };
   const metadata = {

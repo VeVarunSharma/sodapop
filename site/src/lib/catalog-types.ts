@@ -104,7 +104,7 @@ export interface ReleaseConfiguration {
   repository: 'VeVarunSharma/sodapop';
   releaseTag: string | null;
   channels: {
-    npm: { verify: boolean; package: '@sodapop/cli' };
+    npm: { verify: boolean; package: '@sodapop-sh/cli' };
     homebrew: {
       verify: boolean;
       repository: 'VeVarunSharma/homebrew-sodapop' | null;

@@ -1,7 +1,7 @@
 # Sodapop native payload
 
 This package contains the native Sodapop executable for one supported platform.
-It is installed automatically by `@sodapop/cli` and is not intended to be used
+It is installed automatically by `@sodapop-sh/cli` and is not intended to be used
 directly.
 
 The executable is copied from an exact-version Sodapop release archive only

@@ -1,5 +1,5 @@
 {
-  "name": "@sodapop/darwin-arm64",
+  "name": "@sodapop-sh/darwin-arm64",
   "version": "0.0.0-development",
   "description": "Sodapop native executable for macOS arm64",
   "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",

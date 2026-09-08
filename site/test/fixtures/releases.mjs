@@ -29,7 +29,7 @@ export async function releaseFixture(t, {
     configuration: {
       schemaVersion: 1, mode, repository, releaseTag: null,
       channels: {
-        npm: { verify: npm, package: '@sodapop/cli' },
+        npm: { verify: npm, package: '@sodapop-sh/cli' },
         homebrew: { verify: homebrew, repository: homebrew ? tap : null, formula: 'sodapop' },
       },
     },
@@ -120,7 +120,7 @@ export async function releaseFixture(t, {
     const { artifacts, ...header } = f.manifest;
     if (id === 'cli') {
       metadata.optionalDependencies = Object.fromEntries(npmPlatforms.map((platform) => [
-        `@sodapop/${platform.replace('/', '-')}`, version,
+        `@sodapop-sh/${platform.replace('/', '-')}`, version,
       ]));
       metadata.sodapop = {
         ...header, artifacts: structuredClone(artifacts.filter(({ platform }) => npmPlatforms.includes(platform))),
@@ -130,11 +130,11 @@ export async function releaseFixture(t, {
       metadata.sodapop = { ...header, artifact: structuredClone(artifact) };
     }
     metadata.dist = {
-      tarball: `${registry}/@sodapop/${id}/-/${id}-${version}.tgz`,
+      tarball: `${registry}/@sodapop-sh/${id}/-/${id}-${version}.tgz`,
       integrity: `sha512-${createHash('sha512').update(`fixture npm ${id}`).digest('base64')}`,
     };
     f.npm.set(id, metadata);
-    f.setJSON(`${registry}/@sodapop%2f${id}/${id === 'cli' ? 'latest' : version}`, metadata);
+    f.setJSON(`${registry}/@sodapop-sh%2f${id}/${id === 'cli' ? 'latest' : version}`, metadata);
   }
   f.template = await readFile(path.join(repositoryRoot, 'packaging/homebrew/Formula/sodapop.rb.tmpl'), 'utf8');
   f.formula = f.template.replaceAll('@RELEASE_BASE@', base).replaceAll('@VERSION@', version)

@@ -1,10 +1,10 @@
-# `@sodapop/cli`
+# `@sodapop-sh/cli`
 
 The npm launcher for [Sodapop](https://sodapop.sh), a terminal
 application backed by the official GitHub Copilot SDK.
 
 After the corresponding packages are published, install with
-`npm install --global @sodapop/cli` and run `sodapop`.
+`npm install --global @sodapop-sh/cli` and run `sodapop`.
 
 The package installs an exact-version native payload through an
 OS/architecture-specific optional dependency. It does not download executables

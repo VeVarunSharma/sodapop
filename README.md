@@ -58,7 +58,7 @@ commands are:
 brew install VeVarunSharma/sodapop/sodapop
 
 # npm launcher (macOS, glibc-based Linux, and Windows x64)
-npm install --global @sodapop/cli
+npm install --global @sodapop-sh/cli
 
 # Windows x64: download the matching .zip from the GitHub Release,
 # verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.

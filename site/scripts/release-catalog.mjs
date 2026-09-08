@@ -25,13 +25,13 @@ import { isPreview, siteRoot, repositoryRoot as defaultRepositoryRoot } from './
 
 export const releaseIdentities = Object.freeze({
   repository: 'VeVarunSharma/sodapop',
-  npmPackage: '@sodapop/cli',
+  npmPackage: '@sodapop-sh/cli',
   homebrewRepository: 'VeVarunSharma/homebrew-sodapop',
   homebrewFormula: 'sodapop',
 });
 
 export const installCommands = Object.freeze({
-  npm: 'npm install --global @sodapop/cli',
+  npm: 'npm install --global @sodapop-sh/cli',
   homebrew: 'brew install VeVarunSharma/sodapop/sodapop',
 });
 
@@ -51,7 +51,7 @@ export function npmTarget(platform) {
   if (!nativePlatforms.some((target) => target.platform === platform)) throw new Error('Unsupported npm platform');
   const [os, arch] = platform.split('/');
   return {
-    name: `@sodapop/${platform.replace('/', '-')}`,
+    name: `@sodapop-sh/${platform.replace('/', '-')}`,
     os: os === 'windows' ? 'win32' : os,
     cpu: arch === 'amd64' ? 'x64' : arch,
     binary: os === 'windows' ? 'sodapop.exe' : 'sodapop',
@@ -175,7 +175,7 @@ function validateConfiguration(value) {
   object(value.channels.homebrew, ['verify', 'repository', 'formula'], 'Homebrew configuration');
   if (typeof value.channels.npm.verify !== 'boolean' ||
       value.channels.npm.package !== releaseIdentities.npmPackage) {
-    throw new Error('npm configuration requires a boolean verify flag and the source package @sodapop/cli');
+    throw new Error('npm configuration requires a boolean verify flag and the source package @sodapop-sh/cli');
   }
   const tap = value.channels.homebrew;
   if (typeof tap.verify !== 'boolean' || tap.formula !== releaseIdentities.homebrewFormula ||
@@ -402,7 +402,7 @@ export function validateCatalog(value, configuration) {
         throw new Error(`Unpublished ${name} channel requires null command/version/URL and an empty platform list`);
       }
     } else if (channel.status === 'published') {
-      const url = name === 'npm' ? 'https://www.npmjs.com/package/@sodapop/cli'
+      const url = name === 'npm' ? 'https://www.npmjs.com/package/@sodapop-sh/cli'
         : `https://github.com/${releaseIdentities.homebrewRepository}`;
       if (expected.mode !== 'release' || !configuration.channels[name].verify ||
           channel.command !== installCommands[name] || channel.version !== expected.version || channel.url !== url) {

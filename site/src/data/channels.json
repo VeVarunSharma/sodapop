@@ -6,7 +6,7 @@
   "channels": {
     "npm": {
       "verify": false,
-      "package": "@sodapop/cli"
+      "package": "@sodapop-sh/cli"
     },
     "homebrew": {
       "verify": false,

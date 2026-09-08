@@ -97,7 +97,7 @@ When the npm builder receives `--platforms`, it must exactly match the manifest.
 
 The [npm packaging guide](../npm/README.md) describes manifest-derived,
 exact-version optional dependencies. A qualified Windows ZIP can supply
-`@sodapop/windows-amd64`; a four-Unix manifest does not advertise that dependency.
+`@sodapop-sh/windows-amd64`; a four-Unix manifest does not advertise that dependency.
 The four-Unix `npm/packages/cli/package.json` is a development template, not
 the published support matrix.
 

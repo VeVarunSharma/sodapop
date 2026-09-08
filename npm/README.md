@@ -1,16 +1,16 @@
 # Sodapop npm distribution
 
-`@sodapop/cli` supplies the `sodapop` launcher. Its exact-version optional
+`@sodapop-sh/cli` supplies the `sodapop` launcher. Its exact-version optional
 dependencies are generated from the release manifest's available platforms,
 not from a hard-coded list of unpublished packages.
 
 | Native platform | npm package | Payload |
 | --- | --- | --- |
-| darwin/arm64 | `@sodapop/darwin-arm64` | `bin/sodapop` |
-| darwin/amd64 | `@sodapop/darwin-amd64` | `bin/sodapop` |
-| linux/arm64 | `@sodapop/linux-arm64` | `bin/sodapop` |
-| linux/amd64 | `@sodapop/linux-amd64` | `bin/sodapop` |
-| windows/amd64 | `@sodapop/windows-amd64` | `bin/sodapop.exe` |
+| darwin/arm64 | `@sodapop-sh/darwin-arm64` | `bin/sodapop` |
+| darwin/amd64 | `@sodapop-sh/darwin-amd64` | `bin/sodapop` |
+| linux/arm64 | `@sodapop-sh/linux-arm64` | `bin/sodapop` |
+| linux/amd64 | `@sodapop-sh/linux-amd64` | `bin/sodapop` |
+| windows/amd64 | `@sodapop-sh/windows-amd64` | `bin/sodapop.exe` |
 
 Linux packages declare `libc: ["glibc"]`. The launcher rejects musl and
 unidentifiable/conflicting libc evidence rather than guessing. Windows x64 is
@@ -164,12 +164,12 @@ This mode performs the equivalent of:
 ```sh
 npm install --global --prefix TEMP --include=optional \
   --ignore-scripts --registry https://registry.npmjs.org/ \
-  @sodapop/cli@EXACT_MANIFEST_VERSION
+  @sodapop-sh/cli@EXACT_MANIFEST_VERSION
 ```
 
 It does **not** pack local tarballs, preinstall a host package, seed npm's cache,
 use a tag or version range, or fall back to local packages when the namespace
-is absent. Both the default and `@sodapop` scoped registry are forced to the
+is absent. Both the default and `@sodapop-sh` scoped registry are forced to the
 public npm registry. HOME, work directory, user/global npm configuration,
 cache, and prefix are freshly isolated; ambient authentication tokens, proxy
 settings, and `NODE_PATH` are not inherited. Lifecycle scripts remain disabled.

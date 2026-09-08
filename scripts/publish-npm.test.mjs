@@ -10,10 +10,10 @@ function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const entries = [
-    ["platforms/darwin-arm64", { name: "@sodapop/darwin-arm64", version: "1.2.3" }],
+    ["platforms/darwin-arm64", { name: "@sodapop-sh/darwin-arm64", version: "1.2.3" }],
     ["cli", {
-      name: "@sodapop/cli", version: "1.2.3",
-      optionalDependencies: { "@sodapop/darwin-arm64": "1.2.3" }
+      name: "@sodapop-sh/cli", version: "1.2.3",
+      optionalDependencies: { "@sodapop-sh/darwin-arm64": "1.2.3" }
     }]
   ];
   for (const [directory, metadata] of entries) {
@@ -60,7 +60,7 @@ test("publishes platform tarballs before the exact-version launcher", (t) => {
   const directory = fixture(t);
   const { runner, published } = registry();
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, runner, () => {});
-  assert.deepEqual(published, ["sodapop-darwin-arm64-1.2.3.tgz", "sodapop-cli-1.2.3.tgz"]);
+  assert.deepEqual(published, ["sodapop-sh-darwin-arm64-1.2.3.tgz", "sodapop-sh-cli-1.2.3.tgz"]);
 });
 
 test("retry accepts only identical already-published tarballs", (t) => {
@@ -100,7 +100,7 @@ test("rejects mismatched dependencies and prereleases under latest", (t) => {
   );
   const filename = path.join(directory, "cli", "package.json");
   const metadata = JSON.parse(readFileSync(filename));
-  metadata.optionalDependencies["@sodapop/darwin-arm64"] = "^1.2.3";
+  metadata.optionalDependencies["@sodapop-sh/darwin-arm64"] = "^1.2.3";
   writeFileSync(filename, JSON.stringify(metadata));
   assert.throws(() => publishPackages({ directory, version: "1.2.3", tag: "latest" }), /exactly match/);
 });

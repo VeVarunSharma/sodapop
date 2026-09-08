@@ -6,11 +6,11 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const platformNames = new Set([
-  "@sodapop/darwin-amd64",
-  "@sodapop/darwin-arm64",
-  "@sodapop/linux-amd64",
-  "@sodapop/linux-arm64",
-  "@sodapop/windows-amd64"
+  "@sodapop-sh/darwin-amd64",
+  "@sodapop-sh/darwin-arm64",
+  "@sodapop-sh/linux-amd64",
+  "@sodapop-sh/linux-arm64",
+  "@sodapop-sh/windows-amd64"
 ]);
 
 export function validVersion(version) {
@@ -41,7 +41,7 @@ function readPackages(directory, version) {
     const metadata = JSON.parse(readFileSync(path.join(packageDirectory, "package.json"), "utf8"));
     const isCLI = index === directories.length - 1;
     if (metadata.version !== version || metadata.private ||
-        (isCLI ? metadata.name !== "@sodapop/cli" : !platformNames.has(metadata.name)) ||
+        (isCLI ? metadata.name !== "@sodapop-sh/cli" : !platformNames.has(metadata.name)) ||
         seen.has(metadata.name)) {
       throw new Error(`Invalid generated package metadata in ${packageDirectory}`);
     }

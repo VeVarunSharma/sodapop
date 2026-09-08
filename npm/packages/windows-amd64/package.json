@@ -1,5 +1,5 @@
 {
-  "name": "@sodapop/windows-amd64",
+  "name": "@sodapop-sh/windows-amd64",
   "version": "0.0.0-development",
   "description": "Sodapop native executable for Windows amd64",
   "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",

@@ -9,7 +9,7 @@ Check the [download page](/download/) before assuming a package-manager channel
 has been published. The [installation guide](installation.md#supported-platforms)
 lists the five native targets. Homebrew is scoped to macOS/Linux. Windows x64
 npm support depends on the exact release manifest including its qualified ZIP
-and the matching `@sodapop/windows-amd64` package version being published.
+and the matching `@sodapop-sh/windows-amd64` package version being published.
 
 For a manually extracted archive, confirm that the directory on your `PATH`
 contains `sodapop` or, on Windows, `sodapop.exe`. Run the executable by its full

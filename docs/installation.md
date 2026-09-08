@@ -27,7 +27,7 @@ Homebrew is scoped to the four macOS/Linux targets. npm's supported platform set
 comes from the exact release manifest and matching package version, not from
 the repository's development package template.
 
-Windows x64 npm support is conditional: `@sodapop/windows-amd64` is available only
+Windows x64 npm support is conditional: `@sodapop-sh/windows-amd64` is available only
 when the release manifest includes the qualified Windows ZIP and the matching
 npm package version is actually published. A four-Unix release does not
 advertise a Windows dependency. Check the [download page](/download/) for

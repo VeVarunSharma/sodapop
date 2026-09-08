@@ -362,7 +362,7 @@ test('symlink sources and output parents cannot read or overwrite outside files'
   assert.deepEqual(Object.keys(await tree(outsideDirectory)), ['keep.md']);
 });
 
-test('only approved assets are staged unchanged, with dimensions and base-aware metadata', async (t) => {
+test('only approved assets and lossless demo posters are staged with base-aware metadata', async (t) => {
   const f = await fixture(t);
   await put(f.repositoryRoot, 'images/fonts/Avenir.woff2', 'DO NOT COPY FONTS');
   await put(f.repositoryRoot, 'images/source/build.cjs', 'DO NOT COPY SOURCE');
@@ -382,9 +382,21 @@ test('only approved assets are staged unchanged, with dimensions and base-aware 
     assert.equal(copied.length, asset.bytes);
     assert.deepEqual(copied, original[asset.source]);
   }
+  assert.equal(result.posters.length, 4);
+  for (const poster of result.posters) {
+    assert.equal(poster.url, `/preview/${poster.destination}`);
+    assert.equal(poster.width, 3);
+    assert.equal(poster.height, 2);
+    assert.equal(poster.format, 'webp');
+    assert.equal((await readFile(path.join(f.siteRoot, 'public', poster.destination))).length, poster.bytes);
+  }
   const generated = await tree(path.join(f.siteRoot, 'public/assets'));
   assert.deepEqual(Object.keys(generated).sort(),
-    [...publicAssets.map(({ destination }) => destination.slice('assets/'.length)), 'keep.txt'].sort());
+    [
+      ...publicAssets.map(({ destination }) => destination.slice('assets/'.length)),
+      ...result.posters.map(({ destination }) => destination.slice('assets/'.length)),
+      'keep.txt',
+    ].sort());
   assert.doesNotMatch(Object.values(generated).join('\n'), /DO NOT COPY/);
   await put(f.siteRoot, 'public/assets/brand/stale.svg', 'OLD GENERATED ARTWORK');
   assert.deepEqual(await prepareAssets({ ...f, base: '/preview/' }), result);
@@ -444,7 +456,7 @@ test('the real curated prose generates all approved routes using isolated fixtur
   assert.match(installation, /qualified Windows ZIP and the matching npm package version is actually published/);
   assert.match(installation, /Matching hashes do not verify release attestations/);
   const troubleshooting = generated['troubleshooting.md'].toString().replace(/\s+/g, ' ');
-  assert.match(troubleshooting, /@sodapop\/windows-amd64` package version being published/);
+  assert.match(troubleshooting, /@sodapop-sh\/windows-amd64` package version being published/);
   assert.match(troubleshooting, /Launcher and native package versions must match/);
   assert.match(generated['getting-started.md'].toString(), /end users do not need to register an OAuth app/);
   assert.match(generated['development/authentication.md'].toString(),
@@ -474,7 +486,7 @@ test('the original approved artwork and recordings retain their bytes and dimens
     originals.set(source, bytes);
     await put(f.repositoryRoot, source, bytes);
   }
-  const { assets } = await prepareAssets({ ...f, base: '/sodapop/' });
+  const { assets, posters } = await prepareAssets({ ...f, base: '/sodapop/' });
   const bySource = new Map(assets.map((asset) => [asset.source, asset]));
   for (const [source, [width, height]] of Object.entries({
     'images/sodapop-mascot.webp': [1200, 1200],
@@ -496,5 +508,17 @@ test('the original approved artwork and recordings retain their bytes and dimens
   for (const asset of assets) {
     assert.deepEqual(await readFile(path.join(f.siteRoot, 'public', asset.destination)), originals.get(asset.source));
     assert.deepEqual(await readFile(path.join(canonicalRoot, asset.source)), originals.get(asset.source));
+  }
+  assert.equal(posters.length, 4);
+  for (const poster of posters) {
+    const original = bySource.get(poster.source);
+    assert.equal(poster.format, 'webp');
+    assert.equal(poster.width, original.width);
+    assert.equal(poster.height, original.height);
+    assert.ok(poster.bytes < original.bytes, poster.destination);
+    const metadata = await sharp(path.join(f.siteRoot, 'public', poster.destination)).metadata();
+    assert.equal(metadata.format, 'webp');
+    assert.equal(metadata.width, original.width);
+    assert.equal(metadata.height, original.height);
   }
 });

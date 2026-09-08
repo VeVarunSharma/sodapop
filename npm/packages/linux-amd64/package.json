@@ -1,5 +1,5 @@
 {
-  "name": "@sodapop/linux-amd64",
+  "name": "@sodapop-sh/linux-amd64",
   "version": "0.0.0-development",
   "description": "Sodapop native executable for Linux amd64",
   "license": "SEE LICENSE IN THIRD_PARTY_NOTICES.md",

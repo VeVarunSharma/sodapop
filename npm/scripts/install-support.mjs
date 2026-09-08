@@ -67,7 +67,7 @@ export function createNpmSandbox(root = temporaryRoot("npm-install"), { registry
   writeFileSync(path.join(work, "package.json"), '{"name":"sodapop-install-check","private":true}\n');
   const userconfig = path.join(root, "user.npmrc");
   const globalconfig = path.join(root, "global.npmrc");
-  writeFileSync(userconfig, `@sodapop:registry=${registryInstall ? publicRegistry : offlineRegistry}\n`);
+  writeFileSync(userconfig, `@sodapop-sh:registry=${registryInstall ? publicRegistry : offlineRegistry}\n`);
   writeFileSync(globalconfig, "");
   Object.assign(env, {
     NPM_CONFIG_USERCONFIG: userconfig, NPM_CONFIG_GLOBALCONFIG: globalconfig,
@@ -113,7 +113,7 @@ export function packPackage(sandbox, directory) {
   assert.equal(sandbox.registryInstall, false, "public registry checks must not pack local payloads");
   const metadata = JSON.parse(readFileSync(path.join(directory, "package.json"), "utf8"));
   const expected = ["package.json", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"];
-  if (metadata.name === "@sodapop/cli") expected.push("bin/sodapop.js", "lib/launcher.js");
+  if (metadata.name === "@sodapop-sh/cli") expected.push("bin/sodapop.js", "lib/launcher.js");
   else {
     const target = Object.values(TARGETS).find((target) => target.package === metadata.name);
     assert.ok(target, `unexpected package ${metadata.name}`);
@@ -173,7 +173,7 @@ export function installRegistry(sandbox, version, { omitOptional = false, ...dep
   validateVersion(version);
   runNpm(sandbox, [
     "install", "--global", "--prefix", sandbox.prefix,
-    omitOptional ? "--omit=optional" : "--include=optional", `@sodapop/cli@${version}`
+    omitOptional ? "--omit=optional" : "--include=optional", `@sodapop-sh/cli@${version}`
   ], dependencies);
   assert.ok(existsSync(globalShim(sandbox)), "npm global shim is missing");
 }
@@ -187,10 +187,10 @@ function assertWithinPrefix(sandbox, filename) {
 export function assertInstalledHash(sandbox, manifest, target) {
   const entry = manifest.artifacts.find((artifact) => artifact.platform === target.platform);
   assert.ok(entry, `manifest does not declare host ${target.platform}`);
-  const cliPath = path.join(globalPackage(sandbox, "@sodapop/cli"), "package.json");
+  const cliPath = path.join(globalPackage(sandbox, "@sodapop-sh/cli"), "package.json");
   assertWithinPrefix(sandbox, cliPath);
   const cli = JSON.parse(readFileSync(cliPath, "utf8"));
-  assert.equal(cli.name, "@sodapop/cli");
+  assert.equal(cli.name, "@sodapop-sh/cli");
   assert.equal(cli.version, manifest.version);
   const resolver = createRequire(cliPath);
   let metadataPath;
@@ -233,8 +233,8 @@ export function writeSentinels(sandbox) {
 }
 
 export function uninstallLocal(sandbox, target) {
-  runNpm(sandbox, ["uninstall", "--global", "--prefix", sandbox.prefix, "@sodapop/cli", target.package]);
+  runNpm(sandbox, ["uninstall", "--global", "--prefix", sandbox.prefix, "@sodapop-sh/cli", target.package]);
   assert.equal(existsSync(globalShim(sandbox)), false);
-  assert.equal(existsSync(globalPackage(sandbox, "@sodapop/cli")), false);
+  assert.equal(existsSync(globalPackage(sandbox, "@sodapop-sh/cli")), false);
   assert.equal(existsSync(globalPackage(sandbox, target.package)), false);
 }

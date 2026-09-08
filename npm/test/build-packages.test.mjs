@@ -89,7 +89,7 @@ function assertWebsitePayloadIsolation(t, includeWindows) {
   const expectedDependencies = Object.values(TARGETS)
     .filter((target) => selected.has(target.platform)).map((target) => target.package).sort();
   assert.deepEqual(Object.keys(cli.optionalDependencies).sort(), expectedDependencies);
-  assert.equal(cli.optionalDependencies["@sodapop/windows-amd64"], includeWindows ? f.version : undefined);
+  assert.equal(cli.optionalDependencies["@sodapop-sh/windows-amd64"], includeWindows ? f.version : undefined);
   assert.deepEqual(cli.sodapop, f.data);
   const sandbox = createNpmSandbox(path.join(f.root, "sandbox"));
   for (const id of ids) {
@@ -153,7 +153,7 @@ test("four-Unix and explicit host-only manifests never advertise absent payloads
     buildPackages({ ...f, platforms: [...selected.keys()].join(",") });
     const cli = metadata(path.join(f.output, "cli"));
     assert.equal(Object.keys(cli.optionalDependencies).length, selected.size);
-    assert.equal(Object.keys(cli.optionalDependencies).includes("@sodapop/windows-amd64"), host.os === "win32" && selected.size === 1);
+    assert.equal(Object.keys(cli.optionalDependencies).includes("@sodapop-sh/windows-amd64"), host.os === "win32" && selected.size === 1);
   }
 });
 
@@ -271,7 +271,7 @@ test("real npm pack and offline global install/reinstall/upgrade/uninstall use g
   preserve();
 
   runNpm(sandbox, ["install", "--global", "--prefix", sandbox.prefix, "--omit=optional", cli]);
-  assert.ok(existsSync(globalPackage(sandbox, "@sodapop/cli")));
+  assert.ok(existsSync(globalPackage(sandbox, "@sodapop-sh/cli")));
   const missing = runShim(sandbox, []);
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /SODAPOP_MISSING_PAYLOAD/);

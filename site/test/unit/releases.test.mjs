@@ -389,8 +389,8 @@ test('a four-Unix npm manifest exposes only its declared packages, not every nat
   const f = await releaseFixture(t, { npm: true });
   const catalog = await resolveReleases(f.options);
   assert.deepEqual(catalog.channels.npm, {
-    status: 'published', command: 'npm install --global @sodapop/cli', version,
-    url: 'https://www.npmjs.com/package/@sodapop/cli', platforms: platforms.slice(0, 4),
+    status: 'published', command: 'npm install --global @sodapop-sh/cli', version,
+    url: 'https://www.npmjs.com/package/@sodapop-sh/cli', platforms: platforms.slice(0, 4),
   });
   assert.deepEqual(catalog.channels.homebrew, unavailable);
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
@@ -406,7 +406,7 @@ test('npm can publish the manifest-declared Windows ZIP independently of the fou
   const source = await f.copySources();
   const filename = path.join(source, 'npm/packages/cli/package.json');
   const template = JSON.parse(await readFile(filename, 'utf8'));
-  delete template.optionalDependencies['@sodapop/windows-amd64'];
+  delete template.optionalDependencies['@sodapop-sh/windows-amd64'];
   await writeFile(filename, JSON.stringify(template));
   f.npm.get('cli').sodapop.artifacts.reverse();
   const catalog = await resolveReleases(f.options);
@@ -417,7 +417,7 @@ test('npm can publish the manifest-declared Windows ZIP independently of the fou
   assert.equal(catalog.artifacts[4].binary, 'sodapop.exe');
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
   assert.equal(requests.length, 6);
-  assert.ok(requests.some(({ url }) => url === `${registry}/@sodapop%2fwindows-amd64/${version}`));
+  assert.ok(requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-amd64/${version}`));
   assert.equal(f.requests.some(({ url }) => /\.tgz$|\.zip$|\.tar\.gz$/.test(url)), false);
   assert.deepEqual(await readCatalog(f.readOptions), catalog);
   const reordered = await snapshot(f);
@@ -436,8 +436,8 @@ test('public npm metadata reports its exact nonempty declared subset without imp
       assert.deepEqual(catalog.channels.npm.platforms, expected);
       assert.deepEqual(catalog.artifacts.map(({ platform }) => platform), platforms);
       assert.deepEqual(f.requests.filter(({ url }) => url.startsWith(registry)).map(({ url }) => url), [
-        `${registry}/@sodapop%2fcli/latest`,
-        ...expected.map((platform) => `${registry}/@sodapop%2f${platform.replace('/', '-')}/${version}`),
+        `${registry}/@sodapop-sh%2fcli/latest`,
+        ...expected.map((platform) => `${registry}/@sodapop-sh%2f${platform.replace('/', '-')}/${version}`),
       ]);
       assert.deepEqual(await readCatalog(f.readOptions), catalog);
       await assert.rejects(readCatalog({ ...f.readOptions, allowFixtures: false }), /cannot use fixture/);
@@ -447,20 +447,20 @@ test('public npm metadata reports its exact nonempty declared subset without imp
 
 test('a missing declared Windows package keeps npm unpublished instead of silently advertising only Unix', async (t) => {
   const f = await releaseFixture(t, { npm: true, homebrew: true, npmPlatforms: platforms });
-  missing(f, `${registry}/@sodapop%2fwindows-amd64/${version}`);
+  missing(f, `${registry}/@sodapop-sh%2fwindows-amd64/${version}`);
   const catalog = await resolveReleases(f.options);
   assert.deepEqual(catalog.channels.npm, unavailable);
   assert.equal(catalog.channels.homebrew.status, 'published');
   assert.deepEqual(catalog.channels.homebrew.platforms, platforms.slice(0, 4));
   assert.equal(catalog.artifacts.length, 5);
-  assert.ok(f.requests.some(({ url }) => url === `${registry}/@sodapop%2fwindows-amd64/${version}`));
+  assert.ok(f.requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-amd64/${version}`));
 });
 
 test('declared Windows npm metadata must match win32/x64 and the public ZIP/binary release binding', async (t) => {
   for (const [name, mutate] of [
     ['Go OS instead of npm OS', (pkg) => { pkg.os = ['windows']; }],
     ['Go architecture instead of npm CPU', (pkg) => { pkg.cpu = ['amd64']; }],
-    ['wrong package', (pkg) => { pkg.name = '@sodapop/windows-arm64'; }],
+    ['wrong package', (pkg) => { pkg.name = '@sodapop-sh/windows-arm64'; }],
     ['wrong version', (pkg) => { pkg.version = '1.2.4'; }],
     ['tarball instead of ZIP', (pkg) => { pkg.sodapop.artifact.archive = pkg.sodapop.artifact.archive.replace('.zip', '.tar.gz'); }],
     ['archive digest', (pkg) => { pkg.sodapop.artifact.archive_sha256 = 'f'.repeat(64); }],
@@ -478,7 +478,7 @@ test('declared Windows npm metadata must match win32/x64 and the public ZIP/bina
 });
 
 test('development optionalDependencies are not the published npm platform set', async (t) => {
-  for (const names of [[], ['@sodapop/windows-amd64'], null]) {
+  for (const names of [[], ['@sodapop-sh/windows-amd64'], null]) {
     await t.test(JSON.stringify(names), async (t) => {
       const f = await releaseFixture(t, { npm: true, npmPlatforms: platforms });
       const source = await f.copySources();
@@ -524,8 +524,8 @@ test('missing npm launcher/platforms and a stale latest tag keep npm unavailable
   for (const name of ['missing launcher', 'partial native packages', 'stale latest']) {
     await t.test(name, async (t) => {
       const f = await releaseFixture(t, { npm: true, homebrew: true });
-      if (name === 'missing launcher') missing(f, `${registry}/@sodapop%2fcli/latest`);
-      if (name === 'partial native packages') missing(f, `${registry}/@sodapop%2flinux-arm64/${version}`);
+      if (name === 'missing launcher') missing(f, `${registry}/@sodapop-sh%2fcli/latest`);
+      if (name === 'partial native packages') missing(f, `${registry}/@sodapop-sh%2flinux-arm64/${version}`);
       if (name === 'stale latest') {
         const pkg = f.npm.get('cli');
         pkg.version = '1.2.2';
@@ -550,14 +550,14 @@ test('npm metadata rejects wrong identities, unsupported platforms, bad URLs, an
     ['deprecated package', (f) => { f.npm.get('cli').deprecated = 'do not install'; }],
     ['command name', (f) => { f.npm.get('cli').bin = { other: 'bin/sodapop.js' }; }],
     ['launcher runtime', (f) => { f.npm.get('cli').engines.node = '>=10'; }],
-    ['missing Unix package', (f) => { delete f.npm.get('cli').optionalDependencies['@sodapop/linux-arm64']; }],
-    ['undeclared Windows dependency', (f) => { f.npm.get('cli').optionalDependencies['@sodapop/windows-amd64'] = version; }],
-    ['range dependency', (f) => { f.npm.get('cli').optionalDependencies['@sodapop/linux-arm64'] = `^${version}`; }],
+    ['missing Unix package', (f) => { delete f.npm.get('cli').optionalDependencies['@sodapop-sh/linux-arm64']; }],
+    ['undeclared Windows dependency', (f) => { f.npm.get('cli').optionalDependencies['@sodapop-sh/windows-amd64'] = version; }],
+    ['range dependency', (f) => { f.npm.get('cli').optionalDependencies['@sodapop-sh/linux-arm64'] = `^${version}`; }],
     ['tarball host', (f) => { f.npm.get('cli').dist.tarball = 'https://example.test/cli.tgz'; }],
     ['tarball credentials', (f) => { f.npm.get('cli').dist.tarball += '?token=secret'; }],
     ['integrity', (f) => { f.npm.get('cli').dist.integrity = 'sha512-wrong'; }],
     ['newline integrity', (f) => { f.npm.get('cli').dist.integrity += '\n'; }],
-    ['native identity', (f) => { f.npm.get('darwin-arm64').name = '@sodapop/windows-amd64'; }],
+    ['native identity', (f) => { f.npm.get('darwin-arm64').name = '@sodapop-sh/windows-amd64'; }],
     ['native version', (f) => { f.npm.get('darwin-arm64').version = '1.2.4'; }],
     ['native OS', (f) => { f.npm.get('darwin-arm64').os = ['windows']; }],
     ['native CPU', (f) => { f.npm.get('darwin-amd64').cpu = ['amd64']; }],
@@ -652,10 +652,10 @@ test('network/auth/rate-limit failures never become unpublished or pre-release s
     ['release forbidden', `${api}/releases/latest`, 403, {}],
     ['GitHub rate limit', api, 429, {}],
     ['GitHub server error', api, 500, {}],
-    ['npm unauthorized', `${registry}/@sodapop%2fcli/latest`, 401, {}],
-    ['npm forbidden', `${registry}/@sodapop%2fcli/latest`, 403, {}],
-    ['npm rate limit', `${registry}/@sodapop%2fcli/latest`, 429, {}],
-    ['ambiguous npm absence', `${registry}/@sodapop%2fcli/latest`, 404, { error: 'Authentication required' }],
+    ['npm unauthorized', `${registry}/@sodapop-sh%2fcli/latest`, 401, {}],
+    ['npm forbidden', `${registry}/@sodapop-sh%2fcli/latest`, 403, {}],
+    ['npm rate limit', `${registry}/@sodapop-sh%2fcli/latest`, 429, {}],
+    ['ambiguous npm absence', `${registry}/@sodapop-sh%2fcli/latest`, 404, { error: 'Authentication required' }],
     ['tap server error', tapAPI, 503, {}],
     ['ambiguous formula absence', `${tapAPI}/contents/Formula/sodapop.rb`, 404, { message: 'Access denied' }],
   ]) {
@@ -772,7 +772,7 @@ test('source package and tap identity drift is rejected even when channels are d
       } else {
         const filename = path.join(source, `npm/packages/${name.startsWith('launcher') ? 'cli' : 'darwin-amd64'}/package.json`);
         const pkg = JSON.parse(await readFile(filename, 'utf8'));
-        if (name === 'launcher') pkg.optionalDependencies['@sodapop/windows-arm64'] = pkg.version;
+        if (name === 'launcher') pkg.optionalDependencies['@sodapop-sh/windows-arm64'] = pkg.version;
         else if (name === 'launcher joined keys') {
           pkg.optionalDependencies = { [Object.keys(pkg.optionalDependencies).sort().join('\n')]: pkg.version };
         }

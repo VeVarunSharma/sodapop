@@ -6,11 +6,11 @@ const { createHash } = require("node:crypto");
 const { spawn } = require("node:child_process");
 
 const TARGETS = Object.freeze({
-  "darwin-arm64": { package: "@sodapop/darwin-arm64", platform: "darwin/arm64", os: "darwin", cpu: "arm64", binary: "sodapop" },
-  "darwin-x64": { package: "@sodapop/darwin-amd64", platform: "darwin/amd64", os: "darwin", cpu: "x64", binary: "sodapop" },
-  "linux-arm64": { package: "@sodapop/linux-arm64", platform: "linux/arm64", os: "linux", cpu: "arm64", binary: "sodapop" },
-  "linux-x64": { package: "@sodapop/linux-amd64", platform: "linux/amd64", os: "linux", cpu: "x64", binary: "sodapop" },
-  "win32-x64": { package: "@sodapop/windows-amd64", platform: "windows/amd64", os: "win32", cpu: "x64", binary: "sodapop.exe" }
+  "darwin-arm64": { package: "@sodapop-sh/darwin-arm64", platform: "darwin/arm64", os: "darwin", cpu: "arm64", binary: "sodapop" },
+  "darwin-x64": { package: "@sodapop-sh/darwin-amd64", platform: "darwin/amd64", os: "darwin", cpu: "x64", binary: "sodapop" },
+  "linux-arm64": { package: "@sodapop-sh/linux-arm64", platform: "linux/arm64", os: "linux", cpu: "arm64", binary: "sodapop" },
+  "linux-x64": { package: "@sodapop-sh/linux-amd64", platform: "linux/amd64", os: "linux", cpu: "x64", binary: "sodapop" },
+  "win32-x64": { package: "@sodapop-sh/windows-amd64", platform: "windows/amd64", os: "win32", cpu: "x64", binary: "sodapop.exe" }
 });
 const PLATFORM_PACKAGES = Object.freeze(Object.fromEntries(Object.entries(TARGETS).map(([key, target]) => [key, target.package])));
 
@@ -61,7 +61,7 @@ function resolvePayload(options = {}) {
   const cli = JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"));
   const entries = cli.sodapop?.artifacts?.filter((artifact) => artifact.platform === target.platform);
   if (!entries || entries.length === 0 || !Object.hasOwn(cli.optionalDependencies || {}, target.package)) {
-    throw failure("SODAPOP_UNAVAILABLE_PLATFORM", `${target.platform} is not declared by @sodapop/cli@${cli.version}`);
+    throw failure("SODAPOP_UNAVAILABLE_PLATFORM", `${target.platform} is not declared by @sodapop-sh/cli@${cli.version}`);
   }
   if (entries.length !== 1) throw failure("SODAPOP_AMBIGUOUS_PLATFORM", `multiple payloads declared for ${target.platform}`);
   const artifact = entries[0];
@@ -75,11 +75,11 @@ function resolvePayload(options = {}) {
     metadataPath = require.resolve(`${target.package}/package.json`, { paths: [packageRoot] });
   } catch (error) {
     if (error.code !== "MODULE_NOT_FOUND") throw error;
-    throw failure("SODAPOP_MISSING_PAYLOAD", `native payload ${target.package}@${cli.version} is missing; reinstall @sodapop/cli with optional dependencies enabled`);
+    throw failure("SODAPOP_MISSING_PAYLOAD", `native payload ${target.package}@${cli.version} is missing; reinstall @sodapop-sh/cli with optional dependencies enabled`);
   }
   const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8"));
   if (metadata.version !== cli.version) {
-    throw failure("SODAPOP_VERSION_MISMATCH", `native payload version mismatch: @sodapop/cli is ${cli.version}, ${target.package} is ${metadata.version}; reinstall @sodapop/cli`);
+    throw failure("SODAPOP_VERSION_MISMATCH", `native payload version mismatch: @sodapop-sh/cli is ${cli.version}, ${target.package} is ${metadata.version}; reinstall @sodapop-sh/cli`);
   }
   const single = (value, expected) => Array.isArray(value) && value.length === 1 && value[0] === expected;
   const binding = metadata.sodapop;
@@ -100,7 +100,7 @@ function resolvePayload(options = {}) {
     throw failure("SODAPOP_MISSING_PAYLOAD", `${target.package}@${cli.version} does not contain executable bin/${target.binary}`);
   }
   if (hashFile(binary) !== artifact.binary_sha256) {
-    throw failure("SODAPOP_PAYLOAD_MISMATCH", `native payload binary hash mismatch for ${target.package}; reinstall @sodapop/cli`);
+    throw failure("SODAPOP_PAYLOAD_MISMATCH", `native payload binary hash mismatch for ${target.package}; reinstall @sodapop-sh/cli`);
   }
   return binary;
 }

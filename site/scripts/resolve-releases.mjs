@@ -6,7 +6,7 @@
  * - mode: "pre-release" (local, no write/network) or "release".
  * - repository: the canonical VeVarunSharma/sodapop identity, never an endpoint.
  * - releaseTag: null for public latest stable, or an exact stable vX.Y.Z.
- * - channels.npm.verify: opt in to checking @sodapop/cli and every package declared
+ * - channels.npm.verify: opt in to checking @sodapop-sh/cli and every package declared
  *   by its published sodapop manifest, including Windows x64 when declared.
  * - channels.homebrew.verify: opt in after setting repository to the confirmed
  *   public VeVarunSharma/homebrew-sodapop tap; formula must remain "sodapop".
@@ -357,7 +357,7 @@ function packageBinding(value, catalog, artifacts, plural) {
 }
 
 async function npmChannel(request, catalog, nodeRequirement) {
-  const bytes = await request(`${registry}/@sodapop%2fcli/latest`, 'Public npm launcher', jsonLimit, { missing: 'npm' });
+  const bytes = await request(`${registry}/@sodapop-sh%2fcli/latest`, 'Public npm launcher', jsonLimit, { missing: 'npm' });
   if (bytes === null) return;
   const launcher = json(bytes, 'Public npm launcher');
   const version = packageIdentity(launcher, releaseIdentities.npmPackage);
@@ -389,7 +389,7 @@ async function npmChannel(request, catalog, nodeRequirement) {
   }
   catalog.channels.npm = {
     status: 'published', command: installCommands.npm, version,
-    url: 'https://www.npmjs.com/package/@sodapop/cli', platforms: artifacts.map(({ platform }) => platform),
+    url: 'https://www.npmjs.com/package/@sodapop-sh/cli', platforms: artifacts.map(({ platform }) => platform),
   };
 }
 
