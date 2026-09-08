@@ -479,6 +479,11 @@ func (c *Copilot) openSession(ctx context.Context, meta Session, token string, r
 	if err == nil && resume {
 		history, err = runtime.GetEvents(ctx)
 	}
+	if err == nil {
+		session.mu.Lock()
+		err = session.bootstrapErr
+		session.mu.Unlock()
+	}
 	meta.UpdatedAt = c.deps.now().UTC()
 	if err == nil {
 		err = c.index.save(ctx, meta)
