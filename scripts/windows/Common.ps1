@@ -33,7 +33,8 @@ function Get-NewDirectoryPath([string] $Path) {
     if (Test-Path -LiteralPath $full) { throw "Output already exists: $full" }
     $parent = Get-Item -LiteralPath ([IO.Path]::GetDirectoryName($full)) -Force
     while ($null -ne $parent) {
-        if (-not $parent.PSIsContainer -or ($parent.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        if (-not ($parent.Attributes -band [IO.FileAttributes]::Directory) -or
+            ($parent.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
             throw "Output parent must be a real directory: $($parent.FullName)"
         }
         $parent = $parent.Parent

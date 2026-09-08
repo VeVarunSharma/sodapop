@@ -25,4 +25,18 @@ func TestPrivateDirectoryAndFile(t *testing.T) {
 	if err != nil || closeErr != nil || !private {
 		t.Fatalf("private file validation = %t, %v, close=%v", private, err, closeErr)
 	}
+
+	renamed := filepath.Join(directory, "renamed")
+	if err := os.Rename(path, renamed); err != nil {
+		t.Fatal(err)
+	}
+	file, err = os.Open(renamed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	private, err = IsPrivateRegularFile(file)
+	closeErr = file.Close()
+	if err != nil || closeErr != nil || !private {
+		t.Fatalf("renamed private file validation = %t, %v, close=%v", private, err, closeErr)
+	}
 }

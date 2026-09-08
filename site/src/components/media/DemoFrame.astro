@@ -11,9 +11,10 @@ interface Props {
 const { name, title, caption = 'A real, local UI recording. Signed out; no AI responses are simulated.', eager = false } = Astro.props;
 const width = name === 'overview' ? 1440 : 1040;
 const height = name === 'overview' ? 810 : 650;
+const poster = withBase(`assets/demos/${name}.webp`);
 ---
 <figure class:list={['demo-figure', { 'overview-frame': name === 'overview' }]}>
-  <sodapop-demo data-animation={withBase(`assets/demos/${name}.gif`)} data-poster={withBase(`assets/demos/${name}.png`)} data-title={title}>
+  <sodapop-demo data-animation={withBase(`assets/demos/${name}.gif`)} data-poster={poster} data-title={title}>
     <div class="demo-toolbar">
       <span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
       <span class="demo-title">{title}</span>
@@ -23,7 +24,7 @@ const height = name === 'overview' ? 810 : 650;
         <span data-demo-label>Play demo</span>
       </button>
     </div>
-    <img src={withBase(`assets/demos/${name}.png`)} alt={`${title}: the Sodapop terminal interface`} width={width} height={height} loading={eager ? 'eager' : 'lazy'} decoding="async" />
+    <img src={poster} alt={`${title}: the Sodapop terminal interface`} width={width} height={height} loading={eager ? 'eager' : 'lazy'} decoding="async" />
     <span class="sr-only" data-demo-status role="status"></span>
   </sodapop-demo>
   <figcaption>{caption}</figcaption>

@@ -18,8 +18,8 @@ const (
 	startupParticles  = 20
 	startupCanX       = 1
 	startupCanY       = 3
-	startupSodapopX      = startupCanX + mascotOpeningX
-	startupSodapopY      = startupCanY + mascotOpeningY
+	startupSodapopX   = startupCanX + mascotOpeningX
+	startupSodapopY   = startupCanY + mascotOpeningY
 )
 
 type startupState uint8

@@ -23,13 +23,14 @@ const brandFiles = [
   'sodapop-og.png',
   'sodapop-oauth.png',
 ];
+const demoNames = ['overview', 'commands', 'themes', 'diff'];
 
 export const publicAssets = Object.freeze([
   ...brandFiles.map((filename) => ({
     source: `images/${filename}`,
     destination: `assets/brand/${filename}`,
   })),
-  ...['overview', 'commands', 'themes', 'diff'].flatMap((name) =>
+  ...demoNames.flatMap((name) =>
     ['gif', 'png'].map((extension) => ({
       source: `docs/assets/demos/${name}.${extension}`,
       destination: `assets/demos/${name}.${extension}`,
@@ -72,9 +73,13 @@ async function imageDimensions(bytes, source) {
 }
 
 /**
- * Stage only the approved original artwork and recordings; no image conversion.
+ * Stage the approved original artwork and recordings plus lossless WebP demo posters.
  * @param {{repositoryRoot?: string, siteRoot?: string, base?: string}} options
- * @returns {Promise<{base: string, assets: Array<{source: string, destination: string, url: string, width: number, height: number, bytes: number, format: string}>}>}
+ * @returns {Promise<{
+ *   base: string,
+ *   assets: Array<{source: string, destination: string, url: string, width: number, height: number, bytes: number, format: string}>,
+ *   posters: Array<{source: string, destination: string, url: string, width: number, height: number, bytes: number, format: string}>
+ * }>}
  */
 export async function prepareAssets(options = {}) {
   const repositoryRoot = options.repositoryRoot ?? defaultRepositoryRoot;
@@ -82,6 +87,7 @@ export async function prepareAssets(options = {}) {
   const base = normalizeBase(options.base ?? siteConfiguration().base);
   const groups = { brand: new Map(), demos: new Map() };
   const assets = [];
+  const posters = [];
 
   for (const asset of publicAssets) {
     const bytes = await readRepositoryFile(repositoryRoot, asset.source);
@@ -89,11 +95,26 @@ export async function prepareAssets(options = {}) {
     const [, group, filename] = asset.destination.split('/');
     groups[group].set(filename, bytes);
     assets.push({ ...asset, url: `${base}${asset.destination}`, ...dimensions, bytes: bytes.length });
+    if (group === 'demos' && dimensions.format === 'png') {
+      const posterFilename = `${path.basename(filename, '.png')}.webp`;
+      const posterBytes = await sharp(bytes).webp({ lossless: true, effort: 6 }).toBuffer();
+      const destination = `assets/demos/${posterFilename}`;
+      groups.demos.set(posterFilename, posterBytes);
+      posters.push({
+        source: asset.source,
+        destination,
+        url: `${base}${destination}`,
+        width: dimensions.width,
+        height: dimensions.height,
+        bytes: posterBytes.length,
+        format: 'webp',
+      });
+    }
   }
   for (const [group, files] of Object.entries(groups)) {
     await replaceOwnedDirectory(siteRoot, `public/assets/${group}`, files);
   }
-  return { base, assets };
+  return { base, assets, posters };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

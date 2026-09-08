@@ -564,6 +564,7 @@ func TestNativeMSILifecycleSafetyGates(t *testing.T) {
 			t.Fatalf("missing disposable-runner safety gate: %s", required)
 		}
 	}
+
 	script := string(readFixture(t, "Test-Native.ps1"))
 	consent := strings.Index(script, "if ($MsiLifecycle) { Assert-DisposableRunner }")
 	work := strings.Index(script, "$work = Get-NewDirectoryPath")
@@ -583,5 +584,33 @@ func TestNativeMSILifecycleSafetyGates(t *testing.T) {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing native safety contract: %s", required)
 		}
+	}
+}
+
+func TestGetNewDirectoryPathTraversesAncestors(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("PowerShell filesystem behavior is Windows-specific")
+	}
+	pwsh, err := exec.LookPath("pwsh")
+	if err != nil {
+		t.Skip("pwsh is not installed")
+	}
+	common, err := filepath.Abs("Common.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join(t.TempDir(), "one", "two")
+	if err := os.MkdirAll(parent, 0755); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(parent, "new-output")
+	quote := func(value string) string {
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	}
+	script := ". " + quote(common) + "; $actual = Get-NewDirectoryPath " + quote(output) +
+		"; if ($actual -cne [IO.Path]::GetFullPath(" + quote(output) + ")) { throw 'Unexpected output path.' }"
+	command := exec.Command(pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
+	if result, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("Get-NewDirectoryPath failed: %v\n%s", err, result)
 	}
 }

@@ -49,7 +49,7 @@ test('recordings play only on request and stop back on their posters', async ({ 
   await frame.getByRole('button', { name: 'Play A peek inside Sodapop demo' }).click();
   await expect(frame.locator('img')).toHaveAttribute('src', /\.gif$/);
   await frame.getByRole('button', { name: 'Stop A peek inside Sodapop demo' }).click();
-  await expect(frame.locator('img')).toHaveAttribute('src', /\.png$/);
+  await expect(frame.locator('img')).toHaveAttribute('src', /\.webp$/);
   await expect(frame.getByRole('button')).toHaveAttribute('aria-pressed', 'false');
 });
 

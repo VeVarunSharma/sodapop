@@ -49,3 +49,38 @@ func TestWindowsPrivacyRejectsAccessForEveryone(t *testing.T) {
 		t.Fatal("file readable by Everyone was accepted as private")
 	}
 }
+
+func TestWindowsProtectFileSetsCurrentUserOwner(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ProtectFile(file); err != nil {
+		file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	descriptor, err := windows.GetNamedSecurityInfo(
+		path,
+		windows.SE_FILE_OBJECT,
+		windows.OWNER_SECURITY_INFORMATION,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, _, err := descriptor.Owner()
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, _, _, err := privatePrincipals()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if owner == nil || !owner.Equals(user) {
+		t.Fatal("protected file is not owned by the current user")
+	}
+}
