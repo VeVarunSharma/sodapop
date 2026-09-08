@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -51,7 +52,11 @@ func cliRelease(t *testing.T, platform string) (string, string) {
 }
 
 func TestCLIEndToEnd(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "windows/amd64"} {
+	platforms := []string{"linux/amd64", "windows/amd64"}
+	if runtime.GOOS == "windows" {
+		platforms = []string{"windows/amd64"}
+	}
+	for _, platform := range platforms {
 		t.Run(platform, func(t *testing.T) {
 			dir, manifest := cliRelease(t, platform)
 			for _, selector := range []string{"--platform", "--platforms"} {
@@ -115,6 +120,9 @@ func TestCLIRejectsInvalidArgumentsBeforeOutput(t *testing.T) {
 }
 
 func TestCLIFullReleaseDefaultSet(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix executable permission fixtures are covered on Unix runners; Windows covers the native ZIP path")
+	}
 	dir, firstManifest := cliRelease(t, "linux/amd64")
 	if err := os.Remove(firstManifest); err != nil {
 		t.Fatal(err)
