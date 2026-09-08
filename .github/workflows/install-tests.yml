@@ -1,0 +1,179 @@
+name: Verify packaged installations
+
+on:
+  workflow_call:
+    inputs:
+      artifact_pattern:
+        description: Native archive artifacts from this workflow run
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      commit:
+        type: string
+        required: true
+      previous_artifact_pattern:
+        type: string
+        default: ''
+      previous_version:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  SODAPOP_LIVE_QUALIFY: '0'
+  SODAPOP_RUNTIME_SMOKE: '0'
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.artifact_pattern }}
+          path: install-inputs/current
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: inputs.previous_artifact_pattern != ''
+        with:
+          pattern: ${{ inputs.previous_artifact_pattern }}
+          path: install-inputs/previous
+          merge-multiple: true
+      - name: Verify complete native release inputs
+        env:
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.commit }}
+          PREVIOUS_VERSION: ${{ inputs.previous_version }}
+          PREVIOUS_PATTERN: ${{ inputs.previous_artifact_pattern }}
+        shell: bash
+        run: |
+          if [[ -n "$PREVIOUS_VERSION" && -z "$PREVIOUS_PATTERN" || -z "$PREVIOUS_VERSION" && -n "$PREVIOUS_PATTERN" ]]; then
+            printf 'Previous version and artifact pattern must be supplied together.\n' >&2
+            exit 1
+          fi
+          go build -o "$RUNNER_TEMP/releasectl" ./scripts/releasectl
+          "$RUNNER_TEMP/releasectl" manifest --dir install-inputs/current --version "$VERSION" --commit "$COMMIT"
+          "$RUNNER_TEMP/releasectl" verify --dir install-inputs/current --manifest "install-inputs/current/sodapop-$VERSION-manifest.json"
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            "$RUNNER_TEMP/releasectl" manifest --dir install-inputs/previous --version "$PREVIOUS_VERSION" --commit "$COMMIT"
+            "$RUNNER_TEMP/releasectl" verify --dir install-inputs/previous --manifest "install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-install-inputs
+          path: install-inputs/
+          if-no-files-found: error
+          retention-days: 7
+
+  native:
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin/arm64
+          - runner: macos-15-intel
+            target: darwin/amd64
+          - runner: ubuntu-24.04
+            target: linux/amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ inputs.version }}
+      PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      SODAPOP_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-install-inputs
+          path: install-inputs
+      - name: Build native installation verifier
+        shell: bash
+        run: |
+          helper="$RUNNER_TEMP/releasectl$(go env GOEXE)"
+          go build -o "$helper" ./scripts/releasectl
+          printf 'SODAPOP_RELEASECTL=%s\n' "$helper" >> "$GITHUB_ENV"
+      - name: Execute archived and copied portable commands
+        shell: bash
+        run: |
+          go run ./scripts/installcheck \
+            --release-dir install-inputs/current \
+            --manifest "install-inputs/current/sodapop-$VERSION-manifest.json" \
+            --tool "$SODAPOP_RELEASECTL"
+      - name: Exercise real npm installation
+        shell: bash
+        run: |
+          args=(--release-dir "$GITHUB_WORKSPACE/install-inputs/current"
+                --manifest "$GITHUB_WORKSPACE/install-inputs/current/sodapop-$VERSION-manifest.json")
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            args+=(--previous-release-dir "$GITHUB_WORKSPACE/install-inputs/previous"
+                   --previous-manifest "$GITHUB_WORKSPACE/install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json")
+          fi
+          npm run test:install --prefix npm -- "${args[@]}"
+      - name: Set up Homebrew on the disposable native runner
+        if: runner.os != 'Windows'
+        uses: Homebrew/actions/setup-homebrew@f8d4222eb633e65c2a0157383cf80861fc7fae7f
+        with:
+          core: false
+          cask: false
+          stable: true
+          brew-gh-api-token: ''
+      - name: Exercise real Homebrew installation and removal
+        if: runner.os != 'Windows'
+        env:
+          SODAPOP_HOMEBREW_ALLOW_ORDINARY_PREFIX: '1'
+        shell: bash
+        run: |
+          args=(--release-dir "$GITHUB_WORKSPACE/install-inputs/current"
+                --manifest "$GITHUB_WORKSPACE/install-inputs/current/sodapop-$VERSION-manifest.json")
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            args+=(--previous-release-dir "$GITHUB_WORKSPACE/install-inputs/previous"
+                   --previous-manifest "$GITHUB_WORKSPACE/install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json")
+          fi
+          bash scripts/test-homebrew-install.sh "${args[@]}"
+      - name: Exercise the Windows portable installer and generate channel manifests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          go build -o "$env:RUNNER_TEMP/windowsctl.exe" ./scripts/windows
+          if ($LASTEXITCODE -ne 0) { throw 'Could not build Windows installation tools.' }
+          $env:SODAPOP_WINDOWSCTL = "$env:RUNNER_TEMP/windowsctl.exe"
+          $release = Join-Path $env:GITHUB_WORKSPACE 'install-inputs/current'
+          $manifest = Join-Path $release "sodapop-$env:VERSION-manifest.json"
+          & $env:SODAPOP_WINDOWSCTL manifests --dir $release --manifest $manifest --output "$env:RUNNER_TEMP/windows-channels"
+          if ($LASTEXITCODE -ne 0) { throw 'Windows manifest generation failed.' }
+          & ./scripts/windows/Test-Native.ps1 -ReleaseDir $release -Manifest $manifest -OutputDir "$env:RUNNER_TEMP/windows-portable-evidence"
+      - name: Retain Windows channel definitions and portable evidence
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-channel-evidence
+          path: |
+            ${{ runner.temp }}/windows-channels
+            ${{ runner.temp }}/windows-portable-evidence/native-evidence.json
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,61 @@
+name: Verify public native downloads
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Published version without the v prefix
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  SODAPOP_LIVE_QUALIFY: '0'
+  SODAPOP_RUNTIME_SMOKE: '0'
+
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin/arm64
+          - runner: macos-15-intel
+            target: darwin/amd64
+          - runner: ubuntu-24.04
+            target: linux/amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+          - runner: windows-2025
+            target: windows/amd64
+    runs-on: ${{ matrix.runner }}
+    env:
+      INPUT_VERSION: ${{ inputs.version }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      SODAPOP_TARGET: ${{ matrix.target }}
+      SODAPOP_RELEASE_REPOSITORY: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build native verification tools
+        shell: bash
+        run: |
+          mkdir -p bin
+          suffix="$(go env GOEXE)"
+          go build -o "bin/releasectl$suffix" ./scripts/releasectl
+          go build -o "bin/installcheck$suffix" ./scripts/installcheck
+      - name: Download without authentication and exercise installed commands
+        shell: bash
+        run: |
+          version="${INPUT_VERSION:-${RELEASE_TAG#v}}"
+          bash scripts/test-public-download.sh "$version"

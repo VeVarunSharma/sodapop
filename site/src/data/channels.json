@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "mode": "pre-release",
+  "repository": "VeVarunSharma/sodapop",
+  "releaseTag": null,
+  "channels": {
+    "npm": {
+      "verify": false,
+      "package": "@sodapop/cli"
+    },
+    "homebrew": {
+      "verify": false,
+      "repository": null,
+      "formula": "sodapop"
+    }
+  }
+}

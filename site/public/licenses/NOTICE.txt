@@ -1,0 +1,36 @@
+Sodapop website credits
+
+Sodapop's wordmark, mascot, and recorded application demonstrations are original
+project assets. They are not Charm, GitHub, or Copilot branding.
+
+Selected shadcn/ui components, adapted to Sodapop:
+https://ui.shadcn.com
+License: shadcn.txt
+
+Radix UI accessible primitives:
+https://www.radix-ui.com
+License: radix.txt
+
+Lucide icons:
+https://lucide.dev
+License: lucide.txt
+
+Nunito Sans variable font, self-hosted through Fontsource:
+https://fontsource.org/fonts/nunito-sans
+License: nunito-sans.txt
+
+React and React DOM:
+https://react.dev
+Licenses: react.txt, react-dom.txt
+
+Astro and Starlight:
+https://astro.build
+https://starlight.astro.build
+Licenses: astro.txt, starlight.txt
+
+Tailwind CSS:
+https://tailwindcss.com
+License: tailwindcss.txt
+
+The application's bundled Copilot runtime has separate terms; see the project's
+THIRD_PARTY_NOTICES.md. This website does not contain or run that runtime.

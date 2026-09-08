@@ -1,0 +1,65 @@
+---
+import { ArrowUpRight, Pause, Play } from 'lucide-react';
+import { withBase } from '../../lib/urls';
+---
+<footer class="site-footer">
+  <div class="footer-top">
+    <div>
+      <a class="footer-brand" href={withBase()}>
+        <img src={withBase('assets/brand/sodapop-mascot.webp')} width="56" height="56" alt="" loading="lazy" />
+        <span>sodapop<span class="brand-period">.</span></span>
+      </a>
+      <p>Your terminal, with a little more pop.</p>
+    </div>
+    <nav aria-label="Footer navigation">
+      <a href={withBase('download/')}>Get Sodapop</a>
+      <a href={withBase('docs/')}>Documentation</a>
+      <a href="https://github.com/VeVarunSharma/sodapop">Source <ArrowUpRight size={14} aria-hidden="true" /></a>
+      <a href="https://github.com/VeVarunSharma/sodapop/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a>
+      <a href={withBase('licenses/NOTICE.txt')}>Website credits</a>
+    </nav>
+  </div>
+  <div class="footer-bottom">
+    <p>An independent app powered by the GitHub Copilot SDK.<br />Sodapop code is MIT licensed. The bundled runtime has separate terms.</p>
+    <button class="motion-toggle utility-button" type="button" aria-pressed="false">
+      <Pause className="pause-icon" size={15} aria-hidden="true" />
+      <Play className="play-icon" size={15} aria-hidden="true" />
+      <span data-motion-label>Pause bubbles</span>
+    </button>
+  </div>
+  <span class="sr-only" data-motion-status role="status"></span>
+</footer>
+<script>
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  function updateMotion(enabled: boolean) {
+    document.documentElement.dataset.motion = enabled ? 'on' : 'off';
+    document.querySelectorAll<HTMLButtonElement>('.motion-toggle').forEach((button) => {
+      button.setAttribute('aria-pressed', String(!enabled));
+      const label = button.querySelector('[data-motion-label]');
+      if (label) label.textContent = enabled ? 'Pause bubbles' : 'Bubbles paused';
+    });
+    window.dispatchEvent(new CustomEvent('sodapop:motionchange', { detail: { enabled } }));
+  }
+  updateMotion(document.documentElement.dataset.motion === 'on' && !reduced.matches);
+  reduced.addEventListener('change', (event) => {
+    if (event.matches) updateMotion(false);
+  });
+  document.querySelectorAll<HTMLButtonElement>('.motion-toggle').forEach((button) => {
+    button.addEventListener('click', () => {
+      const enabled = document.documentElement.dataset.motion !== 'on';
+      const status = document.querySelector('[data-motion-status]');
+      if (enabled && reduced.matches) {
+        if (status) status.textContent = 'Your reduced-motion setting is keeping decorative bubbles still.';
+        return;
+      }
+      updateMotion(enabled);
+      try {
+        localStorage.setItem('SODAPOP_SITE_MOTION', enabled ? 'on' : 'off');
+        if (status) status.textContent = enabled ? 'Decorative motion enabled.' : 'Decorative motion paused.';
+      } catch (error) {
+        if (!(error instanceof DOMException)) throw error;
+        if (status) status.textContent = 'Motion changed for this page. Your browser could not save the preference.';
+      }
+    });
+  });
+</script>

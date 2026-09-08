@@ -1,0 +1,93 @@
+name: Native installation candidates
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'scripts/**'
+      - 'npm/**'
+      - 'packaging/**'
+      - 'Makefile'
+
+permissions:
+  contents: read
+
+env:
+  SODAPOP_LIVE_QUALIFY: '0'
+  SODAPOP_RUNTIME_SMOKE: '0'
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin/arm64
+            artifact: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin/amd64
+            artifact: darwin-amd64
+          - runner: ubuntu-24.04
+            target: linux/amd64
+            artifact: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+            artifact: linux-arm64
+          - runner: windows-2025
+            target: windows/amd64
+            artifact: windows-amd64
+    runs-on: ${{ matrix.runner }}
+    env:
+      SODAPOP_TARGET: ${{ matrix.target }}
+      # Deliberately non-production: these artifacts only exercise local installs.
+      SODAPOP_GITHUB_CLIENT_ID: fixture.public-client
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build two real candidate versions for upgrade tests
+        shell: bash
+        run: |
+          mkdir -p candidates/previous candidates/current
+          for revision in 1 2; do
+            version="0.0.${revision}"
+            SODAPOP_VERSION="$version" bash scripts/package.sh
+            channel=previous
+            if [[ "$revision" == 2 ]]; then channel=current; fi
+            name="sodapop-${version}-${SODAPOP_TARGET%/*}-${SODAPOP_TARGET#*/}"
+            extension=tar.gz
+            if [[ "${SODAPOP_TARGET%/*}" == windows ]]; then extension=zip; fi
+            cp "dist/$name.$extension" "dist/$name.$extension.sha256" "candidates/$channel/"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sodapop-current-${{ matrix.artifact }}
+          path: candidates/current/
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sodapop-previous-${{ matrix.artifact }}
+          path: candidates/previous/
+          if-no-files-found: error
+          retention-days: 7
+
+  installations:
+    needs: package
+    uses: ./.github/workflows/install-tests.yml
+    with:
+      artifact_pattern: sodapop-current-*
+      version: 0.0.2
+      previous_artifact_pattern: sodapop-previous-*
+      previous_version: 0.0.1
+      commit: ${{ github.sha }}

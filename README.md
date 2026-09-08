@@ -1,8 +1,11 @@
 # Sodapop
 
 <p align="center">
-  <a href="https://sodapop.sh">
-    <img src="images/sodapop-banner.png" width="1000" alt="Sodapop: your terminal, with a little more pop. A smiling pink-and-purple soda-can mascot waves beside the Sodapop wordmark." />
+  <a href="images/sodapop-title.png">
+    <picture>
+      <source media="(prefers-reduced-motion: reduce)" srcset="images/sodapop-title.png" />
+      <img src="images/sodapop-title.gif" width="640" alt="Sodapop's pink-to-purple title, neon carbonation, and smiling soda-can mascot. Open for a still image." />
+    </picture>
   </a>
 </p>
 
@@ -22,7 +25,7 @@ The welcome panel introduces Sodapop's happy soda-can mascot: it lifts its pull 
 
 ## Build and run
 
-Development requires Go 1.27.1 or later, Git, and network access to fetch the pinned dependencies and runtime. The supported targets are macOS (`darwin/arm64`, `darwin/amd64`) and glibc-based Linux (`linux/arm64`, `linux/amd64`).
+Development requires Go 1.27.1 or later, Git, and network access to fetch the pinned dependencies and runtime. Node.js 18 or later is also needed for npm distribution checks and package generation. The supported targets are macOS (`darwin/arm64`, `darwin/amd64`), glibc-based Linux (`linux/arm64`, `linux/amd64`), and Windows x64 (`windows/amd64`).
 
 ```sh
 make build
@@ -30,6 +33,8 @@ make start
 ```
 
 The build downloads the explicitly pinned Copilot runtime, verifies the upstream asset checksums, and embeds it. End users of the resulting executable do not need Go, Node.js, or an existing Copilot installation.
+
+On Windows x64, run `bash scripts/build.sh` from Git Bash and launch `bin/sodapop.exe`. Windows release packaging likewise uses `bash scripts/package.sh`; `make install` remains the Unix local-install helper.
 
 `make start` rebuilds and launches Sodapop; `make run` is an alias. Both use `SODAPOP_OUTPUT` when set, otherwise `bin/sodapop`. Run `make help` to list the available development commands. For local OAuth configuration, copy `.sodapop.env.example` to `.sodapop.env` and set only `SODAPOP_GITHUB_CLIENT_ID` to the project's existing public GitHub OAuth Client ID. The ignored `.sodapop.env` file is loaded automatically by the Makefile, not by direct script invocations or the installed executable.
 
@@ -43,6 +48,35 @@ sodapop
 
 `SODAPOP_INSTALL_DIR` overrides the installation directory. Relative paths resolve from the repository root; the installer prints an absolute directory for PATH setup. Installation does not edit your shell profile.
 
+## Install a published release
+
+Once the owned tap and npm scope are published, the target package-manager
+commands are:
+
+```sh
+# Homebrew tap (macOS and Linux)
+brew install VeVarunSharma/sodapop/sodapop
+
+# npm launcher (macOS, glibc-based Linux, and Windows x64)
+npm install --global @sodapop/cli
+
+# Windows x64: download the matching .zip from the GitHub Release,
+# verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.
+```
+
+The release workflow produces the exact npm packages and Homebrew formula
+needed for those channels; publishing the external tap and npm scope requires
+their ownership and registry configuration. Direct archives remain the
+fallback for Windows and other environments. Package-manager installs do not
+require Go, Node.js (except for the npm launcher), or a separate Copilot
+installation. The exact asset, checksum, manifest, and installed-command
+checks are defined in
+[distribution testing](docs/distribution.md). Windows MSI, WinGet, and Scoop
+publication have additional native installation and ownership gates; generated
+installer metadata alone does not mean a public channel is available.
+See [Windows delivery](packaging/windows/README.md) for verified ZIP extraction,
+per-user MSI recipes, and WinGet/Scoop manifests.
+
 ### Native sign-in prerequisite
 
 Sodapop uses its **own registered GitHub OAuth client**, with device flow enabled. Configure its **public Client ID** at launch:
@@ -54,7 +88,7 @@ sodapop
 
 A distributor can set the same variable at build time to bake the public ID into the executable. **Never supply a client secret or access token in this variable.** Do not copy another application's client ID.
 
-Sign-in stays inside Sodapop: it displays a verification code/link and waits while you authorize in the browser. Sodapop stores credentials in the macOS Keychain or Linux Secret Service. Session-only sign-in is an explicit alternative when secure persistence is unavailable; there is no plaintext fallback.
+Sign-in stays inside Sodapop: it displays a verification code/link and waits while you authorize in the browser. Sodapop stores credentials in the macOS Keychain, Linux Secret Service, or Windows Credential Manager. Session-only sign-in is an explicit alternative when secure persistence is unavailable; there is no plaintext fallback.
 
 **Current release gate:** a Sodapop-owned client ID and a successful real Copilot entitlement/session check are required before native sign-in can be considered qualified. Without a client ID, the interface and local commands remain available, but the application does not pretend to be connected. See [authentication setup](docs/authentication.md).
 
@@ -143,15 +177,20 @@ sodapop --check-runtime
 
 ```sh
 make test
+make distribution-test
 make coverage
 make check
 make runtime-smoke
-SODAPOP_TARGET=linux/amd64 SODAPOP_VERSION=dev make package
+SODAPOP_TARGET=linux/amd64 SODAPOP_VERSION=0.0.2 make package
 ```
+
+Windows builds use `bin/sodapop.exe` by default. Cross-compilation checks build tags and packaging, but Windows ACL enforcement, session locking, Credential Manager access, and the bundled runtime handshake must run on a native Windows x64 runner.
 
 Normal tests are credential-free. `make coverage` enforces both the committed total statement-coverage baseline and package floors for `internal/app`, `internal/engine`, and handwritten `internal/runtimebundle` code. Generated embedded-runtime sources are excluded from the runtime package floor but remain compiled and covered by native smoke checks. `make check` adds race testing and vet. Feature, bug-fix, and observable behavior changes should add or update focused tests in the same change. If the full suite genuinely raises coverage, run `make coverage-baseline` and review the baseline increase; the command refuses to keep or lower the existing value.
 
 `make demos` regenerates the README GIFs and PNG alternatives using a pinned VHS recorder and an isolated, signed-out instance of the real UI. Use `make demos SODAPOP_DEMO=themes` to regenerate one clip. See the [recording guide](docs/vhs/README.md) for dependencies, fixture isolation, and tape editing.
+
+`make brand` regenerates the animated title and its static alternative from the existing wordmark and mascot. This separate artwork workflow uses Pillow, not VHS or a live AI session. See [animated branding](docs/branding.md).
 
 `make runtime-smoke` requires `make bundle` first. The release-candidate workflow runs it on every supported native target. A native-runtime handshake or cross-compilation is not a substitute for real OAuth/Copilot testing on a supported platform.
 
@@ -165,9 +204,40 @@ This opts in to normal Copilot usage and a disposable fixture workspace; it is n
 
 `SODAPOP_TARGET`, `SODAPOP_OUTPUT`, and `SODAPOP_VERSION` control builds. The version defaults to `dev`; the output defaults to `bin/sodapop` and is also used by `make start`, `make run`, and `make install`. Packaging selects its own output in fresh temporary staging, leaving existing files in `dist/` out of the archive.
 
-Candidate archives are named `dist/sodapop-<version>-<goos>-<goarch>.tar.gz`, with a matching `.tar.gz.sha256` file and a same-named top-level archive directory containing `sodapop`. Verify checksums from `dist/` using `shasum -a 256 -c <archive>.sha256` on macOS or `sha256sum -c <archive>.sha256` on Linux. Archives include the runtime, documentation, MIT license, and third-party notices; environment files and unrelated staging content are excluded. Temporary staging is removed when packaging finishes.
+Candidate archives are named `dist/sodapop-<version>-<goos>-<goarch>.tar.gz`
+on macOS/Linux and `.zip` on Windows. Each has a matching `.sha256` sidecar and
+a same-named top-level directory containing `sodapop` or `sodapop.exe`.
+The release manifest binds the version, commit, SDK/runtime pins, archive hash,
+and executable hash. Archives retain documentation and all required license
+notices; environment files and unrelated staging content are excluded.
 
-The release-candidate workflow takes the public Client ID from the repository Actions variable `SODAPOP_GITHUB_CLIENT_ID`. Keep the existing client ID and OAuth grants; this workflow builds candidate artifacts without publishing a GitHub release. Sodapop's original code is licensed under [MIT](LICENSE); the bundled Copilot runtime retains its separate terms.
+An owned Homebrew tap can generate its formula from the checksums attached to an exact tagged release; the template and stale-formula check are documented in [Homebrew tap packaging](packaging/homebrew/README.md). This repository does not claim or configure `homebrew-core` distribution.
+
+The tagged release workflow takes the public Client ID from the repository
+Actions variable `SODAPOP_GITHUB_CLIENT_ID`. It exercises the archived commands
+and package-manager installations on native runners before preparing a draft
+release and exact-version channel packages. It does not bypass signing,
+notarization, registry ownership, or owner approval for publication.
+The separate native-candidate workflow uses explicit test-only versions and a
+fixture client ID for installation mechanics, never real sign-in or publication.
+Keep the existing client ID and OAuth grants; Sodapop's original code is licensed
+under [MIT](LICENSE), while the bundled Copilot runtime retains its separate terms.
+
+For a local native archive with a generated manifest:
+
+```sh
+make native-install-test SODAPOP_VERSION=0.0.2 SODAPOP_RELEASE_DIR=dist
+```
+
+After a release is actually public, exercise its unauthenticated download:
+
+```sh
+make public-download-test SODAPOP_VERSION=0.0.2
+```
+
+These commands verify and run the installed executable without an ambient
+Copilot installation or sign-in. They fail when an asset or prerequisite is
+missing; a fixture suite passing is not substituted for a native installation.
 
 ## Brand assets
 
@@ -177,15 +247,32 @@ Sodapop's visual identity pairs its smiling soda-can mascot and silver pull tab 
 |---|---|
 | OAuth application logo | [512 x 512 PNG](images/sodapop-oauth.png); badge background `#09090B` |
 | Repository social preview | [1280 x 640 PNG](images/sodapop-repo-social.png) |
-| README and wide banners | [PNG](images/sodapop-banner.png) or [SVG](images/sodapop-banner.svg) |
+| Animated README title | [GIF](images/sodapop-title.gif) or [static PNG](images/sodapop-title.png) |
+| Static wide banners | [PNG](images/sodapop-banner.png) or [SVG](images/sodapop-banner.svg) |
 | Main brand image | [PNG](images/sodapop-main.png) or [SVG](images/sodapop-main.svg) |
 | Transparent website mascot | [SVG](images/sodapop-mascot.svg), [PNG](images/sodapop-mascot.png), or [WebP](images/sodapop-mascot.webp) |
 | Website logo | [For dark backgrounds](images/sodapop-lockup-on-dark.svg) or [for light backgrounds](images/sodapop-lockup-on-light.svg) |
 
 The [images directory](images/) also includes browser icons, a landing-page social card, and editable vector masters. Open `images/index.html` locally for the visual gallery and usage guidance.
 
+## Website development
+
+The landing page and documentation hub live in the private `site/` package,
+independently of the Go application and CLI installer packages:
+
+```sh
+npm --prefix site ci
+npm --prefix site run dev
+```
+
+The website reuses selected documentation and artwork; it does not publish the
+checkout or rebuild the bundled Copilot runtime. Its Pages workflow keeps
+pre-release availability explicit and deploys only `site/dist/`. See the
+[website development guide](https://github.com/VeVarunSharma/sodapop/blob/main/site/README.md)
+for content, release metadata, and deployment configuration.
+
 ## Boundaries
 
-The first release focuses on macOS/Linux local coding. Windows, BYOK, explicit MCP/skills/plugin management, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
+The first release supports macOS, glibc-based Linux, and Windows x64 local coding. Windows ARM64, BYOK, explicit MCP/skills/plugin management, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
 
 Sodapop is an independent application, not the official GitHub Copilot CLI. See [third-party notices](THIRD_PARTY_NOTICES.md).

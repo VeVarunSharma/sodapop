@@ -1,0 +1,49 @@
+---
+import { Sun, Moon, ArrowUpRight } from 'lucide-react';
+import MobileMenu from './MobileMenu';
+import { withBase } from '../../lib/urls';
+---
+<header class="site-header">
+  <a class="brand-link" href={withBase()} aria-label="Sodapop home">
+    <img class="logo-light" src={withBase('assets/brand/sodapop-lockup-on-light.svg')} width="176" height="44" alt="Sodapop" />
+    <img class="logo-dark" src={withBase('assets/brand/sodapop-lockup-on-dark.svg')} width="176" height="44" alt="Sodapop" />
+  </a>
+  <nav class="desktop-nav" aria-label="Main navigation">
+    <a href={`${withBase()}#features`}>The good stuff</a>
+    <a href={withBase('docs/')}>Docs</a>
+    <a href="https://github.com/VeVarunSharma/sodapop">GitHub <ArrowUpRight size={14} aria-hidden="true" /></a>
+  </nav>
+  <div class="header-actions">
+    <button class="theme-toggle icon-button" type="button" aria-label="Switch color theme">
+      <Sun className="sun-icon" size={19} aria-hidden="true" />
+      <Moon className="moon-icon" size={19} aria-hidden="true" />
+    </button>
+    <a class="button button-small header-get" href={withBase('download/')}>Get Sodapop <ArrowUpRight size={16} aria-hidden="true" /></a>
+    <div class="mobile-menu">
+      <MobileMenu client:load home={withBase()} download={withBase('download/')} docs={withBase('docs/')} />
+    </div>
+  </div>
+  <div class="no-js-only">
+    <nav class="no-js-nav" aria-label="Mobile navigation">
+      <a href={withBase('download/')}>Get Sodapop</a>
+      <a href={withBase('docs/')}>Docs</a>
+    </nav>
+  </div>
+</header>
+<p class="sr-only" id="theme-status" role="status"></p>
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.theme-toggle').forEach((button) => {
+    button.addEventListener('click', () => {
+      const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+      document.documentElement.dataset.theme = theme;
+      const status = document.getElementById('theme-status');
+      try {
+        localStorage.setItem('starlight-theme', theme);
+        if (status) status.textContent = `${theme === 'light' ? 'Light' : 'Dark'} theme selected.`;
+      } catch (error) {
+        if (!(error instanceof DOMException)) throw error;
+        if (status) status.textContent = 'Theme changed for this page. Your browser could not save the preference.';
+      }
+    });
+  });
+</script>

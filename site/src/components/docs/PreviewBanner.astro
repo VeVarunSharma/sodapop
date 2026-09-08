@@ -1,0 +1,19 @@
+---
+import DefaultBanner from '@astrojs/starlight/components/Banner.astro';
+import { isPreview } from '../../../scripts/site-config.mjs';
+---
+{isPreview() ? (
+  <aside class="preview-banner" aria-label="Preview build" data-pagefind-ignore>
+    <strong>Website preview.</strong> Release availability is intentionally disabled.
+  </aside>
+) : <DefaultBanner />}
+<style>
+  .preview-banner {
+    padding: .8rem 1.2rem;
+    background: var(--sp-aqua);
+    color: var(--sp-text);
+    border-bottom: 1px solid var(--sp-line);
+    text-align: center;
+    font-size: .875rem;
+  }
+</style>

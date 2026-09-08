@@ -1,0 +1,11 @@
+Set Shell "bash"
+Set FontFamily "Menlo"
+Set FontSize 18
+Set Width 1440
+Set Height 810
+Set LetterSpacing 0
+Set Padding 8
+Set Framerate 25
+Set TypingSpeed 45ms
+Set CursorBlink false
+Set Theme {"background":"#09090B","foreground":"#F4F4F5","cursor":"#67E8F9","selection":"#30303D","black":"#09090B","red":"#FB7185","green":"#A3E635","yellow":"#FBBF24","blue":"#79C0FF","magenta":"#C084FC","cyan":"#67E8F9","white":"#F4F4F5","brightBlack":"#9292A3","brightRed":"#FB7185","brightGreen":"#A3E635","brightYellow":"#FBBF24","brightBlue":"#79C0FF","brightMagenta":"#C084FC","brightCyan":"#67E8F9","brightWhite":"#FFFFFF"}

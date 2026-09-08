@@ -1,0 +1,147 @@
+name: Sodapop website
+
+on:
+  push:
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'images/**'
+      - 'README.md'
+      - 'go.mod'
+      - 'Makefile'
+      - 'LICENSE'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'internal/commands/registry.go'
+      - 'internal/runtimebundle/version.go'
+      - 'npm/packages/cli/package.json'
+      - 'packaging/homebrew/**'
+      - 'packaging/windows/README.md'
+      - '.github/workflows/pages.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'images/**'
+      - 'README.md'
+      - 'go.mod'
+      - 'Makefile'
+      - 'LICENSE'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'internal/commands/registry.go'
+      - 'internal/runtimebundle/version.go'
+      - 'npm/packages/cli/package.json'
+      - 'packaging/homebrew/**'
+      - 'packaging/windows/README.md'
+      - '.github/workflows/pages.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.event_name == 'release' && github.run_id || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-refresh:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Request a website refresh on the default branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SODAPOP_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref "$SODAPOP_DEFAULT_BRANCH"
+
+  build:
+    if: github.event_name != 'release'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        publication: [configured, project]
+    env:
+      ASTRO_TELEMETRY_DISABLED: '1'
+      SODAPOP_SITE_PREVIEW: ${{ github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && '0' || '1' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: site/.node-version
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Read the actual Pages publishing target
+        id: pages
+        if: matrix.publication == 'configured' && env.SODAPOP_SITE_PREVIEW == '0'
+        uses: actions/configure-pages@v5
+      - name: Select the website build URL and base path
+        env:
+          SODAPOP_SITE_VARIANT: ${{ matrix.publication }}
+          SODAPOP_PAGES_URL: ${{ steps.pages.outputs.base_url }}
+          SODAPOP_PAGES_REQUIRED: ${{ matrix.publication == 'configured' && env.SODAPOP_SITE_PREVIEW == '0' && '1' || '0' }}
+          SODAPOP_EXPECTED_SITE_URL: ${{ vars.SODAPOP_SITE_URL }}
+          SODAPOP_EXPECTED_SITE_BASE: ${{ vars.SODAPOP_SITE_BASE }}
+        run: node site/scripts/pages-target.mjs
+      - name: Install website dependencies
+        run: npm --prefix site ci
+      - name: Resolve explicitly configured release availability
+        if: env.SODAPOP_SITE_PREVIEW == '0'
+        run: npm --prefix site run release:sync
+      - name: Check types and content
+        run: npm --prefix site run check
+      - name: Test offline contracts
+        run: npm --prefix site test
+      - name: Build static website
+        run: npm --prefix site run build
+      - name: Inspect the static artifact
+        run: npm --prefix site run check:artifact
+      - name: Install browser for website checks
+        run: npm --prefix site exec -- playwright install --with-deps chromium
+      - name: Exercise built pages
+        run: npm --prefix site run test:e2e
+      - name: Retain browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-browser-${{ matrix.publication }}
+          path: site/test-results/
+          if-no-files-found: ignore
+      - name: Require a public build before publication
+        if: matrix.publication == 'configured' && env.SODAPOP_SITE_PREVIEW == '0'
+        run: npm --prefix site run check:artifact -- --public
+      - name: Require the configured site URL to match Pages
+        if: steps.pages.outcome == 'success'
+        env:
+          SODAPOP_PAGES_URL: ${{ steps.pages.outputs.base_url }}
+        run: node --input-type=module -e 'import { assertPagesTarget } from "./site/scripts/site-config.mjs"; assertPagesTarget(process.env.SODAPOP_PAGES_URL);'
+      - name: Upload only the static website
+        if: matrix.publication == 'configured' && env.SODAPOP_SITE_PREVIEW == '0'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    if: github.event_name != 'release' && github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - name: Publish the reviewed website
+        id: publish
+        uses: actions/deploy-pages@v4

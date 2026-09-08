@@ -1,0 +1,44 @@
+{
+  "name": "@sodapop/cli",
+  "version": "0.0.0-development",
+  "description": "Sodapop terminal application backed by the official GitHub Copilot SDK",
+  "license": "MIT",
+  "private": true,
+  "homepage": "https://sodapop.sh",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VeVarunSharma/sodapop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VeVarunSharma/sodapop/issues"
+  },
+  "keywords": [
+    "copilot",
+    "github-copilot",
+    "terminal",
+    "cli",
+    "tui"
+  ],
+  "bin": {
+    "sodapop": "bin/sodapop.js"
+  },
+  "files": [
+    "bin/sodapop.js",
+    "lib/launcher.js",
+    "LICENSE",
+    "README.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@sodapop/darwin-amd64": "0.0.0-development",
+    "@sodapop/darwin-arm64": "0.0.0-development",
+    "@sodapop/linux-amd64": "0.0.0-development",
+    "@sodapop/linux-arm64": "0.0.0-development"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

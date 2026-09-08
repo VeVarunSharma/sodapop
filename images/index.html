@@ -81,6 +81,20 @@
 
   <h2>Start with these</h2>
   <div class="grid">
+    <article class="card full">
+      <div class="preview hero">
+        <picture>
+          <source media="(prefers-reduced-motion: reduce)" srcset="sodapop-title.png">
+          <img src="sodapop-title.gif" alt="Animated Sodapop wordmark with neon bubbles and the original smiling mascot" width="1000" height="560">
+        </picture>
+      </div>
+      <div class="content">
+        <h3>Animated README title</h3>
+        <p>The original rounded wordmark and waving can, brought to life with a gentle neon sheen, carbonation, and orbital accents. The title stays readable throughout the seamless loop.</p>
+        <div class="meta">1000 x 560 / 4-second loop / GIF + full-color PNG</div>
+        <div class="links"><a href="sodapop-title.gif" download>Animated GIF</a><a href="sodapop-title.png" download>Static PNG</a><a href="../docs/branding.md">Regeneration guide</a></div>
+      </div>
+    </article>
     <article class="card">
       <div class="preview icon crop"><img src="sodapop-oauth.png" alt="Sodapop OAuth icon shown inside a circular crop" width="512" height="512"></div>
       <div class="content">
@@ -201,6 +215,7 @@
   </div>
   <div class="notes">
     <h3>Where each file goes</h3>
+    <p><strong>Animated README title:</strong> use <code>sodapop-title.gif</code> with its PNG as a still and reduced-motion alternative. The existing wide banner remains available for static layouts.</p>
     <p><strong>OAuth app:</strong> upload <code>sodapop-oauth.png</code> under Application logo and set Badge background color to <code>#09090B</code>. The PNG is 512 x 512 and below GitHub's 1 MB upload limit. <a href="https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-a-custom-badge-for-your-oauth-app" rel="noreferrer" target="_blank">GitHub's badge guidance</a>.</p>
     <p><strong>Repository:</strong> use <code>sodapop-repo-social.png</code> in Settings &gt; Social preview. It is 1280 x 640 and below 1 MB. Use <code>sodapop-banner.svg</code> for a README header instead. <a href="https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview" rel="noreferrer" target="_blank">GitHub's preview guidance</a>.</p>
     <p><strong>Landing page:</strong> use the transparent mascot, the appropriate light/dark logo lockup, and the favicon set. Point social metadata to the published absolute URL of <code>sodapop-og.png</code>; uploading this folder alone does not configure the page.</p>
@@ -208,6 +223,7 @@
   </div>
   <details>
     <summary>Editable sources and export information</summary>
+    <p><code>make brand</code> runs <code>source/animate.py</code> to create the looping title from the finished PNG artwork, without external fonts. When rebuilding everything, run it after the static exporter and finalizer so the asset manifest also includes the animation.</p>
     <p>Every SVG is a self-contained vector master with outlined lettering. It needs no fonts, scripts, remote images, or network connection to display. The PNGs are ready for upload; the WebP files are lossless web exports. <a href="brand-assets.json">The asset manifest</a> includes dimensions, palette values, and file sizes.</p>
     <p>Optional regeneration sources are in <code>source/build.cjs</code> and <code>source/finish.py</code>. The artwork exporter uses <code>@resvg/resvg-js@2.6.2</code> with locally licensed Avenir Next and Menlo font files supplied as arguments. The finalizer uses Pillow for WebP and ICO output. These tools are separate from the Go application; no font files or renderer dependencies are bundled here.</p>
   </details>

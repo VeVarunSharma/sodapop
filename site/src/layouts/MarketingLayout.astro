@@ -1,0 +1,67 @@
+---
+import ThemeProvider from '@astrojs/starlight/components/ThemeProvider.astro';
+import SiteHeader from '../components/marketing/SiteHeader.astro';
+import SiteFooter from '../components/marketing/SiteFooter.astro';
+import { withBase } from '../lib/urls';
+import { isPreview } from '../../scripts/site-config.mjs';
+import '../styles/marketing.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  noindex?: boolean;
+  canonicalPath?: string;
+}
+const {
+  title = 'Sodapop - Your terminal, with a little more pop.',
+  description = 'A colorful terminal coding companion powered by the GitHub Copilot SDK. Real tools, clear approvals, and a little personality.',
+  noindex = false,
+  canonicalPath = Astro.url.pathname,
+} = Astro.props;
+const canonical = new URL(canonicalPath, Astro.site);
+const social = new URL(withBase('assets/brand/sodapop-og.png'), Astro.site);
+---
+<!doctype html>
+<html lang="en" data-theme="light" data-motion="off">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="sodapop-build" content={isPreview() ? 'preview' : 'public'} />
+    <meta name="theme-color" content="#fffaf2" />
+    <link rel="canonical" href={canonical} />
+    {(noindex || isPreview()) && <meta name="robots" content="noindex" />}
+    <link rel="icon" type="image/svg+xml" href={withBase('assets/brand/sodapop-favicon.svg')} />
+    <link rel="apple-touch-icon" href={withBase('assets/brand/apple-touch-icon.png')} />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={social} />
+    <meta property="og:image:alt" content="Sodapop's smiling soda-can mascot and pink-to-purple wordmark." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <ThemeProvider />
+    <script is:inline>
+      document.documentElement.dataset.js = 'true';
+      const motionAllowed = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try {
+        document.documentElement.dataset.motion =
+          motionAllowed && localStorage.getItem('SODAPOP_SITE_MOTION') !== 'off' ? 'on' : 'off';
+      } catch (error) {
+        if (!(error instanceof DOMException)) throw error;
+        document.documentElement.dataset.motion = 'off';
+        console.warn('Sodapop motion preference storage is unavailable; decorative motion is off.');
+      }
+    </script>
+  </head>
+  <body class="soda-page">
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <div class="page-shell">
+      <SiteHeader />
+      {isPreview() && <aside class="preview-banner" aria-label="Preview build"><strong>Website preview</strong> Release availability is intentionally disabled in this build.</aside>}
+      <main id="main-content" tabindex="-1"><slot /></main>
+      <SiteFooter />
+    </div>
+  </body>
+</html>

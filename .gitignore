@@ -1,0 +1,39 @@
+/bin/
+/dist/
+/coverage.out
+/internal/runtimebundle/zcopilot*
+/internal/runtimebundle/LICENSE.copilot*
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.sodapop.env
+.sodapop.env.*
+!.sodapop.env.example
+
+# Go build & test artifacts
+*.exe
+*.test
+*.out
+vendor/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+
+# Tooling
+.playwright-mcp/
+
+# Independent website outputs
+/site/node_modules/
+/site/dist/
+/site/.astro/
+/site/.generated/
+/site/src/content/docs/
+/site/public/assets/
+/site/test-results/
+/site/playwright-report/
