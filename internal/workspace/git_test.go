@@ -315,6 +315,9 @@ func TestCleanAndStagedUnstagedSameFile(t *testing.T) {
 func TestRenameDeleteAndUnusualPaths(t *testing.T) {
 	dir, service := gitFixture(t)
 	oldName, newName := "old\n\tname.txt", "new\nname -> \"quoted\".txt"
+	if runtime.GOOS == "windows" {
+		oldName, newName = "old name [quoted].txt", "new name -> quoted.txt"
+	}
 	for _, name := range []string{oldName, "staged-delete", "unstaged-delete"} {
 		writeFixture(t, filepath.Join(dir, name), name+"\n")
 	}
