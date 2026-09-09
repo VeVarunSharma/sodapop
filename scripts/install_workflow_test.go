@@ -189,6 +189,7 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 		"permission-contents: write", "permission-pull-requests: write",
 		"repositories: homebrew-sodapop", "gh pr create", "--registry-install",
 		"needs: [prepare, npm]",
+		"ref: ${{ github.event.repository.default_branch }}",
 	} {
 		if !strings.Contains(text, requirement) {
 			t.Errorf("publication workflow is missing %q", requirement)

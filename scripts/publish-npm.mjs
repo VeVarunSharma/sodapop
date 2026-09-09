@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -68,6 +68,67 @@ function resultJSON(result, operation) {
   }
 }
 
+function packReceipt(runner, args, metadata, version, operation) {
+  const receipts = resultJSON(runner(args), operation);
+  if (!Array.isArray(receipts) || receipts.length !== 1) {
+    throw new Error(`Expected exactly one packed tarball for ${metadata.name}`);
+  }
+  const receipt = receipts[0];
+  if (receipt.name !== metadata.name || receipt.version !== version ||
+      typeof receipt.filename !== "string" ||
+      !/^[A-Za-z0-9][A-Za-z0-9.-]*\.tgz$/.test(receipt.filename)) {
+    throw new Error(`Unexpected npm pack receipt for ${metadata.name}`);
+  }
+  return receipt;
+}
+
+function receiptFiles(receipt, operation) {
+  if (!Array.isArray(receipt.files) || receipt.files.length === 0) {
+    throw new Error(`${operation} did not describe its package files`);
+  }
+  const seen = new Set();
+  const files = receipt.files.map((file) => {
+    if (!file || typeof file.path !== "string" || file.path === "" ||
+        file.path.startsWith("/") || file.path.split("/").includes("..") ||
+        !Number.isSafeInteger(file.size) || file.size < 0 ||
+        !Number.isSafeInteger(file.mode) || file.mode < 0 || seen.has(file.path)) {
+      throw new Error(`${operation} returned invalid package file metadata`);
+    }
+    seen.add(file.path);
+    return { path: file.path, size: file.size, mode: file.mode };
+  });
+  return files.sort((left, right) => left.path.localeCompare(right.path));
+}
+
+function publishedPayloadMatches(runner, staging, packageDirectory, metadata, version, localReceipt, publishedIntegrity) {
+  const publishedDirectory = path.join(staging, metadata.name.replace("@", "").replace("/", "-"), "published");
+  mkdirSync(publishedDirectory, { recursive: true });
+  const specification = `${metadata.name}@${version}`;
+  const publishedReceipt = packReceipt(runner, [
+    "pack", "--ignore-scripts", "--json", "--pack-destination", publishedDirectory,
+    "--registry=https://registry.npmjs.org", specification
+  ], metadata, version, `Pack published ${specification}`);
+  const publishedTarball = path.join(publishedDirectory, publishedReceipt.filename);
+  const downloadedIntegrity = "sha512-" +
+    createHash("sha512").update(readFileSync(publishedTarball)).digest("base64");
+  if (publishedReceipt.integrity !== publishedIntegrity || downloadedIntegrity !== publishedIntegrity) {
+    throw new Error(`Registry metadata and downloaded tarball integrity disagree for ${specification}`);
+  }
+  if (JSON.stringify(receiptFiles(localReceipt, `Pack ${metadata.name}`)) !==
+      JSON.stringify(receiptFiles(publishedReceipt, `Pack published ${specification}`))) {
+    return false;
+  }
+  const difference = runner([
+    "diff", "--ignore-scripts", "--color=false",
+    `--diff=${specification}`, `--diff=${packageDirectory}`,
+    "--registry=https://registry.npmjs.org"
+  ]);
+  if (difference.error || difference.status !== 0) {
+    throw new Error(`Could not compare published payload for ${specification}`);
+  }
+  return difference.stdout.trim() === "";
+}
+
 export function publishPackages({ directory, version, tag }, runner = npm, log = console.log) {
   if (!directory || !validVersion(version) || !["preview", "latest"].includes(tag)) {
     throw new Error("Provide a generated package directory, exact SemVer, and preview or latest tag");
@@ -79,19 +140,12 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
   const staging = mkdtempSync(path.join(tmpdir(), "sodapop-npm-publish-"));
   try {
     for (const { directory: packageDirectory, metadata } of packages) {
-      const receipts = resultJSON(runner([
-        "pack", "--ignore-scripts", "--json", "--pack-destination", staging, packageDirectory
-      ]), `Pack ${metadata.name}`);
-      if (!Array.isArray(receipts) || receipts.length !== 1) {
-        throw new Error(`Expected exactly one packed tarball for ${metadata.name}`);
-      }
-      const receipt = receipts[0];
-      if (receipt.name !== metadata.name || receipt.version !== version ||
-          typeof receipt.filename !== "string" ||
-          !/^[A-Za-z0-9][A-Za-z0-9.-]*\.tgz$/.test(receipt.filename)) {
-        throw new Error(`Unexpected npm pack receipt for ${metadata.name}`);
-      }
-      const tarball = path.join(staging, receipt.filename);
+      const localDirectory = path.join(staging, metadata.name.replace("@", "").replace("/", "-"), "local");
+      mkdirSync(localDirectory, { recursive: true });
+      const receipt = packReceipt(runner, [
+        "pack", "--ignore-scripts", "--json", "--pack-destination", localDirectory, packageDirectory
+      ], metadata, version, `Pack ${metadata.name}`);
+      const tarball = path.join(localDirectory, receipt.filename);
       const integrity = "sha512-" + createHash("sha512").update(readFileSync(tarball)).digest("base64");
       if (integrity !== receipt.integrity) {
         throw new Error(`Packed bytes do not match npm's receipt for ${metadata.name}`);
@@ -101,7 +155,12 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
       if (!existing.error && existing.status === 0) {
         const published = resultJSON(existing, `Read ${specification}`);
         if (published !== integrity) {
-          throw new Error(`Refusing to replace different published bytes for ${specification}`);
+          if (!publishedPayloadMatches(
+            runner, staging, packageDirectory, metadata, version, receipt, published
+          )) {
+            throw new Error(`Refusing to replace different published payload for ${specification}`);
+          }
+          log(`Already published with equivalent payload despite different tar metadata: ${specification}`);
         }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"

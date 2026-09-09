@@ -27,24 +27,59 @@ function registry(mode = "missing") {
   const published = [];
   const data = Buffer.from("unit test tarball receipt");
   const integrity = "sha512-" + createHash("sha512").update(data).digest("base64");
+  const publishedData = mode === "matching" || mode === "wrong-tag"
+    ? data
+    : Buffer.from("published tar container");
+  const publishedIntegrity = "sha512-" + createHash("sha512").update(publishedData).digest("base64");
+  const filesByName = new Map();
   const runner = (args) => {
     if (args[0] === "pack") {
-      const metadata = JSON.parse(readFileSync(path.join(args.at(-1), "package.json")));
+      const specification = args.at(-1);
+      const fromRegistry = specification.startsWith("@sodapop-sh/") && specification.includes("@1.2.3");
+      const metadata = fromRegistry
+        ? { name: specification.slice(0, specification.lastIndexOf("@")), version: "1.2.3" }
+        : JSON.parse(readFileSync(path.join(specification, "package.json")));
       const filename = metadata.name.replace("@", "").replace("/", "-") + "-1.2.3.tgz";
       const destination = args[args.indexOf("--pack-destination") + 1];
-      writeFileSync(path.join(destination, filename), data);
-      return { status: 0, stdout: JSON.stringify([{ ...metadata, filename, integrity }]) };
+      const bytes = fromRegistry ? publishedData : data;
+      writeFileSync(path.join(destination, filename), bytes);
+      const localFiles = [{
+        path: "package.json",
+        size: fromRegistry
+          ? filesByName.get(metadata.name)[0].size
+          : readFileSync(path.join(specification, "package.json")).length,
+        mode: 0o644
+      }];
+      if (!fromRegistry) filesByName.set(metadata.name, localFiles);
+      const files = localFiles.map((file) => ({
+        ...file,
+        mode: fromRegistry && mode === "different-mode" ? 0o755 : file.mode
+      }));
+      return {
+        status: 0,
+        stdout: JSON.stringify([{
+          ...metadata, filename, files,
+          integrity: fromRegistry ? publishedIntegrity : integrity
+        }])
+      };
     }
     if (args[0] === "view") {
       if (args[2] === "dist-tags") {
         return { status: 0, stdout: JSON.stringify({ latest: mode === "wrong-tag" ? "1.2.2" : "1.2.3", preview: "1.2.3" }) };
       }
-      if (mode === "matching" || mode === "different" || mode === "wrong-tag") {
-        return { status: 0, stdout: JSON.stringify(mode === "different" ? "sha512-other" : integrity) };
+      if (["matching", "equivalent", "different", "different-mode", "wrong-tag"].includes(mode)) {
+        return { status: 0, stdout: JSON.stringify(publishedIntegrity) };
       }
       return {
         status: 1,
         stdout: JSON.stringify({ error: { code: mode === "missing" ? "E404" : "ENOTCONN" } })
+      };
+    }
+    if (args[0] === "diff") {
+      assert.ok(args.includes("--registry=https://registry.npmjs.org"));
+      return {
+        status: 0,
+        stdout: mode === "different" ? "diff --git a/package.json b/package.json\n" : ""
       };
     }
     assert.equal(args[0], "publish");
@@ -63,17 +98,26 @@ test("publishes platform tarballs before the exact-version launcher", (t) => {
   assert.deepEqual(published, ["sodapop-sh-darwin-arm64-1.2.3.tgz", "sodapop-sh-cli-1.2.3.tgz"]);
 });
 
-test("retry accepts only identical already-published tarballs", (t) => {
+test("retry accepts identical tarballs or equivalent payloads only", (t) => {
   const directory = fixture(t);
   const matching = registry("matching");
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, matching.runner, () => {});
   assert.deepEqual(matching.published, []);
+  const equivalent = registry("equivalent");
+  publishPackages({ directory, version: "1.2.3", tag: "latest" }, equivalent.runner, () => {});
+  assert.deepEqual(equivalent.published, []);
   const different = registry("different");
   assert.throws(
     () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, different.runner, () => {}),
-    /different published bytes/
+    /different published payload/
   );
   assert.deepEqual(different.published, []);
+  const differentMode = registry("different-mode");
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, differentMode.runner, () => {}),
+    /different published payload/
+  );
+  assert.deepEqual(differentMode.published, []);
   const wrongTag = registry("wrong-tag");
   assert.throws(
     () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, wrongTag.runner, () => {}),
