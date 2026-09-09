@@ -196,6 +196,11 @@ Stable npm publication and stable tap updates require
 `SODAPOP_STABLE_RELEASE_QUALIFIED=true`. This records owner sign-off after native
 installation, signing/notarization, and sign-in qualification; it is not an
 automated signature validator. Leave it unset until that evidence exists.
+The Windows release job uses the protected `release-signing` environment and
+GitHub OIDC to sign `sodapop.exe` with Azure Artifact Signing, then requires a
+valid Authenticode signature and RFC 3161 timestamp before packaging or manifest
+generation. The generated archive, npm package, and release manifest therefore
+bind the exact signed executable; they never patch a published archive.
 Registering WinGet/Scoop channels, configuring signing credentials, and obtaining
 native ARM64 evidence remain separate external/platform gates.
 

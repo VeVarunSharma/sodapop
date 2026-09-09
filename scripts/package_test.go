@@ -277,6 +277,56 @@ func TestReleaseManifestDescribesVerifiedNativeArtifacts(t *testing.T) {
 	}
 }
 
+func TestPackagePreservesExplicitPrebuiltWindowsBinary(t *testing.T) {
+	root := packageFixture(t)
+	const signed = "signed Windows fixture bytes"
+	writeFixtureFile(t, root, ".release-signing/sodapop.exe", signed, 0755)
+	output, err := runPackage(t, root,
+		"SODAPOP_TARGET=windows/amd64",
+		"SODAPOP_PREBUILT_BINARY=.release-signing/sodapop.exe")
+	if err != nil {
+		t.Fatalf("package prebuilt Windows binary: %s: %v", output, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "go-build.log")); !os.IsNotExist(err) {
+		t.Fatalf("prebuilt packaging unexpectedly rebuilt the command: %v", err)
+	}
+	manifest := packageManifest(t, root, []string{"windows/amd64"})
+	extracted := filepath.Join(t.TempDir(), "extracted")
+	if err := distribution.Extract(filepath.Join(root, "dist"), manifest, "windows/amd64", extracted); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(extracted, distribution.PackageName(packageVersion, "windows/amd64"), "sodapop.exe"))
+	if err != nil || string(data) != signed {
+		t.Fatalf("prebuilt Windows binary changed: %q, %v", data, err)
+	}
+}
+
+func TestPackageRejectsInvalidPrebuiltBinary(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		target string
+		path   string
+		want   string
+	}{
+		{"non-windows", "linux/amd64", ".release-signing/sodapop.exe", "supported only for windows/amd64"},
+		{"missing", "windows/amd64", ".release-signing/missing.exe", "existing regular non-symlink file"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := packageFixture(t)
+			writeFixtureFile(t, root, ".release-signing/sodapop.exe", "signed fixture", 0755)
+			output, err := runPackage(t, root,
+				"SODAPOP_TARGET="+tc.target,
+				"SODAPOP_PREBUILT_BINARY="+tc.path)
+			if err == nil || !strings.Contains(output, tc.want) {
+				t.Fatalf("invalid prebuilt binary accepted: %s: %v", output, err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "go-build.log")); !os.IsNotExist(err) {
+				t.Fatalf("invalid prebuilt binary invoked build: %v", err)
+			}
+		})
+	}
+}
+
 func TestReleaseManifestRejectsIncompleteOrCorruptArtifacts(t *testing.T) {
 	for _, mutation := range []string{"missing", "checksum", "multiline"} {
 		root := packageFixture(t)
@@ -379,8 +429,9 @@ func TestTaggedReleaseWorkflowCreatesDraftAssets(t *testing.T) {
 		`version="${GITHUB_REF_NAME#v}"`,
 		`printf 'SODAPOP_VERSION=%s\n' "$version" >> "$GITHUB_ENV"`,
 		"SODAPOP_GITHUB_CLIENT_ID: ${{ vars.SODAPOP_GITHUB_CLIENT_ID }}",
-		"target: darwin/arm64", "target: darwin/amd64", "target: linux/arm64", "target: linux/amd64", "target: windows/amd64",
-		"needs: [package, installations, channels]", "contents: write",
+		"target: darwin/arm64", "target: darwin/amd64", "target: linux/arm64", "target: linux/amd64",
+		"SODAPOP_TARGET: windows/amd64",
+		"needs: [version, package, package-windows, installations, channels]", "contents: write",
 		"npm run build --prefix npm", "name: npm-packages",
 		"bash scripts/generate-homebrew-formula.sh", "name: homebrew-formula",
 		`"$helper" manifest --dir dist`, "--platforms",
