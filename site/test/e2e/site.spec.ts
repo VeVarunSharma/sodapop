@@ -16,7 +16,8 @@ test('homepage delivers the original brand without eager GIFs or console failure
   await page.goto('./');
   const title = 'Sodapop - Your bubbly terminal coding companion';
   const description = 'An independent terminal coding companion powered by the GitHub Copilot SDK. Explore code, compare approaches, taste-test changes, and inspect the diff.';
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText("A little can of let's build that.");
+  await expect(page.locator('.hero-copy > .eyebrow')).toHaveText('Your repo called. It ordered something fizzy.');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText("Let's make something pop.");
   await expect(page.getByRole('heading', { name: 'Ideas, checks, settings. One vending machine.', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Taste-test it. Then take a look.', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'How fizzy are we feeling?', exact: true })).toBeVisible();
