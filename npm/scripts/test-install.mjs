@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { buildPackages, readManifest, releaseControl } from "./build-packages.mjs";
 import {
-  assertInstalledHash, assertSuccess, createNpmSandbox, installLocal, installRegistry, packPackage,
+  assertInstalledHash, assertSuccess, createNpmSandbox, globalPackage, installLocal, installRegistry, packPackage,
   runNpm, runShim, temporaryRoot, uninstallLocal, writeSentinels
 } from "./install-support.mjs";
 
@@ -175,9 +175,11 @@ export function testNativeInstall(options) {
     uninstallLocal(sandbox, target);
     preserve();
     if (options.registryInstall) {
-      installRegistry(sandbox, newer.manifest.version, { omitOptional: true });
+      installRegistry(sandbox, newer.manifest.version);
+      rmSync(globalPackage(sandbox, target.package), { recursive: true, force: true });
       // Never execute registry-supplied JS when the native payload cannot first
-      // be checked against the trusted archive's manifest.
+      // be checked against the trusted archive's manifest. Remove it explicitly:
+      // npm may retain platform optional dependencies despite --omit=optional.
       assert.throws(() => assertInstalledHash(sandbox, newer.manifest, target), { code: "SODAPOP_MISSING_PAYLOAD" });
     } else {
       runNpm(sandbox, ["install", "--global", "--prefix", sandbox.prefix, "--omit=optional", newer.cli]);
