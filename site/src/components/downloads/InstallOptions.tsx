@@ -25,7 +25,7 @@ function CopyCommand({ command }: { command: string }) {
     <>
       <div className="command-line">
         <span className="command-dollar" aria-hidden="true">$</span>
-        <code>{command}</code>
+        <code tabIndex={0}>{command}</code>
         <Button variant="ghost" className="copy-command" aria-label="Copy installation command" disabled={!ready} onClick={copy}>
           {status === 'copied' ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
         </Button>

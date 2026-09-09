@@ -8,7 +8,7 @@ const catalog = getCatalog();
 const methods = installMethods(catalog);
 ---
 <div class="install-panel">
-  <div class="js-enhanced-only"><InstallOptions client:visible methods={methods} /></div>
+  <div class="js-enhanced-only"><InstallOptions client:load methods={methods} /></div>
   <a class="text-link" href={withBase('docs/development/')}>Read the source-build prerequisites <span aria-hidden="true">&rarr;</span></a>
   <div class="no-js-only">
     <div class="no-js-install">
