@@ -99,7 +99,11 @@ func TestUnbornStagedUnstagedAndUntracked(t *testing.T) {
 	writeFixture(t, file, "staged\n")
 	gitRun(t, dir, "add", "example.txt")
 	writeFixture(t, file, "unstaged\n")
-	writeFixture(t, filepath.Join(dir, "odd\nname.txt"), "untracked preview\n")
+	untrackedName, expectedUntrackedName := "odd\nname.txt", `odd\nname.txt`
+	if runtime.GOOS == "windows" {
+		untrackedName, expectedUntrackedName = "odd name.txt", "odd name.txt"
+	}
+	writeFixture(t, filepath.Join(dir, untrackedName), "untracked preview\n")
 	status, err := service.Status(context.Background())
 	if err != nil || status.Branch != "main" || len(status.Entries) != 2 {
 		t.Fatalf("unborn status: %#v, %v", status, err)
@@ -109,7 +113,7 @@ func TestUnbornStagedUnstagedAndUntracked(t *testing.T) {
 	if err != nil || !diff.IsRepository || diff.Truncated {
 		t.Fatalf("unborn diff: %#v, %v", diff, err)
 	}
-	for _, text := range []string{"STAGED", "UNSTAGED", "UNTRACKED", "staged", "unstaged", "untracked preview", `odd\nname.txt`} {
+	for _, text := range []string{"STAGED", "UNSTAGED", "UNTRACKED", "staged", "unstaged", "untracked preview", expectedUntrackedName} {
 		if !strings.Contains(diff.Text, text) {
 			t.Errorf("diff missing %q: %s", text, diff.Text)
 		}
@@ -335,8 +339,10 @@ func TestRenameDeleteAndUnusualPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	untracked := "--option-like\npath.txt"
+	expectedUntracked := `--option-like\npath.txt`
 	if runtime.GOOS == "windows" {
 		untracked = "--option-like path.txt"
+		expectedUntracked = untracked
 	}
 	writeFixture(t, filepath.Join(dir, untracked), "literal filename\n")
 	status, err := service.Status(t.Context())
@@ -354,7 +360,7 @@ func TestRenameDeleteAndUnusualPaths(t *testing.T) {
 		t.Errorf("deletion/untracked status was lost: %#v", entries)
 	}
 	diff, err := service.Diff(t.Context(), "all")
-	if err != nil || !strings.Contains(diff.Text, "literal filename") || !strings.Contains(diff.Text, `--option-like\npath.txt`) {
+	if err != nil || !strings.Contains(diff.Text, "literal filename") || !strings.Contains(diff.Text, expectedUntracked) {
 		t.Fatalf("unusual filename diff: %s, %v", diff.Text, err)
 	}
 }

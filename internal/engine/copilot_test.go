@@ -108,9 +108,11 @@ func TestNewValidatesIsolatedStorageAndIdentity(t *testing.T) {
 	if _, err := New(cfg); err == nil {
 		t.Fatal("accepted missing home")
 	}
-	t.Setenv("HOME", t.TempDir())
+	userHome := t.TempDir()
+	t.Setenv("HOME", userHome)
+	t.Setenv("USERPROFILE", userHome)
 	cfg = testConfig(t)
-	cfg.Home = filepath.Join(os.Getenv("HOME"), ".copilot")
+	cfg.Home = filepath.Join(userHome, ".copilot")
 	if _, err := New(cfg); err == nil {
 		t.Fatal("accepted default Copilot state")
 	}
