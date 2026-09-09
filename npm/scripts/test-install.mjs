@@ -77,6 +77,14 @@ function loadRelease(releaseDirectory, filename) {
   return { ...release, bytes, metadata: readManifest(release, bytes) };
 }
 
+export function selectTargetManifest(manifest, platform) {
+  const artifacts = manifest.artifacts.filter((artifact) => artifact.platform === platform);
+  if (artifacts.length !== 1) {
+    throw new Error(`manifest must declare exactly one ${platform} artifact`);
+  }
+  return { ...manifest, artifacts };
+}
+
 function nativeEnvironment(sandbox) {
   const bin = path.join(sandbox.root, "runtime-bin");
   mkdirSync(bin);
@@ -133,7 +141,10 @@ export function testNativeInstall(options) {
     const env = nativeEnvironment(sandbox);
     const prepare = (release, name) => {
       const snapshot = path.join(root, `${name}-manifest.json`);
-      writeFileSync(snapshot, release.bytes);
+      const bytes = options.registryInstall
+        ? release.bytes
+        : Buffer.from(`${JSON.stringify(selectTargetManifest(release.metadata, target.platform), null, 2)}\n`);
+      writeFileSync(snapshot, bytes);
       if (options.registryInstall) {
         releaseControl(["verify", "--dir", release.releaseDirectory, "--manifest", snapshot,
           "--platform", target.platform]);

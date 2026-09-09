@@ -20,7 +20,7 @@ on:
         type: string
         default: ''
       targeted_artifacts:
-        description: Download only each matrix target plus the verified manifests
+        description: Consume separately named native artifacts plus the verified manifests
         type: boolean
         default: false
       current_artifact_prefix:
@@ -252,13 +252,15 @@ jobs:
       - uses: actions/download-artifact@v4
         if: inputs.targeted_artifacts
         with:
-          name: ${{ inputs.current_artifact_prefix }}${{ matrix.artifact }}
+          pattern: ${{ inputs.current_artifact_prefix }}*
           path: install-inputs/current
+          merge-multiple: true
       - uses: actions/download-artifact@v4
         if: inputs.targeted_artifacts && inputs.previous_artifact_prefix != ''
         with:
-          name: ${{ inputs.previous_artifact_prefix }}${{ matrix.artifact }}
+          pattern: ${{ inputs.previous_artifact_prefix }}*
           path: install-inputs/previous
+          merge-multiple: true
       - uses: actions/download-artifact@v4
         if: inputs.targeted_artifacts
         with:

@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { parseInstallArguments, upgradeNotRun } from "../scripts/test-install.mjs";
+import { parseInstallArguments, selectTargetManifest, upgradeNotRun } from "../scripts/test-install.mjs";
 import {
   assertInstalledHash, createNpmSandbox, globalPackage, globalShim, installLocal,
   installRegistry, packPackage, publicRegistry, runNpm, temporaryRoot
@@ -43,6 +43,26 @@ test("native install command requires current inputs and an optional complete pr
     releaseDirectory: path.resolve("current"), manifest: path.resolve("current.json"),
     previousReleaseDirectory: path.resolve("previous"), previousManifest: path.resolve("previous.json")
   });
+});
+
+test("local install package builds narrow a verified manifest to the host payload", () => {
+  const manifest = {
+    version: "1.2.3",
+    artifacts: [
+      { platform: "darwin/arm64", archive: "darwin" },
+      { platform: "linux/amd64", archive: "linux" }
+    ]
+  };
+  assert.deepEqual(selectTargetManifest(manifest, "linux/amd64"), {
+    version: "1.2.3",
+    artifacts: [{ platform: "linux/amd64", archive: "linux" }]
+  });
+  assert.equal(manifest.artifacts.length, 2);
+  assert.throws(() => selectTargetManifest(manifest, "windows/amd64"), /exactly one/);
+  assert.throws(() => selectTargetManifest({
+    ...manifest,
+    artifacts: [...manifest.artifacts, { platform: "linux/amd64", archive: "duplicate" }]
+  }, "linux/amd64"), /exactly one/);
 });
 
 test("public registry mode is explicit, position independent, and cannot override registry URL", () => {

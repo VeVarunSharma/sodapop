@@ -21,6 +21,9 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 			"cache: false",
 			"Verify target-specific installation inputs",
 			"--platform \"$SODAPOP_TARGET\"",
+			"name: ${{ inputs.current_artifact_prefix }}${{ matrix.artifact }}",
+			"pattern: ${{ inputs.current_artifact_prefix }}*",
+			"pattern: ${{ inputs.previous_artifact_prefix }}*",
 			"releasectl\" verify",
 		},
 		"native-candidates.yml": {
@@ -58,6 +61,30 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestTargetedInstallDownloadsMatchChannelNeeds(t *testing.T) {
+	data, err := os.ReadFile("../.github/workflows/install-tests.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, portable, found := strings.Cut(string(data), "  portable-npm:\n")
+	if !found {
+		t.Fatal("portable npm job is missing")
+	}
+	portable, homebrew, found := strings.Cut(portable, "  homebrew:\n")
+	if !found {
+		t.Fatal("Homebrew job is missing")
+	}
+	exact := "name: ${{ inputs.current_artifact_prefix }}${{ matrix.artifact }}"
+	pattern := "pattern: ${{ inputs.current_artifact_prefix }}*"
+	if !strings.Contains(portable, exact) || strings.Contains(portable, pattern) {
+		t.Fatal("portable npm must download only its matrix target")
+	}
+	if !strings.Contains(homebrew, pattern) || !strings.Contains(homebrew, "merge-multiple: true") ||
+		strings.Contains(homebrew, exact) {
+		t.Fatal("Homebrew must download the complete verified release set")
 	}
 }
 
