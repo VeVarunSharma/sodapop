@@ -63,7 +63,7 @@ function registry(mode = "missing") {
             "diff --git a/bin/sodapop b/bin/sodapop",
             "old mode 100644",
             "new mode 100755",
-            "index v1.2.3..v1.2.3",
+            "index v1.2.3..v1.2.3 ",
             "--- a/bin/sodapop",
             "+++ b/bin/sodapop",
             ""
