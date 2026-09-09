@@ -79,6 +79,42 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
   const staging = mkdtempSync(path.join(tmpdir(), "sodapop-npm-publish-"));
   try {
     for (const { directory: packageDirectory, metadata } of packages) {
+      const specification = `${metadata.name}@${version}`;
+      const existing = runner(["view", specification, "dist.integrity", "--json", "--registry=https://registry.npmjs.org"]);
+      if (!existing.error && existing.status === 0) {
+        const publishedIntegrity = resultJSON(existing, `Read ${specification}`);
+        if (typeof publishedIntegrity !== "string" || !publishedIntegrity.startsWith("sha512-")) {
+          throw new Error(`${specification} does not expose a valid registry integrity`);
+        }
+        const comparison = runner([
+          "diff", `--diff=${specification}`, `--diff=${packageDirectory}`,
+          "--diff-name-only", "--registry=https://registry.npmjs.org"
+        ]);
+        if (comparison.error || comparison.status !== 0) {
+          throw new Error(`Could not compare published contents for ${specification}`);
+        }
+        if (comparison.stdout.trim() !== "") {
+          throw new Error(`Refusing to replace different published package contents for ${specification}`);
+        }
+        const tags = resultJSON(runner([
+          "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
+        ]), `Read channel tags for ${metadata.name}`);
+        if (!tags || tags[tag] !== version) {
+          throw new Error(`${specification} has matching contents, but ${tag} does not point to it; an owner must explicitly promote the registry tag`);
+        }
+        log(`Already published with matching contents: ${specification}`);
+        continue;
+      }
+      let code;
+      try {
+        code = JSON.parse(existing.stdout).error?.code;
+      } catch {
+        throw new Error(`Could not determine publication state for ${specification}`);
+      }
+      if (existing.error || code !== "E404") {
+        throw new Error(`Registry lookup failed for ${specification}; refusing to assume it is unpublished`);
+      }
+
       const receipts = resultJSON(runner([
         "pack", "--ignore-scripts", "--json", "--pack-destination", staging, packageDirectory
       ]), `Pack ${metadata.name}`);
@@ -95,31 +131,6 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
       const integrity = "sha512-" + createHash("sha512").update(readFileSync(tarball)).digest("base64");
       if (integrity !== receipt.integrity) {
         throw new Error(`Packed bytes do not match npm's receipt for ${metadata.name}`);
-      }
-      const specification = `${metadata.name}@${version}`;
-      const existing = runner(["view", specification, "dist.integrity", "--json", "--registry=https://registry.npmjs.org"]);
-      if (!existing.error && existing.status === 0) {
-        const published = resultJSON(existing, `Read ${specification}`);
-        if (published !== integrity) {
-          throw new Error(`Refusing to replace different published bytes for ${specification}`);
-        }
-        const tags = resultJSON(runner([
-          "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
-        ]), `Read channel tags for ${metadata.name}`);
-        if (!tags || tags[tag] !== version) {
-          throw new Error(`${specification} has matching bytes, but ${tag} does not point to it; an owner must explicitly promote the registry tag`);
-        }
-        log(`Already published with matching integrity: ${specification}`);
-        continue;
-      }
-      let code;
-      try {
-        code = JSON.parse(existing.stdout).error?.code;
-      } catch {
-        throw new Error(`Could not determine publication state for ${specification}`);
-      }
-      if (existing.error || code !== "E404") {
-        throw new Error(`Registry lookup failed for ${specification}; refusing to assume it is unpublished`);
       }
       const published = runner([
         "publish", tarball, "--access", "public", "--provenance", "--ignore-scripts",
