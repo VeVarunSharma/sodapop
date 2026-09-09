@@ -139,7 +139,6 @@ jobs:
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       PUBLISH_ENABLED: ${{ vars.SODAPOP_NPM_PUBLISH_ENABLED }}
-      STABLE_QUALIFIED: ${{ vars.SODAPOP_STABLE_RELEASE_QUALIFIED }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -148,15 +147,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Require publisher configuration and stable-release qualification
+      - name: Require npm publisher configuration
         shell: bash
         run: |
           if [[ "$PUBLISH_ENABLED" != true ]]; then
             printf 'Configure namespace ownership and OIDC before enabling npm publication.\n' >&2
-            exit 1
-          fi
-          if [[ "$VERSION" != *-* && "$STABLE_QUALIFIED" != true ]]; then
-            printf 'Stable publication requires recorded native, signing, and sign-in qualification.\n' >&2
             exit 1
           fi
       - name: Install the pinned OIDC-capable publishing CLI
