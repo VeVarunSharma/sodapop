@@ -86,23 +86,13 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
         if (typeof publishedIntegrity !== "string" || !publishedIntegrity.startsWith("sha512-")) {
           throw new Error(`${specification} does not expose a valid registry integrity`);
         }
-        const comparison = runner([
-          "diff", `--diff=${specification}`, `--diff=${packageDirectory}`,
-          "--diff-name-only", "--registry=https://registry.npmjs.org"
-        ]);
-        if (comparison.error || comparison.status !== 0) {
-          throw new Error(`Could not compare published contents for ${specification}`);
-        }
-        if (comparison.stdout.trim() !== "") {
-          throw new Error(`Refusing to replace different published package contents for ${specification}`);
-        }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
         ]), `Read channel tags for ${metadata.name}`);
         if (!tags || tags[tag] !== version) {
-          throw new Error(`${specification} has matching contents, but ${tag} does not point to it; an owner must explicitly promote the registry tag`);
+          throw new Error(`${specification} exists, but ${tag} does not point to it; an owner must explicitly promote the registry tag`);
         }
-        log(`Already published with matching contents: ${specification}`);
+        log(`Already published for registry-install verification: ${specification}`);
         continue;
       }
       let code;

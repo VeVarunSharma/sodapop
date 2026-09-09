@@ -174,11 +174,13 @@ The bootstrap workflow is not a fallback for later releases.
 The verified release tag generates the npm package directories, while the
 reviewed default branch supplies the publisher control-plane script so an
 immutable release can benefit from publication recovery fixes. The publisher
-compares an already-published version's packaged contents with those generated
-directories, and creates verified tarballs only for versions that do not exist.
-A retry may reuse identical published contents; different contents or an
-ambiguous registry/network failure are fatal. Native packages publish before
-the launcher. Prereleases use `preview`, never `latest`.
+creates verified tarballs only for versions that do not exist. For an existing
+exact version it requires valid registry integrity metadata and the requested
+dist-tag, then the required five-platform registry-install matrix verifies the
+published launcher, native package metadata, executable hashes, notices, and
+install/removal behavior against the release manifest. Any mismatch fails the
+publication workflow. Ambiguous registry/network failures are fatal. Native
+packages publish before the launcher. Prereleases use `preview`, never `latest`.
 
 The Homebrew job uses a GitHub App limited to the existing `homebrew-sodapop`
 repository with contents and pull-request write permissions. Configure the
