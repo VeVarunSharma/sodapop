@@ -43,3 +43,36 @@ func TestWindowsIndexLockHonorsCancellationAndRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWindowsIndexLockWaitsForConcurrentProtection(t *testing.T) {
+	home := t.TempDir()
+	if err := securefs.MkdirAllPrivate(home); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	creator, err := root.OpenFile("sodapop-sessions.lock", os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer creator.Close()
+	protected := make(chan error, 1)
+	go func() {
+		time.Sleep(25 * time.Millisecond)
+		protected <- securefs.ProtectFile(creator)
+	}()
+	lock, err := lockIndex(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := <-protected; err != nil {
+		lock.Close()
+		t.Fatal(err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
