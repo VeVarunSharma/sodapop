@@ -177,9 +177,9 @@ immutable release can benefit from publication recovery fixes. The publisher
 compares an already-published version's packaged contents with those generated
 directories, and creates verified tarballs only for versions that do not exist.
 A retry may reuse identical published contents. The only accepted metadata-only
-difference is npm reporting a published native executable as mode `0644` while
-the verified generated package marks the same path `0755`; public installation
-checks must still prove that the installed command runs. Different contents or
+difference is npm reporting the native executable modes as `0644` and `0755`
+between the published and verified generated packages; public installation checks
+must still prove that the installed command runs. Different contents or
 an ambiguous registry/network failure are fatal. Native packages publish before
 the launcher. Prereleases use `preview`, never `latest`.
 
