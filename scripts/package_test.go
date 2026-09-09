@@ -384,7 +384,10 @@ func TestTaggedReleaseWorkflowCreatesDraftAssets(t *testing.T) {
 		"npm run build --prefix npm", "name: npm-packages",
 		"bash scripts/generate-homebrew-formula.sh", "name: homebrew-formula",
 		`"$helper" manifest --dir dist`, "--platforms",
-		`gh release create "$GITHUB_REF_NAME"`, "--verify-tag", "--draft",
+		`release_flags=(--draft)`,
+		`if [[ "$SODAPOP_VERSION" == *-* ]]; then`,
+		`release_flags+=(--prerelease)`,
+		`gh release create "$GITHUB_REF_NAME"`, "--verify-tag", `"${release_flags[@]}"`,
 	} {
 		if !strings.Contains(workflow, required) {
 			t.Errorf("release workflow is missing %q", required)

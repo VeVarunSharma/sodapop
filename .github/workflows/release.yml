@@ -206,10 +206,14 @@ jobs:
             printf 'Expected five archives, five checksums, and one release manifest.\n' >&2
             exit 1
           fi
+          release_flags=(--draft)
+          if [[ "$SODAPOP_VERSION" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --draft \
+            "${release_flags[@]}" \
             --title "$GITHUB_REF_NAME" \
             --generate-notes \
             "${archives[@]}" \
