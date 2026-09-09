@@ -89,9 +89,37 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 			t.Errorf("publication workflow is missing %q", requirement)
 		}
 	}
+
 	for _, excluded := range []string{"pull_request_target:", "--clobber", "--force", "gh pr merge", "NODE_AUTH_TOKEN:"} {
 		if strings.Contains(text, excluded) {
 			t.Errorf("publication workflow unexpectedly contains %q", excluded)
+		}
+	}
+}
+
+func TestNPMBootstrapWorkflowIsOneTimeAndProtected(t *testing.T) {
+	data, err := os.ReadFile("../.github/workflows/bootstrap-npm.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, requirement := range []string{
+		"workflow_dispatch:", "environment: npm-publish",
+		"SODAPOP_NPM_BOOTSTRAP_ENABLED", "NPM_BOOTSTRAP_TOKEN",
+		"BOOTSTRAP @sodapop-sh", "isImmutable == true", "isPrerelease == true",
+		"gh release verify ", "gh release verify-asset ", "go run ./scripts/releasectl verify",
+		"registry-url: https://registry.npmjs.org", "npm@11.15.0",
+		"node scripts/publish-npm.mjs", "preview",
+	} {
+		if !strings.Contains(text, requirement) {
+			t.Errorf("npm bootstrap workflow is missing %q", requirement)
+		}
+	}
+	for _, excluded := range []string{
+		"pull_request_target:", "homebrew-publish", " latest", "--force", "--clobber",
+	} {
+		if strings.Contains(text, excluded) {
+			t.Errorf("npm bootstrap workflow unexpectedly contains %q", excluded)
 		}
 	}
 }
