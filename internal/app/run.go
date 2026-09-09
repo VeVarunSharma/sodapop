@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/x/term"
 
 	"github.com/VeVarunSharma/sodapop/internal/auth"
+	"github.com/VeVarunSharma/sodapop/internal/commands"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
 	"github.com/VeVarunSharma/sodapop/internal/runtimebundle"
@@ -103,10 +104,14 @@ func run(ctx context.Context, args []string, input *os.File, output io.Writer, d
 	flags.BoolVar(&noBanner, "no-banner", false, "skip the startup mascot banner")
 	flags.BoolVar(&checkRuntime, "check-runtime", false, "check the bundled runtime without signing in or calling a model")
 	flags.Usage = func() {
+		commandNames := make([]string, 0, len(commands.All()))
+		for _, command := range commands.All() {
+			commandNames = append(commandNames, "/"+command.Name)
+		}
 		fmt.Fprintln(output, "Sodapop - a neon terminal coding companion")
 		fmt.Fprintln(output, "\nUsage: sodapop [options]")
 		fmt.Fprintln(output, "\nRun sodapop from your project directory. Type / for commands or /login for your account.")
-		fmt.Fprintln(output, "\nCommands: /help /login /logout /model /clear /resume /compact /plan /autopilot /mcp /skill /diff /theme /exit")
+		fmt.Fprintln(output, "\nCommands: "+strings.Join(commandNames, " "))
 		fmt.Fprintln(output, "\nSign-in uses Sodapop's own GitHub OAuth device flow. Development builds need")
 		fmt.Fprintln(output, "SODAPOP_GITHUB_CLIENT_ID set to a registered, device-flow-enabled public client ID.")
 		fmt.Fprintln(output, "\nOptions:")

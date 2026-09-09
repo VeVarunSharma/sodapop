@@ -14,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/VeVarunSharma/sodapop/internal/auth"
+	"github.com/VeVarunSharma/sodapop/internal/commands"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
 	"github.com/VeVarunSharma/sodapop/internal/skills"
@@ -41,9 +42,15 @@ func TestInformationFlagsDoNotNeedTerminalOrIdentity(t *testing.T) {
 			} else if !strings.HasPrefix(output.String(), "sodapop "+Version+"\n") {
 				t.Fatalf("version did not identify the executable: %q", output.String())
 			}
-			if (arg == "--help" || arg == "-h") && (!strings.Contains(output.String(), "/clear") ||
-				!strings.Contains(output.String(), "/compact") || strings.Contains(output.String(), "/new")) {
-				t.Fatalf("help did not advertise the current commands: %q", output.String())
+			if arg == "--help" || arg == "-h" {
+				for _, command := range commands.All() {
+					if !strings.Contains(output.String(), "/"+command.Name) {
+						t.Fatalf("help omitted /%s: %q", command.Name, output.String())
+					}
+				}
+				if strings.Contains(output.String(), "/new") {
+					t.Fatalf("help advertised a retired command: %q", output.String())
+				}
 			}
 		})
 	}
