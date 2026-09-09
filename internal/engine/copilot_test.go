@@ -37,7 +37,7 @@ func TestStartUsesOnlyExplicitSodapopIdentityAndBundle(t *testing.T) {
 	}
 	options := client.options
 	connection, ok := options.Connection.(copilot.StdioConnection)
-	if !ok || connection.Path != "/bundled/copilot-runtime" || len(connection.Args) != 0 {
+	if !ok || !filepath.IsAbs(connection.Path) || filepath.Base(connection.Path) != "copilot-runtime" || len(connection.Args) != 0 {
 		t.Fatalf("wrong transport: %#v", options.Connection)
 	}
 	if options.GitHubToken != "sodapop-private-test-token" || options.UseLoggedInUser == nil || *options.UseLoggedInUser ||
