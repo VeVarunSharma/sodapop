@@ -186,6 +186,7 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 		"environment: npm-publish", "environment: homebrew-publish",
 		"SODAPOP_STABLE_RELEASE_QUALIFIED", "SODAPOP_NPM_PUBLISH_ENABLED",
 		"id-token: write", "npm@11.15.0", "node scripts/publish-npm.mjs",
+		"ref: ${{ github.event.repository.default_branch }}",
 		"permission-contents: write", "permission-pull-requests: write",
 		"repositories: homebrew-sodapop", "gh pr create", "--registry-install",
 		"needs: [prepare, npm]",
