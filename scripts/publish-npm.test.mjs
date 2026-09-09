@@ -28,7 +28,7 @@ function registry(mode = "missing") {
   const compared = [];
   const data = Buffer.from("unit test tarball receipt");
   const integrity = "sha512-" + createHash("sha512").update(data).digest("base64");
-  const runner = (args) => {
+  const runner = (args, options = {}) => {
     if (args[0] === "pack") {
       const metadata = JSON.parse(readFileSync(path.join(args.at(-1), "package.json")));
       const filename = metadata.name.replace("@", "").replace("/", "-") + "-1.2.3.tgz";
@@ -50,6 +50,9 @@ function registry(mode = "missing") {
     }
     if (args[0] === "diff") {
       compared.push(args);
+      assert.ok(options.cwd.endsWith(path.join("platforms", "darwin-arm64")) ||
+        options.cwd.endsWith("cli"));
+      assert.equal(args.filter((arg) => arg.startsWith("--diff=")).length, 1);
       if (mode === "comparison-error") return { status: 1, stdout: "", stderr: "registry unavailable" };
       return { status: 0, stdout: mode === "different" ? "package.json\n" : "" };
     }
