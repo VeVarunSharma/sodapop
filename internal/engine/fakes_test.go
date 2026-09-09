@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -324,8 +325,9 @@ func testConfig(t *testing.T) Config {
 
 func testEngine(t *testing.T, cfg Config, client *fakeClient, alter func(*dependencies)) *Copilot {
 	t.Helper()
+	bundlePath := filepath.Join(t.TempDir(), "bundled", "copilot-runtime")
 	deps := dependencies{
-		bundlePath: func() (string, error) { return "/bundled/copilot-runtime", nil },
+		bundlePath: func() (string, error) { return bundlePath, nil },
 		client: func(options *copilot.ClientOptions) runtimeClient {
 			client.mu.Lock()
 			client.options = options
