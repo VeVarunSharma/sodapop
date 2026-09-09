@@ -335,6 +335,9 @@ func TestRenameDeleteAndUnusualPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	untracked := "--option-like\npath.txt"
+	if runtime.GOOS == "windows" {
+		untracked = "--option-like path.txt"
+	}
 	writeFixture(t, filepath.Join(dir, untracked), "literal filename\n")
 	status, err := service.Status(t.Context())
 	if err != nil {
