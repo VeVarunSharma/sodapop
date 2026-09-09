@@ -184,7 +184,22 @@ for (const width of [320, 390, 768, 1440]) {
     for (const route of ['./', 'download/', 'docs/', 'docs/getting-started/', 'docs/customization/']) {
       await page.goto(route);
       await page.waitForLoadState('networkidle');
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (route === 'download/') {
+        await expect(page.getByRole('button', { name: 'Copy installation command' })).toBeEnabled();
+      }
+      const layout = await page.evaluate(() => ({
+        viewport: innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflow: [...document.querySelectorAll<HTMLElement>('body *')]
+          .map((element) => {
+            const bounds = element.getBoundingClientRect();
+            return { tag: element.tagName, className: element.className, left: bounds.left, right: bounds.right };
+          })
+          .filter(({ left, right }) => left < -0.5 || right > innerWidth + 0.5)
+          .slice(0, 10),
+      }));
+      expect(layout.scrollWidth, `horizontal overflow on ${route}: ${JSON.stringify(layout.overflow)}`)
+        .toBe(layout.viewport);
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
       expect(results.violations).toEqual([]);
     }
