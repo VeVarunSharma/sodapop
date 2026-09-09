@@ -5,7 +5,7 @@
  * Configure only src/data/channels.json:
  * - mode: "pre-release" (local, no write/network) or "release".
  * - repository: the canonical VeVarunSharma/sodapop identity, never an endpoint.
- * - releaseTag: null for public latest stable, or an exact stable vX.Y.Z.
+ * - releaseTag: null for public latest stable, or an exact vX.Y.Z release tag.
  * - channels.npm.verify: opt in to checking @sodapop-sh/cli and every package declared
  *   by its published sodapop manifest, including Windows x64 when declared.
  * - channels.homebrew.verify: opt in after setting repository to the confirmed
@@ -27,7 +27,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   catalogFromManifest, catalogPaths, installCommands, readCatalog, readReleaseInputs,
-  isDependencyVersion, npmTarget, parseReleaseJSON, previewCatalog, releaseIdentities, stableVersion, validateCatalog,
+  isDependencyVersion, npmInstallCommand, npmTarget, parseReleaseJSON, previewCatalog,
+  releaseIdentities, releaseVersion, stableVersion, validateCatalog,
 } from './release-catalog.mjs';
 
 /** @typedef {import('../src/lib/catalog-types.ts').PublishedReleaseCatalog} PublishedReleaseCatalog */
@@ -205,15 +206,17 @@ async function publicRepository(request, repository, label) {
 
 function releaseMetadata(value, configuration) {
   record(value, 'GitHub release');
-  if (!Number.isSafeInteger(value.id) || value.id < 1 || value.draft !== false || value.prerelease !== false ||
+  if (!Number.isSafeInteger(value.id) || value.id < 1 || value.draft !== false || typeof value.prerelease !== 'boolean' ||
       typeof value.tag_name !== 'string' || !value.tag_name.startsWith('v')) {
-    fail('GitHub release must be a public stable, non-draft release with an exact vX.Y.Z tag');
+    fail('GitHub release must be public, non-draft, and use an exact release tag');
   }
-  const version = stableVersion(value.tag_name.slice(1), 'Release tag');
+  const version = releaseVersion(value.tag_name.slice(1), 'Release tag');
+  const prerelease = version.includes('-');
   const releaseURL = `https://github.com/${configuration.repository}/releases/tag/v${version}`;
   if (value.html_url !== releaseURL || value.url !== `${api}/repos/${configuration.repository}/releases/${value.id}` ||
       value.assets_url !== `${api}/repos/${configuration.repository}/releases/${value.id}/assets` ||
-      !publishedTimestamp(value.published_at) ||
+      !publishedTimestamp(value.published_at) || value.prerelease !== prerelease ||
+      (configuration.releaseTag === null && prerelease) ||
       (configuration.releaseTag !== null && value.tag_name !== configuration.releaseTag)) {
     fail('GitHub release URL, publication metadata, or configured tag is invalid');
   }
@@ -275,7 +278,7 @@ async function smallAsset(request, asset, label, limit) {
 async function nativeRelease(request, configuration) {
   await publicRepository(request, configuration.repository, 'Canonical release repository');
   const selector = configuration.releaseTag === null ? 'latest' : `tags/${configuration.releaseTag}`;
-  const release = json(await request(`${api}/repos/${configuration.repository}/releases/${selector}`, 'Public stable release'), 'Public stable release');
+  const release = json(await request(`${api}/repos/${configuration.repository}/releases/${selector}`, 'Public release'), 'Public release');
   const { version, assets } = releaseMetadata(release, configuration);
   const manifestName = `sodapop-${version}-manifest.json`;
   const bytes = await smallAsset(request, assets.get(manifestName), 'Published release manifest', manifestLimit);
@@ -310,7 +313,7 @@ async function nativeRelease(request, configuration) {
 
 function packageIdentity(value, name) {
   record(value, 'npm package');
-  const version = stableVersion(value.version, 'npm package version');
+  const version = releaseVersion(value.version, 'npm package version');
   if (value.name !== name || value.private === true || value.deprecated ||
       value.repository?.url !== `git+https://github.com/${releaseIdentities.repository}.git`) {
     fail('Published npm package identity does not match the owned source package');
@@ -357,7 +360,14 @@ function packageBinding(value, catalog, artifacts, plural) {
 }
 
 async function npmChannel(request, catalog, nodeRequirement) {
-  const bytes = await request(`${registry}/@sodapop-sh%2fcli/latest`, 'Public npm launcher', jsonLimit, { missing: 'npm' });
+  const tag = catalog.version.includes('-') ? 'preview' : 'latest';
+  const tagBytes = await request(`${registry}/-/package/@sodapop-sh%2fcli/dist-tags`,
+    'Public npm channel tags', jsonLimit, { missing: 'npm' });
+  if (tagBytes === null) return;
+  const tags = record(json(tagBytes, 'Public npm channel tags'), 'Public npm channel tags');
+  if (tags[tag] !== catalog.version) return;
+  const bytes = await request(`${registry}/@sodapop-sh%2fcli/${catalog.version}`, 'Public npm launcher',
+    jsonLimit, { missing: 'npm' });
   if (bytes === null) return;
   const launcher = json(bytes, 'Public npm launcher');
   const version = packageIdentity(launcher, releaseIdentities.npmPackage);
@@ -388,7 +398,7 @@ async function npmChannel(request, catalog, nodeRequirement) {
     packageBinding(pkg.sodapop, catalog, [artifact], false);
   }
   catalog.channels.npm = {
-    status: 'published', command: installCommands.npm, version,
+    status: 'published', command: npmInstallCommand(version), version,
     url: 'https://www.npmjs.com/package/@sodapop-sh/cli', platforms: artifacts.map(({ platform }) => platform),
   };
 }
@@ -501,7 +511,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const args = process.argv.slice(2);
     if (args.length === 1 && args[0] === '--help') {
-      console.log('Usage: npm --prefix site run release:sync\nEdit src/data/channels.json to select explicit pre-release/release mode, an optional stable releaseTag, and independent channel verify flags. SODAPOP_SITE_PREVIEW=1 selects an offline preview without release metadata reads, requests, or writes; unset or 0 retains strict production behavior. No tokens, endpoint overrides, or fixture flags are accepted.');
+      console.log('Usage: npm --prefix site run release:sync\nEdit src/data/channels.json to select explicit pre-release/release mode, an optional exact releaseTag, and independent channel verify flags. SODAPOP_SITE_PREVIEW=1 selects an offline preview without release metadata reads, requests, or writes; unset or 0 retains strict production behavior. No tokens, endpoint overrides, or fixture flags are accepted.');
     } else {
       if (args.length !== 0) throw new Error('Unsupported arguments; use --help for the operator-controlled channel configuration');
       const catalog = await resolveReleases();

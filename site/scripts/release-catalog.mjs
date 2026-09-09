@@ -35,6 +35,10 @@ export const installCommands = Object.freeze({
   homebrew: 'brew install VeVarunSharma/sodapop/sodapop',
 });
 
+export function npmInstallCommand(version) {
+  return version.includes('-') ? `${installCommands.npm}@preview` : installCommands.npm;
+}
+
 export const nativePlatforms = Object.freeze(/** @type {const} */ ([
   { platform: 'darwin/arm64', label: 'macOS (Apple silicon)' },
   { platform: 'darwin/amd64', label: 'macOS (Intel x64)' },
@@ -65,6 +69,7 @@ export const catalogPaths = Object.freeze({
 
 const sha256Pattern = /^[0-9a-f]{64}$/;
 const stablePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const releasePattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const dependencyPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const catalogKeys = [
   'schemaVersion', 'mode', 'version', 'releaseUrl', 'manifestUrl', 'commit',
@@ -85,9 +90,22 @@ function object(value, required, label, optional = []) {
 }
 
 /** @internal Shared exact-version contract for native and package-manager metadata. */
-export function stableVersion(value, label) {
+export function releaseVersion(value, label) {
   if (typeof value !== 'string' || value.length > 64 || value.trim() !== value ||
-      !stablePattern.test(value) || value === '0.0.0') {
+      !releasePattern.test(value) || value === '0.0.0') {
+    throw new Error(`${label} must be an exact, non-placeholder release version`);
+  }
+  const prerelease = value.split('-').slice(1).join('-');
+  if (prerelease && !prerelease.split('.').every(
+    (part) => !/^\d+$/.test(part) || part === '0' || !part.startsWith('0')
+  )) {
+    throw new Error(`${label} must be an exact, non-placeholder release version`);
+  }
+  return value;
+}
+
+export function stableVersion(value, label) {
+  if (!stablePattern.test(releaseVersion(value, label))) {
     throw new Error(`${label} must be an exact, non-placeholder stable X.Y.Z version`);
   }
   return value;
@@ -166,9 +184,9 @@ function validateConfiguration(value) {
   }
   if (value.releaseTag !== null) {
     if (typeof value.releaseTag !== 'string' || !value.releaseTag.startsWith('v')) {
-      throw new Error('releaseTag must be null or an exact stable vX.Y.Z tag');
+      throw new Error('releaseTag must be null or an exact vX.Y.Z release tag');
     }
-    stableVersion(value.releaseTag.slice(1), 'releaseTag');
+    releaseVersion(value.releaseTag.slice(1), 'releaseTag');
   }
   object(value.channels, ['npm', 'homebrew'], 'Channel configuration');
   object(value.channels.npm, ['verify', 'package'], 'npm configuration');
@@ -295,7 +313,7 @@ export function previewCatalog(environment = process.env) {
 export function catalogFromManifest(value, configuration) {
   object(value, ['schema_version', 'version', 'commit', 'copilot_runtime_version', 'copilot_sdk_version', 'artifacts'], 'Release manifest');
   if (value.schema_version !== 1) throw new Error('Release manifest requires schema_version 1');
-  const version = stableVersion(value.version, 'Manifest version');
+  const version = releaseVersion(value.version, 'Manifest version');
   if (configuration.releaseTag !== null && configuration.releaseTag !== `v${version}`) {
     throw new Error('Manifest version does not match configured releaseTag');
   }
@@ -404,8 +422,9 @@ export function validateCatalog(value, configuration) {
     } else if (channel.status === 'published') {
       const url = name === 'npm' ? 'https://www.npmjs.com/package/@sodapop-sh/cli'
         : `https://github.com/${releaseIdentities.homebrewRepository}`;
+      const command = name === 'npm' ? npmInstallCommand(expected.version) : installCommands.homebrew;
       if (expected.mode !== 'release' || !configuration.channels[name].verify ||
-          channel.command !== installCommands[name] || channel.version !== expected.version || channel.url !== url) {
+          channel.command !== command || channel.version !== expected.version || channel.url !== url) {
         throw new Error(`Published ${name} channel identity, version, command, or configuration is invalid`);
       }
       const declared = new Set(channel.platforms);
@@ -417,7 +436,7 @@ export function validateCatalog(value, configuration) {
       if (name === 'homebrew' && (platforms.length !== 4 || platforms.includes('windows/amd64'))) {
         throw new Error('Published Homebrew channel requires exactly the four Unix platforms');
       }
-      expected.channels[name] = { status: 'published', command: installCommands[name], version: expected.version, url, platforms };
+      expected.channels[name] = { status: 'published', command, version: expected.version, url, platforms };
     } else {
       throw new Error(`Resolved ${name} channel has an invalid publication status`);
     }

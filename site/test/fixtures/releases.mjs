@@ -17,7 +17,7 @@ const encodeJSON = (value) => Buffer.from(`${JSON.stringify(value)}\n`);
 
 export async function releaseFixture(t, {
   mode = 'release', npm = false, homebrew = false, windowsZip = true, sdk = true,
-  npmPlatforms = platforms.slice(0, 4),
+  npmPlatforms = platforms.slice(0, 4), releaseVersion = version,
 } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), 'sodapop-site-releases-'));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -27,7 +27,8 @@ export async function releaseFixture(t, {
     configPath: path.join(root, 'channels.json'),
     resolvedPath: path.join(root, '.generated/releases.json'),
     configuration: {
-      schemaVersion: 1, mode, repository, releaseTag: null,
+      schemaVersion: 1, mode, repository,
+      releaseTag: releaseVersion.includes('-') ? `v${releaseVersion}` : null,
       channels: {
         npm: { verify: npm, package: '@sodapop-sh/cli' },
         homebrew: { verify: homebrew, repository: homebrew ? tap : null, formula: 'sodapop' },
@@ -41,21 +42,21 @@ export async function releaseFixture(t, {
       full_name: tap, private: false, visibility: 'public',
       html_url: `https://github.com/${tap}`, url: tapAPI, default_branch: 'main',
     },
-    manifestName: `sodapop-${version}-manifest.json`,
+    manifestName: `sodapop-${releaseVersion}-manifest.json`,
     manifest: {
-      schema_version: 1, version, commit: createHash('sha1').update('fixture commit').digest('hex'),
+      schema_version: 1, version: releaseVersion, commit: createHash('sha1').update('fixture commit').digest('hex'),
       copilot_runtime_version: '1.0.83', ...(sdk ? { copilot_sdk_version: '1.0.13' } : {}),
       artifacts: platforms.map((platform) => ({
         platform,
-        archive: `sodapop-${version}-${platform.replace('/', '-')}${windowsZip && platform === 'windows/amd64' ? '.zip' : '.tar.gz'}`,
+        archive: `sodapop-${releaseVersion}-${platform.replace('/', '-')}${windowsZip && platform === 'windows/amd64' ? '.zip' : '.tar.gz'}`,
         archive_sha256: sha256(`fixture archive ${platform}`),
         binary_sha256: sha256(`fixture binary ${platform}`),
       })),
     },
     release: {
-      id: 123, tag_name: `v${version}`, draft: false, prerelease: false,
+      id: 123, tag_name: `v${releaseVersion}`, draft: false, prerelease: releaseVersion.includes('-'),
       published_at: '2026-09-01T12:00:00Z',
-      html_url: `https://github.com/${repository}/releases/tag/v${version}`,
+      html_url: `https://github.com/${repository}/releases/tag/v${releaseVersion}`,
       url: `${api}/releases/123`, assets_url: `${api}/releases/123/assets`, assets: [],
     },
     npm: new Map(),
@@ -63,7 +64,7 @@ export async function releaseFixture(t, {
       return writeFile(this.configPath, `${JSON.stringify(this.configuration)}\n`);
     },
   };
-  const base = `https://github.com/${repository}/releases/download/v${version}`;
+  const base = `https://github.com/${repository}/releases/download/v${releaseVersion}`;
   let assetID = 1;
   function addAsset(name, size, hash) {
     const id = assetID++;
@@ -105,22 +106,22 @@ export async function releaseFixture(t, {
   addAsset(f.manifestName, 1, sha256('placeholder'));
   f.refreshManifest();
   f.gitRef = {
-    ref: `refs/tags/v${version}`,
+    ref: `refs/tags/v${releaseVersion}`,
     object: { type: 'commit', sha: f.manifest.commit, url: `${api}/git/commits/${f.manifest.commit}` },
   };
   f.setJSON(api, f.repository);
   f.setJSON(`${api}/releases/latest`, f.release);
-  f.setJSON(`${api}/releases/tags/v${version}`, f.release);
-  f.setJSON(`${api}/git/ref/tags/v${version}`, f.gitRef);
+  f.setJSON(`${api}/releases/tags/v${releaseVersion}`, f.release);
+  f.setJSON(`${api}/git/ref/tags/v${releaseVersion}`, f.gitRef);
   f.setJSON(tapAPI, f.tap);
   for (const id of ['cli', ...platforms.map((platform) => platform.replace('/', '-'))]) {
     const metadata = JSON.parse(await readFile(path.join(repositoryRoot, `npm/packages/${id}/package.json`), 'utf8'));
     delete metadata.private;
-    metadata.version = version;
+    metadata.version = releaseVersion;
     const { artifacts, ...header } = f.manifest;
     if (id === 'cli') {
       metadata.optionalDependencies = Object.fromEntries(npmPlatforms.map((platform) => [
-        `@sodapop-sh/${platform.replace('/', '-')}`, version,
+        `@sodapop-sh/${platform.replace('/', '-')}`, releaseVersion,
       ]));
       metadata.sodapop = {
         ...header, artifacts: structuredClone(artifacts.filter(({ platform }) => npmPlatforms.includes(platform))),
@@ -130,14 +131,18 @@ export async function releaseFixture(t, {
       metadata.sodapop = { ...header, artifact: structuredClone(artifact) };
     }
     metadata.dist = {
-      tarball: `${registry}/@sodapop-sh/${id}/-/${id}-${version}.tgz`,
+      tarball: `${registry}/@sodapop-sh/${id}/-/${id}-${releaseVersion}.tgz`,
       integrity: `sha512-${createHash('sha512').update(`fixture npm ${id}`).digest('base64')}`,
     };
     f.npm.set(id, metadata);
-    f.setJSON(`${registry}/@sodapop-sh%2f${id}/${id === 'cli' ? 'latest' : version}`, metadata);
+    f.setJSON(`${registry}/@sodapop-sh%2f${id}/${releaseVersion}`, metadata);
   }
+  f.distTags = {
+    [releaseVersion.includes('-') ? 'preview' : 'latest']: releaseVersion,
+  };
+  f.setJSON(`${registry}/-/package/@sodapop-sh%2fcli/dist-tags`, f.distTags);
   f.template = await readFile(path.join(repositoryRoot, 'packaging/homebrew/Formula/sodapop.rb.tmpl'), 'utf8');
-  f.formula = f.template.replaceAll('@RELEASE_BASE@', base).replaceAll('@VERSION@', version)
+  f.formula = f.template.replaceAll('@RELEASE_BASE@', base).replaceAll('@VERSION@', releaseVersion)
     .replaceAll('@COPILOT_SDK_VERSION@', f.manifest.copilot_sdk_version ?? 'missing')
     .replaceAll('@COPILOT_RUNTIME_VERSION@', f.manifest.copilot_runtime_version);
   for (const artifact of f.manifest.artifacts.slice(0, 4)) {

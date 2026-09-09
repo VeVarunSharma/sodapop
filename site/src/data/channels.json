@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "mode": "pre-release",
+  "mode": "release",
   "repository": "VeVarunSharma/sodapop",
-  "releaseTag": null,
+  "releaseTag": "v0.1.0-rc.9",
   "channels": {
     "npm": {
-      "verify": false,
+      "verify": true,
       "package": "@sodapop-sh/cli"
     },
     "homebrew": {

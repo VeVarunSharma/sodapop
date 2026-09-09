@@ -486,7 +486,8 @@ test('the real curated prose generates all approved routes using isolated fixtur
     .includes(`[npm packaging guide](${canonicalRepository}/blob/HEAD/npm/README.md)`));
   const development = generated['development/index.md'].toString().replace(/\s+/g, ' ');
   assert.match(development, /development template, not the published support matrix/);
-  assert.match(development, /pre-release default leaves all channels unpublished/);
+  assert.match(development, /select an exact stable or prerelease tag/);
+  assert.match(development, /prerelease npm uses `preview`, while Homebrew remains stable-only/);
   const distribution = generated['development/distribution.md'].toString().replace(/\s+/g, ' ');
   for (const field of ['copilot_sdk_version', 'copilot_runtime_version', 'archive_sha256', 'binary_sha256']) {
     assert.ok(distribution.includes(`\`${field}\``), field);
