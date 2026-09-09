@@ -91,7 +91,8 @@ test('availability is honest and denied clipboard access has a visible fallback'
     await expect(page.getByRole('link', { name: 'Download archive' })).toHaveCount(0);
     await expect(page.locator('code').filter({ hasText: 'npm install' })).toHaveCount(0);
   } else {
-    await expect(page.getByRole('heading', { name: `Sodapop ${catalog.version}`, exact: true })).toBeVisible();
+    const heading = catalog.version.includes('-') ? `Sodapop preview ${catalog.version}` : `Sodapop ${catalog.version}`;
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download archive' })).toHaveCount(catalog.artifacts.length);
   }
   await page.getByRole('button', { name: 'Copy installation command' }).click();
