@@ -107,7 +107,7 @@ jobs:
       - name: Inspect the static artifact
         run: npm --prefix site run check:artifact
       - name: Install browser for website checks
-        run: npm --prefix site exec -- playwright install --with-deps chromium
+        run: npm --prefix site exec -- playwright install chromium
       - name: Exercise built pages
         run: npm --prefix site run test:e2e
       - name: Retain browser diagnostics on failure
