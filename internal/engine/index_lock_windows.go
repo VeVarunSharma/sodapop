@@ -12,6 +12,11 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+const (
+	lockProtectionPollInterval = 5 * time.Millisecond
+	lockProtectionWait         = 250 * time.Millisecond
+)
+
 func lockIndex(ctx context.Context, root *os.Root) (*os.File, error) {
 	const name = "sodapop-sessions.lock"
 	lock, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
@@ -45,12 +50,8 @@ func lockIndex(ctx context.Context, root *os.Root) (*os.File, error) {
 	if existing != nil && !os.SameFile(existing, info) {
 		return fail(errors.New("Sodapop session lock changed while it was being opened"))
 	}
-	private, err := securefs.IsPrivateRegularFile(lock)
-	if err != nil {
+	if err := waitForPrivateLock(ctx, lock, created); err != nil {
 		return fail(err)
-	}
-	if !private {
-		return fail(errors.New("Sodapop session lock must be a private regular file"))
 	}
 	for {
 		if err := ctx.Err(); err != nil {
@@ -68,6 +69,31 @@ func lockIndex(ctx context.Context, root *os.Root) (*os.File, error) {
 		case <-ctx.Done():
 			timer.Stop()
 			return fail(ctx.Err())
+		case <-timer.C:
+		}
+	}
+}
+
+func waitForPrivateLock(ctx context.Context, lock *os.File, created bool) error {
+	deadline := time.Now().Add(lockProtectionWait)
+	for {
+		private, err := securefs.IsPrivateRegularFile(lock)
+		if err != nil {
+			return err
+		}
+		if private {
+			return nil
+		}
+		if created || !time.Now().Before(deadline) {
+			return errors.New("Sodapop session lock must be a private regular file")
+		}
+		// Another process may have created the shared lock and not yet finished
+		// replacing its inherited ACL. Wait briefly, but never accept it unprotected.
+		timer := time.NewTimer(lockProtectionPollInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
 		case <-timer.C:
 		}
 	}
