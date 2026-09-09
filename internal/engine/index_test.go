@@ -169,7 +169,19 @@ func TestVersionOneIndexMigratesSelectionsOnNextWrite(t *testing.T) {
 		session.ID, project,
 	)
 	path := filepath.Join(home, indexFilename)
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := securefs.ProtectFile(file); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if _, err := file.WriteString(content); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
 	index := &sessionIndex{home: home, project: project, account: "one"}

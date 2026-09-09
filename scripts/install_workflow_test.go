@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -49,27 +50,22 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 	}
 }
 
-func TestCIKeepsWindowsTestsToPortableAndNativePackages(t *testing.T) {
-	data, err := os.ReadFile("../.github/workflows/ci.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	for _, required := range []string{
-		"windows-2025",
-		"go test -race ./internal/app ./internal/auth ./internal/commands ./internal/config",
-		"./internal/integration ./internal/runtimebundle ./internal/securefs ./internal/ui/logo",
-		"./scripts/installcheck ./scripts/windows",
-		"go build ./cmd/sodapop",
-		"- name: Check formatting\n        if: runner.os != 'Windows'",
-	} {
-		if !strings.Contains(text, required) {
-			t.Errorf("Windows CI is missing %q", required)
+func TestCIAndReleaseExerciseTheSameWindowsPackages(t *testing.T) {
+	const windowsTest = "go test -race ./internal/... ./scripts/installcheck ./scripts/releasectl ./scripts/windows"
+	for _, workflow := range []string{"ci.yml", "release.yml"} {
+		data, err := os.ReadFile(filepath.Join("../.github/workflows", workflow))
+		if err != nil {
+			t.Fatal(err)
 		}
-	}
-	for _, unsupported := range []string{"go test -race ./internal/...", "./scripts/releasectl"} {
-		if strings.Contains(text, unsupported) {
-			t.Errorf("Windows CI unexpectedly runs unsupported scope %q", unsupported)
+		text := string(data)
+		for _, required := range []string{
+			"windows-2025",
+			windowsTest,
+			"go build ./cmd/sodapop",
+		} {
+			if !strings.Contains(text, required) {
+				t.Errorf("%s is missing %q", workflow, required)
+			}
 		}
 	}
 }

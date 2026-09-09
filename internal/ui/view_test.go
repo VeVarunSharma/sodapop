@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -128,7 +129,7 @@ func TestSidebarIsWideOnlyAndChatKeepsPriority(t *testing.T) {
 		t.Fatalf("wide layout did not preserve chat width: %+v", m.layout)
 	}
 	view := m.View().Content
-	for _, expected := range []string{"SODAPOP", "vtest", "/project", "main", "GPT-5.6 Luna", "Default", "MCP SERVERS", "SKILLS", "None"} {
+	for _, expected := range []string{"SODAPOP", "vtest", filepath.Clean("/project"), "main", "GPT-5.6 Luna", "Default", "MCP SERVERS", "SKILLS", "None"} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("sidebar omitted %q:\n%s", expected, view)
 		}
