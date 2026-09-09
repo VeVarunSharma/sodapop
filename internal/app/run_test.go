@@ -135,7 +135,7 @@ func TestInteractiveRunWiresOptionsAndDoesNotPersistTemporaryOverrides(t *testin
 	if state.authClientID != "environment-client" {
 		t.Fatalf("client ID = %q", state.authClientID)
 	}
-	if state.options.Project != "/canonical/project" || state.options.Version != Version ||
+	if state.options.Project != state.project || state.options.Version != Version ||
 		!state.options.Preferences.NoColor || !state.options.Preferences.ReducedMotion || !state.options.Preferences.ASCII {
 		t.Fatalf("unexpected UI options: %+v", state.options)
 	}
@@ -185,7 +185,7 @@ func TestInteractiveRunBuildsAccountBoundEngine(t *testing.T) {
 	if err != nil || got != backend || backend.starts != 1 {
 		t.Fatalf("engine result = %#v, starts=%d, err=%v", got, backend.starts, err)
 	}
-	if state.engineConfig.AccountID != "account-a" || state.engineConfig.Project != "/canonical/project" ||
+	if state.engineConfig.AccountID != "account-a" || state.engineConfig.Project != state.project ||
 		filepath.Dir(state.engineConfig.Home) != filepath.Join(state.paths.StateDir, "copilot") ||
 		strings.Contains(state.engineConfig.Home, "account-a") {
 		t.Fatalf("engine config = %+v", state.engineConfig)
@@ -307,6 +307,7 @@ type runTestState struct {
 	mcpRegistry      config.MCPRegistry
 	engineConfig     engine.Config
 	paths            config.Paths
+	project          string
 }
 
 func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
@@ -326,6 +327,8 @@ func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
 	state := &runTestState{input: input, output: output, model: &testApplicationModel{}}
 	paths := config.Paths{ConfigFile: filepath.Join(t.TempDir(), "config.json"), StateDir: filepath.Join(t.TempDir(), "state")}
 	state.paths = paths
+	project, canonicalProject := t.TempDir(), t.TempDir()
+	state.project = canonicalProject
 	deps := defaultRunDependencies()
 	deps.isTerminal = func(uintptr) bool { return true }
 	deps.resolvePaths = func() (config.Paths, error) { return paths, nil }
@@ -340,8 +343,8 @@ func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
 		state.mcpRegistry = registry
 		return nil
 	}
-	deps.getwd = func() (string, error) { return "/project", nil }
-	deps.evalSymlinks = func(string) (string, error) { return "/canonical/project", nil }
+	deps.getwd = func() (string, error) { return project, nil }
+	deps.evalSymlinks = func(string) (string, error) { return canonicalProject, nil }
 	deps.newWorkspace = func(string) (ui.Workspace, error) { return testWorkspace{}, nil }
 	deps.newAuth = func(clientID string) applicationAuth {
 		state.authClientID = clientID
