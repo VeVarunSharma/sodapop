@@ -72,6 +72,19 @@ function resultJSON(result, operation) {
   }
 }
 
+export function commandFailureDetail(result) {
+  if (result.error) return result.error.message;
+  const output = [result.stderr, result.stdout]
+    .filter((value) => typeof value === "string" && value.trim() !== "")
+    .join("\n")
+    .replace(/\u001b\[[0-9;]*m/g, "")
+    .replace(/\bnpm_[A-Za-z0-9_-]{20,}\b/g, "[redacted npm token]")
+    .replace(/(\/\/registry\.npmjs\.org\/:_authToken=)\S+/gi, "$1[redacted]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .trim();
+  return output ? output.slice(-4096) : `exit ${result.status}`;
+}
+
 export function expectedExecutableModeDifference(output) {
   const lines = output.trim().split(/\r?\n/).map((line) => line.trimEnd());
   if (lines.length !== 6) return false;
@@ -160,7 +173,10 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
         "--tag", tag, "--registry=https://registry.npmjs.org"
       ]);
       if (published.error || published.status !== 0) {
-        throw new Error(`Publication failed for ${specification}; rerun only with these identical package bytes`);
+        throw new Error(
+          `Publication failed for ${specification}; rerun only with these identical package bytes: ` +
+          commandFailureDetail(published)
+        );
       }
       log(`Published ${specification} under ${tag}`);
     }
