@@ -25,6 +25,7 @@ function fixture(t) {
 
 function registry(mode = "missing") {
   const published = [];
+  const compared = [];
   const data = Buffer.from("unit test tarball receipt");
   const integrity = "sha512-" + createHash("sha512").update(data).digest("base64");
   const runner = (args) => {
@@ -39,7 +40,7 @@ function registry(mode = "missing") {
       if (args[2] === "dist-tags") {
         return { status: 0, stdout: JSON.stringify({ latest: mode === "wrong-tag" ? "1.2.2" : "1.2.3", preview: "1.2.3" }) };
       }
-      if (mode === "matching" || mode === "different" || mode === "wrong-tag") {
+      if (mode === "matching" || mode === "different" || mode === "wrong-tag" || mode === "comparison-error") {
         return { status: 0, stdout: JSON.stringify(mode === "different" ? "sha512-other" : integrity) };
       }
       return {
@@ -47,13 +48,18 @@ function registry(mode = "missing") {
         stdout: JSON.stringify({ error: { code: mode === "missing" ? "E404" : "ENOTCONN" } })
       };
     }
+    if (args[0] === "diff") {
+      compared.push(args);
+      if (mode === "comparison-error") return { status: 1, stdout: "", stderr: "registry unavailable" };
+      return { status: 0, stdout: mode === "different" ? "package.json\n" : "" };
+    }
     assert.equal(args[0], "publish");
     assert.ok(args.includes("--provenance"));
     assert.ok(args.includes("--ignore-scripts"));
     published.push(path.basename(args[1]));
     return { status: 0, stdout: "" };
   };
-  return { runner, published };
+  return { runner, published, compared };
 }
 
 test("publishes platform tarballs before the exact-version launcher", (t) => {
@@ -63,15 +69,17 @@ test("publishes platform tarballs before the exact-version launcher", (t) => {
   assert.deepEqual(published, ["sodapop-sh-darwin-arm64-1.2.3.tgz", "sodapop-sh-cli-1.2.3.tgz"]);
 });
 
-test("retry accepts only identical already-published tarballs", (t) => {
+test("retry accepts only identical already-published package contents", (t) => {
   const directory = fixture(t);
   const matching = registry("matching");
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, matching.runner, () => {});
   assert.deepEqual(matching.published, []);
+  assert.equal(matching.compared.length, 2);
+  assert.ok(matching.compared.every((args) => args.includes("--diff-name-only")));
   const different = registry("different");
   assert.throws(
     () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, different.runner, () => {}),
-    /different published bytes/
+    /different published package contents/
   );
   assert.deepEqual(different.published, []);
   const wrongTag = registry("wrong-tag");
@@ -80,6 +88,16 @@ test("retry accepts only identical already-published tarballs", (t) => {
     /explicitly promote/
   );
   assert.deepEqual(wrongTag.published, []);
+});
+
+test("published-package comparison failures stop without publishing", (t) => {
+  const directory = fixture(t);
+  const failed = registry("comparison-error");
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, failed.runner, () => {}),
+    /Could not compare published contents/
+  );
+  assert.deepEqual(failed.published, []);
 });
 
 test("network failure is not mistaken for an unpublished package", (t) => {
