@@ -90,7 +90,8 @@ export type Catalog = ReleaseCatalog;
  * Operator-owned src/data/channels.json. No environment variables can promote a
  * release, change an endpoint, supply credentials, or enable fixture metadata.
  * null releaseTag means GitHub's public latest stable release; otherwise use an
- * exact vX.Y.Z tag. Confirm npm namespace/tap ownership before enabling verify.
+ * exact stable or prerelease vX.Y.Z tag. Confirm npm namespace/tap ownership
+ * before enabling verify.
  * A channel's verify flag enables a lookup, not publication.
  * npm availability comes from the registry manifest and its matching packages,
  * not the development launcher's optionalDependencies. Local subset fixtures do

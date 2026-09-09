@@ -8,6 +8,7 @@ import { withBase } from '../lib/urls';
 
 const catalog = getCatalog();
 const prerelease = catalog.mode === 'pre-release';
+const publishedPreview = catalog.mode === 'release' && catalog.version.includes('-');
 const windowsArtifact = catalog.artifacts.find((artifact) => artifact.platform === 'windows/amd64');
 const windowsFilename = windowsArtifact?.archive ?? null;
 if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) {
@@ -23,10 +24,10 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
     </section>
 
     <section class="release-notice" aria-labelledby="release-status">
-      {prerelease ? <FlaskConical size={25} aria-hidden="true" /> : <ShieldCheck size={25} aria-hidden="true" />}
+      {prerelease || publishedPreview ? <FlaskConical size={25} aria-hidden="true" /> : <ShieldCheck size={25} aria-hidden="true" />}
       <div>
-        <h2 id="release-status">{prerelease ? 'Still in the soda lab.' : `Sodapop ${catalog.version}`}</h2>
-        <p>{prerelease ? 'Public binary downloads and package-manager installs are not enabled on this site yet. The source-build path is available for developers; it needs the prerequisites below.' : 'Download the archive for your operating system and processor. Compare its checksum before extracting the executable.'}</p>
+        <h2 id="release-status">{prerelease ? 'Still in the soda lab.' : `${publishedPreview ? 'Sodapop preview' : 'Sodapop'} ${catalog.version}`}</h2>
+        <p>{prerelease ? 'Public binary downloads and package-manager installs are not enabled on this site yet. The source-build path is available for developers; it needs the prerequisites below.' : publishedPreview ? 'This published preview is available through verified native downloads and npm. Homebrew remains unavailable until the stable release is signed and qualified.' : 'Download the archive for your operating system and processor. Compare its checksum before extracting the executable.'}</p>
         {!prerelease && catalog.releaseUrl && <a class="text-link" href={catalog.releaseUrl}>Read the release notes <ArrowUpRight size={14} aria-hidden="true" /></a>}
       </div>
     </section>

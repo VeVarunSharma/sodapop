@@ -119,8 +119,10 @@ the published support matrix.
 
 Generating packages and matching hashes do not establish registry availability,
 publisher identity, verified attestations, or code signing. Public channels
-need their separate publication and qualification evidence. The website's
-pre-release default leaves all channels unpublished until explicitly confirmed.
+need their separate publication and qualification evidence. The website catalog
+can select an exact stable or prerelease tag, but exposes only channels whose
+public metadata matches that release; prerelease npm uses `preview`, while
+Homebrew remains stable-only.
 
 ## Developer references
 

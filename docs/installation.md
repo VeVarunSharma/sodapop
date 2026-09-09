@@ -2,13 +2,16 @@
 
 Let's get Sodapop onto your machine. The [download page](/download/) is the
 authority for current public availability, exact release versions, and enabled
-installation methods. Sodapop's website can launch before native archives,
-npm packages, or the Homebrew tap are published. An unavailable method is not
-a working installation command.
+installation methods. Sodapop's website can launch before every distribution
+channel is published. An unavailable method is not a working installation
+command.
 
-If public downloads are not enabled, use the
-[source-build guide](development.md). Local builds need the existing Sodapop
-public-client configuration to sign in; they do not need a new OAuth app.
+The generated installation choices below come from the same public release
+catalog as the download page, including an exact preview dist-tag when a
+prerelease is selected. Channels that have not passed public verification are
+omitted. The [source-build guide](development.md) remains available for
+developers. Local builds need the existing Sodapop public-client configuration
+to sign in; they do not need a new OAuth app.
 
 <!-- SODAPOP_INSTALLATION_REFERENCE -->
 

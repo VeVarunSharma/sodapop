@@ -60,9 +60,12 @@ Reduced-motion visitors keep the static poster. Preserve those controls.
 
 ## Pre-release and published downloads
 
-`src/data/channels.json` defaults to an explicit **pre-release** state. That state
-does not invent a version, download URL, npm command, or published tap. Source-build
-guidance remains available with its actual prerequisites.
+`src/data/channels.json` explicitly selects either a source-only **pre-release**
+state or an exact public stable/prerelease tag. Source-only mode does not invent
+a version, download URL, npm command, or published tap. The current production
+configuration selects `v0.1.0-rc.9`, verifies npm's `preview` dist-tag, and keeps
+Homebrew unavailable. Source-build guidance remains available with its actual
+prerequisites.
 
 The release resolver is an explicit operator/CI action:
 
@@ -77,8 +80,10 @@ snapshot into the static routes. Page components use `src/lib/catalog.ts`;
 do not call the filesystem reader from bundled pages, where `import.meta.url`
 points into generated output instead of the source checkout.
 
-When enabling release mode, configure the public repository and separately
-published npm/Homebrew channels as defined in the channel configuration. The
+When enabling release mode, configure the public repository, an exact release
+tag when selecting a prerelease, and separately published npm/Homebrew channels
+as defined in the channel configuration. A prerelease npm channel must match
+the `preview` dist-tag; stable npm must match `latest`. The
 resolver validates release and manifest identity, platform assets, and checksum
 metadata before replacing the local resolved catalog. Failure must leave previous
 valid metadata/deployment intact. The website never publishes an application

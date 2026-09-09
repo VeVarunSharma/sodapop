@@ -48,29 +48,27 @@ sodapop
 
 `SODAPOP_INSTALL_DIR` overrides the installation directory. Relative paths resolve from the repository root; the installer prints an absolute directory for PATH setup. Installation does not edit your shell profile.
 
-## Install a published release
+## Install the published preview
 
-Once the owned tap and npm scope are published, the target package-manager
-commands are:
+The current public release is
+[`v0.1.0-rc.9`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.0-rc.9).
+Its native archives are available from that release, and the npm launcher is
+published under the `preview` dist-tag:
 
 ```sh
-# Homebrew tap (macOS and Linux)
-brew install VeVarunSharma/sodapop/sodapop
-
 # npm launcher (macOS, glibc-based Linux, and Windows x64)
-npm install --global @sodapop-sh/cli
+npm install --global @sodapop-sh/cli@preview
 
 # Windows x64: download the matching .zip from the GitHub Release,
 # verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.
 ```
 
-The release workflow produces the exact npm packages and Homebrew formula
-needed for those channels; publishing the external tap and npm scope requires
-their ownership and registry configuration. Direct archives remain the
-fallback for Windows and other environments. Package-manager installs do not
-require Go, Node.js (except for the npm launcher), or a separate Copilot
-installation. The exact asset, checksum, manifest, and installed-command
-checks are defined in
+Homebrew is **not published yet**. The tap remains gated on a signed, notarized,
+owner-qualified stable release; do not use or redistribute a generated formula
+as if it were public. Direct archives remain available for every supported
+platform. Package-manager installs do not require Go or a separate Copilot
+installation; the npm launcher does require Node.js. The exact asset, checksum,
+manifest, and installed-command checks are defined in
 [distribution testing](docs/distribution.md). Windows MSI, WinGet, and Scoop
 publication have additional native installation and ownership gates; generated
 installer metadata alone does not mean a public channel is available.

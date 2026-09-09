@@ -200,7 +200,7 @@ test('source/config identities and explicit opt-ins fail before any public reque
     ['unscoped credentials', (c) => { c.token = 'do-not-serialize'; }],
     ['fixture flag', (c) => { c.allowFixtures = true; }],
     ['missing channel', (c) => { delete c.channels.npm; }],
-    ...['latest', '1.2.3', 'v0.0.0', 'v01.2.3', 'v1.2.3-rc.1', 'v1.2.3+dev', 'v1.2.3\n', 'v1.2.3/else']
+    ...['latest', '1.2.3', 'v0.0.0', 'v01.2.3', 'v1.2.3-01', 'v1.2.3+dev', 'v1.2.3-', 'v1.2.3\n', 'v1.2.3/else']
       .map((tag) => [`invalid tag ${JSON.stringify(tag)}`, (c) => { c.releaseTag = tag; }]),
   ];
   for (const [name, mutate] of cases) {
@@ -278,7 +278,7 @@ test('native manifest parsing rejects duplicate/escaped keys and excessive JSON 
   }
 });
 
-test('public release/repository metadata must identify the exact stable non-draft publication', async (t) => {
+test('public release/repository metadata must identify the exact selected non-draft publication', async (t) => {
   const cases = [
     ['draft', (f) => { f.release.draft = true; }],
     ['prerelease', (f) => { f.release.prerelease = true; }],
@@ -394,7 +394,7 @@ test('a four-Unix npm manifest exposes only its declared packages, not every nat
   });
   assert.deepEqual(catalog.channels.homebrew, unavailable);
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
-  assert.equal(requests.length, 5);
+  assert.equal(requests.length, 6);
   assert.equal(requests.some(({ url }) => /windows|\.tgz/.test(url)), false);
   assert.equal(catalog.artifacts[4].platform, 'windows/amd64');
   assert.equal(f.npm.has('windows-amd64'), true);
@@ -416,7 +416,7 @@ test('npm can publish the manifest-declared Windows ZIP independently of the fou
   assert.equal(catalog.artifacts[4].archive, `sodapop-${version}-windows-amd64.zip`);
   assert.equal(catalog.artifacts[4].binary, 'sodapop.exe');
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
-  assert.equal(requests.length, 6);
+  assert.equal(requests.length, 7);
   assert.ok(requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-amd64/${version}`));
   assert.equal(f.requests.some(({ url }) => /\.tgz$|\.zip$|\.tar\.gz$/.test(url)), false);
   assert.deepEqual(await readCatalog(f.readOptions), catalog);
@@ -436,7 +436,8 @@ test('public npm metadata reports its exact nonempty declared subset without imp
       assert.deepEqual(catalog.channels.npm.platforms, expected);
       assert.deepEqual(catalog.artifacts.map(({ platform }) => platform), platforms);
       assert.deepEqual(f.requests.filter(({ url }) => url.startsWith(registry)).map(({ url }) => url), [
-        `${registry}/@sodapop-sh%2fcli/latest`,
+        `${registry}/-/package/@sodapop-sh%2fcli/dist-tags`,
+        `${registry}/@sodapop-sh%2fcli/${version}`,
         ...expected.map((platform) => `${registry}/@sodapop-sh%2f${platform.replace('/', '-')}/${version}`),
       ]);
       assert.deepEqual(await readCatalog(f.readOptions), catalog);
@@ -520,26 +521,33 @@ test('local native subsets cannot silently replace the five advertised public do
   await assert.rejects(readFile(f.resolvedPath), { code: 'ENOENT' });
 });
 
-test('missing npm launcher/platforms and a stale latest tag keep npm unavailable but do not hide Homebrew', async (t) => {
-  for (const name of ['missing launcher', 'partial native packages', 'stale latest']) {
+test('missing npm launcher/platforms and a stale dist-tag keep npm unavailable but do not hide Homebrew', async (t) => {
+  for (const name of ['missing launcher', 'partial native packages', 'stale dist-tag']) {
     await t.test(name, async (t) => {
       const f = await releaseFixture(t, { npm: true, homebrew: true });
-      if (name === 'missing launcher') missing(f, `${registry}/@sodapop-sh%2fcli/latest`);
+      if (name === 'missing launcher') missing(f, `${registry}/@sodapop-sh%2fcli/${version}`);
       if (name === 'partial native packages') missing(f, `${registry}/@sodapop-sh%2flinux-arm64/${version}`);
-      if (name === 'stale latest') {
-        const pkg = f.npm.get('cli');
-        pkg.version = '1.2.2';
-        pkg.dist.tarball = pkg.dist.tarball.replace(version, pkg.version);
-        for (const name of Object.keys(pkg.optionalDependencies)) pkg.optionalDependencies[name] = pkg.version;
-        pkg.sodapop.version = pkg.version;
-        for (const artifact of pkg.sodapop.artifacts) artifact.archive = artifact.archive.replace(version, pkg.version);
-      }
+      if (name === 'stale dist-tag') f.distTags.latest = '1.2.2';
       const catalog = await resolveReleases(f.options);
       assert.deepEqual(catalog.channels.npm, unavailable);
       assert.equal(catalog.channels.homebrew.status, 'published');
       assert.equal(catalog.artifacts.length, 5);
     });
   }
+});
+
+test('an exact published prerelease resolves native downloads and npm preview without Homebrew', async (t) => {
+  const releaseVersion = '1.2.3-rc.9';
+  const f = await releaseFixture(t, { npm: true, releaseVersion });
+  const catalog = await resolveReleases(f.options);
+  assert.equal(catalog.version, releaseVersion);
+  assert.deepEqual(catalog.channels.npm, {
+    status: 'published', command: 'npm install --global @sodapop-sh/cli@preview', version: releaseVersion,
+    url: 'https://www.npmjs.com/package/@sodapop-sh/cli', platforms: platforms.slice(0, 4),
+  });
+  assert.deepEqual(catalog.channels.homebrew, unavailable);
+  assert.ok(f.requests.some(({ url }) => url.endsWith('/dist-tags')));
+  assert.ok(f.requests.some(({ url }) => url.endsWith(`/@sodapop-sh%2fcli/${releaseVersion}`)));
 });
 
 test('npm metadata rejects wrong identities, unsupported platforms, bad URLs, and manifest mismatches', async (t) => {
@@ -652,10 +660,12 @@ test('network/auth/rate-limit failures never become unpublished or pre-release s
     ['release forbidden', `${api}/releases/latest`, 403, {}],
     ['GitHub rate limit', api, 429, {}],
     ['GitHub server error', api, 500, {}],
-    ['npm unauthorized', `${registry}/@sodapop-sh%2fcli/latest`, 401, {}],
-    ['npm forbidden', `${registry}/@sodapop-sh%2fcli/latest`, 403, {}],
-    ['npm rate limit', `${registry}/@sodapop-sh%2fcli/latest`, 429, {}],
-    ['ambiguous npm absence', `${registry}/@sodapop-sh%2fcli/latest`, 404, { error: 'Authentication required' }],
+    ['npm dist-tag unauthorized', `${registry}/-/package/@sodapop-sh%2fcli/dist-tags`, 401, {}],
+    ['npm dist-tag rate limit', `${registry}/-/package/@sodapop-sh%2fcli/dist-tags`, 429, {}],
+    ['npm unauthorized', `${registry}/@sodapop-sh%2fcli/${version}`, 401, {}],
+    ['npm forbidden', `${registry}/@sodapop-sh%2fcli/${version}`, 403, {}],
+    ['npm rate limit', `${registry}/@sodapop-sh%2fcli/${version}`, 429, {}],
+    ['ambiguous npm absence', `${registry}/@sodapop-sh%2fcli/${version}`, 404, { error: 'Authentication required' }],
     ['tap server error', tapAPI, 503, {}],
     ['ambiguous formula absence', `${tapAPI}/contents/Formula/sodapop.rb`, 404, { message: 'Access denied' }],
   ]) {
