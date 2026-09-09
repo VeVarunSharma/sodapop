@@ -121,10 +121,13 @@ test("mode-only retries accept only the expected native executable normalization
     "+++ b/bin/sodapop"
   ].join("\n");
   assert.equal(expectedNativeModeDifference(valid), true);
+  assert.equal(expectedNativeModeDifference(
+    valid.replace("old mode 100644\nnew mode 100755", "old mode 100755\nnew mode 100644")
+  ), true);
   assert.equal(expectedNativeModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
   for (const invalid of [
     valid.replace("new mode 100755", "new mode 100644"),
-    valid.replace("old mode 100644", "old mode 100755"),
+    valid.replace("new mode 100755", "new mode 100700"),
     valid.replaceAll("bin/sodapop", "package.json"),
     `${valid}\n@@ -1 +1 @@\n-old\n+new`
   ]) {

@@ -76,7 +76,9 @@ export function expectedNativeModeDifference(output) {
   const lines = output.trim().split(/\r?\n/);
   if (lines.length !== 6) return false;
   const match = lines[0].match(/^diff --git a\/(bin\/sodapop(?:\.exe)?) b\/\1$/);
-  if (!match || lines[1] !== "old mode 100644" || lines[2] !== "new mode 100755" ||
+  const oldMode = lines[1].match(/^old mode (100644|100755)$/)?.[1];
+  const newMode = lines[2].match(/^new mode (100644|100755)$/)?.[1];
+  if (!match || !oldMode || !newMode || oldMode === newMode ||
       !/^index \S+\.\.\S+(?: \d+)?$/.test(lines[3]) ||
       lines[4] !== `--- a/${match[1]}` || lines[5] !== `+++ b/${match[1]}`) {
     return false;
