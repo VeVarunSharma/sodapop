@@ -146,11 +146,12 @@ sodapop-demo > img { width: 100%; height: auto; }
 .install-copy .eyebrow { margin-bottom: 15px; }
 .install-copy p { color: var(--sp-muted); font-size: 15px; margin-top: 16px; }
 .install-panel { min-width: 0; padding: 24px; border-radius: 18px; background: var(--sp-panel); border: 1px solid var(--sp-line); box-shadow: var(--sp-shadow); }
-.install-tabs { min-height: 44px; height: auto; max-width: 100%; flex-wrap: wrap; padding: 4px; border-radius: 999px; margin-bottom: 13px; }
-.install-tabs [data-slot="tabs-trigger"] { min-height: 36px; padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--sp-muted); }
+.install-options { min-width: 0; }
+.install-tabs { width: 100%; min-height: 44px; height: auto; max-width: 100%; flex-wrap: wrap; padding: 4px; border-radius: 999px; margin-bottom: 13px; }
+.install-tabs [data-slot="tabs-trigger"] { min-width: 0; min-height: 36px; padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: normal; color: var(--sp-muted); }
 .install-tabs [data-slot="tabs-trigger"][data-state="active"] { color: var(--sp-text); }
 .install-tabs [data-slot="tabs-trigger"] svg { width: 14px; height: 14px; }
-.command-line { display: flex; align-items: center; gap: 10px; padding: 9px 9px 9px 16px; background: var(--sp-code); color: #f5eaff; border-radius: 10px; min-height: 58px; }
+.command-line { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; overflow: hidden; padding: 9px 9px 9px 16px; background: var(--sp-code); color: #f5eaff; border-radius: 10px; min-height: 58px; }
 .command-line code { min-width: 0; flex: 1; overflow-x: auto; font: 13px/1.7 var(--sp-mono); white-space: pre; padding-block: 4px; }
 .command-dollar { color: #92dcca; font: 13px var(--sp-mono); }
 .copy-command { color: #ddcaee; min-width: 40px; min-height: 40px; padding: 8px; border: 1px solid #655371; background: transparent; }
@@ -187,6 +188,7 @@ sodapop-demo > img { width: 100%; height: auto; }
 .release-notice h2 { font-size: 19px; font-weight: 850; }
 .release-notice p { font-size: 14px; color: var(--sp-muted); margin-top: 4px; }
 .download-grid { display: grid; grid-template-columns: 1.12fr .88fr; gap: 35px; margin-top: 30px; align-items: start; }
+.download-grid > * { min-width: 0; }
 .download-guide { padding: 28px; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 20px; }
 .download-guide h2, .compatibility h2, .faq-section h2, .native-downloads h2 { font-size: 25px; font-weight: 850; letter-spacing: -.035em; margin-bottom: 20px; }
 .download-guide ol { list-style: none; display: grid; gap: 22px; counter-reset: steps; padding: 0; margin: 0; }
@@ -194,6 +196,8 @@ sodapop-demo > img { width: 100%; height: auto; }
 .download-guide li::before { content: counter(steps); position: absolute; left: 0; top: 0; width: 26px; height: 26px; background: var(--sp-lilac); color: var(--sp-violet); border-radius: 50%; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
 .download-guide li strong { display: block; color: var(--sp-text); font-size: 14px; margin-bottom: 5px; }
 .download-guide code, .compatibility code, .integrity-note code { font: .9em var(--sp-mono); padding: 2px 5px; border-radius: 4px; background: var(--sp-lilac); color: var(--sp-violet); }
+.integrity-note { overflow-wrap: anywhere; }
+.integrity-note code { white-space: normal; overflow-wrap: anywhere; }
 .compatibility { margin-top: 50px; }
 .table-scroll { overflow-x: auto; border: 1px solid var(--sp-line); border-radius: 16px; background: var(--sp-panel); }
 .compatibility table { border-collapse: collapse; width: 100%; font-size: 13px; text-align: left; }
