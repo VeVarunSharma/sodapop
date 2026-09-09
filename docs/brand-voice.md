@@ -25,7 +25,7 @@ reader, not serve up another slogan.
 
 | Instead of | Try | Why it fits |
 | --- | --- | --- |
-| A fresh take on your terminal | Psst. Bring that half-built idea. | Welcomes a developer and their project. |
+| A fresh take on your terminal | Your repo called. It ordered something fizzy. | Makes the joke while keeping the repo in view. |
 | Comfortably familiar. Refreshingly different. | Let's poke around your repo. | Invites a specific activity. |
 | Less hunting. More doing. | The good stuff starts with `/`. | Leads directly to command discovery. |
 | Make yourself at home. | How fizzy are we feeling? | Introduces actual theme and personality choices. |
