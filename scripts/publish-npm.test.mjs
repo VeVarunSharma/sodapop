@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { expectedNativeModeDifference, publishPackages, validVersion } from "./publish-npm.mjs";
+import { expectedExecutableModeDifference, publishPackages, validVersion } from "./publish-npm.mjs";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
@@ -111,7 +111,7 @@ test("retry accepts only identical already-published package contents", (t) => {
   assert.deepEqual(wrongTag.published, []);
 });
 
-test("mode-only retries accept only the expected native executable normalization", () => {
+test("mode-only retries accept only the expected executable normalization", () => {
   const valid = [
     "diff --git a/bin/sodapop b/bin/sodapop",
     "old mode 100644",
@@ -120,18 +120,19 @@ test("mode-only retries accept only the expected native executable normalization
     "--- a/bin/sodapop",
     "+++ b/bin/sodapop"
   ].join("\n");
-  assert.equal(expectedNativeModeDifference(valid), true);
-  assert.equal(expectedNativeModeDifference(
+  assert.equal(expectedExecutableModeDifference(valid), true);
+  assert.equal(expectedExecutableModeDifference(
     valid.replace("old mode 100644\nnew mode 100755", "old mode 100755\nnew mode 100644")
   ), true);
-  assert.equal(expectedNativeModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
+  assert.equal(expectedExecutableModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
+  assert.equal(expectedExecutableModeDifference(valid.replaceAll("sodapop", "sodapop.js")), true);
   for (const invalid of [
     valid.replace("new mode 100755", "new mode 100644"),
     valid.replace("new mode 100755", "new mode 100700"),
     valid.replaceAll("bin/sodapop", "package.json"),
     `${valid}\n@@ -1 +1 @@\n-old\n+new`
   ]) {
-    assert.equal(expectedNativeModeDifference(invalid), false);
+    assert.equal(expectedExecutableModeDifference(invalid), false);
   }
 });
 
