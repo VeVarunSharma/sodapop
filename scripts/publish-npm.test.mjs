@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { publishPackages, validVersion } from "./publish-npm.mjs";
+import { expectedNativeModeDifference, publishPackages, validVersion } from "./publish-npm.mjs";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
@@ -40,7 +40,8 @@ function registry(mode = "missing") {
       if (args[2] === "dist-tags") {
         return { status: 0, stdout: JSON.stringify({ latest: mode === "wrong-tag" ? "1.2.2" : "1.2.3", preview: "1.2.3" }) };
       }
-      if (mode === "matching" || mode === "different" || mode === "wrong-tag" || mode === "comparison-error") {
+      if (mode === "matching" || mode === "mode-only" || mode === "different" ||
+          mode === "wrong-tag" || mode === "comparison-error") {
         return { status: 0, stdout: JSON.stringify(mode === "different" ? "sha512-other" : integrity) };
       }
       return {
@@ -53,7 +54,22 @@ function registry(mode = "missing") {
       assert.ok(options.cwd.endsWith(path.join("platforms", "darwin-arm64")) ||
         options.cwd.endsWith("cli"));
       assert.equal(args.filter((arg) => arg.startsWith("--diff=")).length, 1);
+      assert.ok(!args.includes("--diff-name-only"));
       if (mode === "comparison-error") return { status: 1, stdout: "", stderr: "registry unavailable" };
+      if (mode === "mode-only") {
+        return {
+          status: 0,
+          stdout: [
+            "diff --git a/bin/sodapop b/bin/sodapop",
+            "old mode 100644",
+            "new mode 100755",
+            "index v1.2.3..v1.2.3",
+            "--- a/bin/sodapop",
+            "+++ b/bin/sodapop",
+            ""
+          ].join("\n")
+        };
+      }
       return { status: 0, stdout: mode === "different" ? "package.json\n" : "" };
     }
     assert.equal(args[0], "publish");
@@ -78,7 +94,9 @@ test("retry accepts only identical already-published package contents", (t) => {
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, matching.runner, () => {});
   assert.deepEqual(matching.published, []);
   assert.equal(matching.compared.length, 2);
-  assert.ok(matching.compared.every((args) => args.includes("--diff-name-only")));
+  const modeOnly = registry("mode-only");
+  publishPackages({ directory, version: "1.2.3", tag: "latest" }, modeOnly.runner, () => {});
+  assert.deepEqual(modeOnly.published, []);
   const different = registry("different");
   assert.throws(
     () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, different.runner, () => {}),
@@ -91,6 +109,27 @@ test("retry accepts only identical already-published package contents", (t) => {
     /explicitly promote/
   );
   assert.deepEqual(wrongTag.published, []);
+});
+
+test("mode-only retries accept only the expected native executable normalization", () => {
+  const valid = [
+    "diff --git a/bin/sodapop b/bin/sodapop",
+    "old mode 100644",
+    "new mode 100755",
+    "index v1.2.3..v1.2.3",
+    "--- a/bin/sodapop",
+    "+++ b/bin/sodapop"
+  ].join("\n");
+  assert.equal(expectedNativeModeDifference(valid), true);
+  assert.equal(expectedNativeModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
+  for (const invalid of [
+    valid.replace("new mode 100755", "new mode 100644"),
+    valid.replace("old mode 100644", "old mode 100755"),
+    valid.replaceAll("bin/sodapop", "package.json"),
+    `${valid}\n@@ -1 +1 @@\n-old\n+new`
+  ]) {
+    assert.equal(expectedNativeModeDifference(invalid), false);
+  }
 });
 
 test("published-package comparison failures stop without publishing", (t) => {
