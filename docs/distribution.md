@@ -143,8 +143,11 @@ credential-free installation commands grants permission for live model usage.
 
 ## Owner-controlled publication
 
-`publish-channels.yml` is manually dispatched for a release that is already
-public. It verifies GitHub's release attestation, the downloaded manifest's
+`publish-channels.yml` starts automatically only after the release-triggered
+public-download workflow succeeds. Prereleases select npm only; stable releases
+select npm and Homebrew. Manual dispatch remains available for an owner-reviewed
+recovery or retry. Manual public-download runs do not trigger publication. The
+workflow verifies GitHub's release attestation, the downloaded manifest's
 attestation, and the archive/binary hashes before generating channel packages.
 It never rebuilds the application for another channel. Enable immutable releases
 on the repository before using this workflow.

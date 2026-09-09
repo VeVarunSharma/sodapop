@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -77,7 +78,15 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 	}
 	text := string(data)
 	for _, requirement := range []string{
-		"workflow_dispatch:", "gh release verify ", "gh release verify-asset ",
+		"workflow_run:", "workflows: [Verify public native downloads]",
+		"github.event.workflow_run.conclusion == 'success'",
+		"github.event.workflow_run.event == 'release'", "workflow_dispatch:",
+		"publish_npm: ${{ steps.release.outputs.publish_npm }}",
+		"publish_homebrew: ${{ steps.release.outputs.publish_homebrew }}",
+		"needs.prepare.outputs.publish_npm == 'true'",
+		"needs.prepare.outputs.publish_homebrew == 'true'",
+		"isImmutable == true", "isPrerelease == true",
+		"gh release verify ", "gh release verify-asset ",
 		"environment: npm-publish", "environment: homebrew-publish",
 		"SODAPOP_STABLE_RELEASE_QUALIFIED", "SODAPOP_NPM_PUBLISH_ENABLED",
 		"id-token: write", "npm@11.15.0", "node scripts/publish-npm.mjs",
@@ -94,6 +103,124 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 		if strings.Contains(text, excluded) {
 			t.Errorf("publication workflow unexpectedly contains %q", excluded)
 		}
+	}
+}
+
+func TestChannelPublicationResolvesAutomaticAndManualSelections(t *testing.T) {
+	data, err := os.ReadFile("../.github/workflows/publish-channels.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, step, found := strings.Cut(string(data), "      - name: Resolve an approved public release and channel selection\n")
+	if !found {
+		t.Fatal("release resolution step missing")
+	}
+	_, block, found := strings.Cut(step, "        run: |\n")
+	if !found {
+		t.Fatal("release resolution script missing")
+	}
+	var lines []string
+	for _, line := range strings.Split(block, "\n") {
+		statement, ok := strings.CutPrefix(line, "          ")
+		if !ok {
+			break
+		}
+		lines = append(lines, statement)
+	}
+
+	root := t.TempDir()
+	bin := filepath.Join(root, "bin")
+	if err := os.Mkdir(bin, 0755); err != nil {
+		t.Fatal(err)
+	}
+	gh := `#!/usr/bin/env bash
+set -euo pipefail
+case "$1 $2" in
+  "release view") printf '%s\n' "$FAKE_RELEASE_METADATA" ;;
+  "release verify") printf 'verified\n' ;;
+  *) printf 'unexpected gh invocation: %s\n' "$*" >&2; exit 1 ;;
+esac
+`
+	if err := os.WriteFile(filepath.Join(bin, "gh"), []byte(gh), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name       string
+		event      string
+		tag        string
+		version    string
+		npm        string
+		homebrew   string
+		metadata   string
+		wantOutput string
+		wantOK     bool
+	}{
+		{
+			name: "automatic prerelease", event: "workflow_run", tag: "v1.2.3-rc.1",
+			metadata:   `{"isDraft":false,"isImmutable":true,"isPrerelease":true}`,
+			wantOutput: "version=1.2.3-rc.1\ntag=v1.2.3-rc.1\npublish_npm=true\npublish_homebrew=false\n",
+			wantOK:     true,
+		},
+		{
+			name: "automatic stable", event: "workflow_run", tag: "v1.2.3",
+			metadata:   `{"isDraft":false,"isImmutable":true,"isPrerelease":false}`,
+			wantOutput: "version=1.2.3\ntag=v1.2.3\npublish_npm=true\npublish_homebrew=true\n",
+			wantOK:     true,
+		},
+		{
+			name: "manual Homebrew recovery", event: "workflow_dispatch", version: "1.2.3",
+			npm: "false", homebrew: "true",
+			metadata:   `{"isDraft":false,"isImmutable":true,"isPrerelease":false}`,
+			wantOutput: "version=1.2.3\ntag=v1.2.3\npublish_npm=false\npublish_homebrew=true\n",
+			wantOK:     true,
+		},
+		{
+			name: "invalid automatic tag", event: "workflow_run", tag: "main",
+			metadata: `{"isDraft":false,"isImmutable":true,"isPrerelease":false}`,
+			wantOK:   false,
+		},
+		{
+			name: "mutable release", event: "workflow_run", tag: "v1.2.3",
+			metadata: `{"isDraft":false,"isImmutable":false,"isPrerelease":false}`,
+			wantOK:   false,
+		},
+		{
+			name: "draft release", event: "workflow_run", tag: "v1.2.3",
+			metadata: `{"isDraft":true,"isImmutable":true,"isPrerelease":false}`,
+			wantOK:   false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			outputFile := filepath.Join(t.TempDir(), "output")
+			command := exec.Command("bash", "-euo", "pipefail", "-c", strings.Join(lines, "\n"))
+			command.Env = []string{
+				"PATH=" + bin + string(os.PathListSeparator) + os.Getenv("PATH"),
+				"EVENT_NAME=" + tc.event,
+				"AUTOMATIC_TAG=" + tc.tag,
+				"INPUT_VERSION=" + tc.version,
+				"INPUT_NPM=" + tc.npm,
+				"INPUT_HOMEBREW=" + tc.homebrew,
+				"FAKE_RELEASE_METADATA=" + tc.metadata,
+				"GITHUB_REPOSITORY=VeVarunSharma/sodapop",
+				"GITHUB_OUTPUT=" + outputFile,
+			}
+			output, err := command.CombinedOutput()
+			if (err == nil) != tc.wantOK {
+				t.Fatalf("release selection result: %s: %v", output, err)
+			}
+			if !tc.wantOK {
+				return
+			}
+			got, err := os.ReadFile(outputFile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tc.wantOutput {
+				t.Fatalf("release outputs = %q, want %q", got, tc.wantOutput)
+			}
+		})
 	}
 }
 
