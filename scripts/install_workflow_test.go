@@ -231,6 +231,20 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 			t.Errorf("publication workflow unexpectedly contains %q", excluded)
 		}
 	}
+	_, npmJob, found := strings.Cut(text, "  npm:\n")
+	if !found {
+		t.Fatal("npm publication job is missing")
+	}
+	npmJob, homebrewJob, found := strings.Cut(npmJob, "  homebrew:\n")
+	if !found {
+		t.Fatal("Homebrew publication job is missing")
+	}
+	if strings.Contains(npmJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
+		t.Fatal("stable npm publication must not depend on deferred Homebrew and live qualification")
+	}
+	if !strings.Contains(homebrewJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
+		t.Fatal("stable Homebrew publication must retain the owner qualification gate")
+	}
 	if count := strings.Count(text, "ref: ${{ github.event.repository.default_branch }}"); count != 2 {
 		t.Errorf("publisher and public-install verifier default-branch checkouts = %d, want 2", count)
 	}

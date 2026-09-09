@@ -192,10 +192,14 @@ repository with contents and pull-request write permissions. Configure the
 secret in GitHub, not in this checkout or chat. It opens a version-update PR; it
 does not create the tap, merge the PR, or imply that the public tap has updated.
 
-Stable npm publication and stable tap updates require
-`SODAPOP_STABLE_RELEASE_QUALIFIED=true`. This records owner sign-off after native
-installation, signing/notarization, and sign-in qualification; it is not an
-automated signature validator. Leave it unset until that evidence exists.
+Stable npm publication is bound to a stable, immutable, attested GitHub release,
+the protected npm environment, and the five-platform public-registry installation
+checks. It does not claim Apple notarization, Homebrew readiness, or live Copilot
+qualification; those gates may complete independently after npm publication.
+Stable tap updates still require `SODAPOP_STABLE_RELEASE_QUALIFIED=true`. This
+records owner sign-off after the broader native, signing/notarization, and sign-in
+qualification; it is not an automated signature validator. Leave it unset until
+that evidence exists.
 The Windows release job uses the protected `release-signing` environment and
 GitHub OIDC to sign `sodapop.exe` with Azure Artifact Signing, then requires a
 valid Authenticode signature and RFC 3161 timestamp before packaging or manifest
