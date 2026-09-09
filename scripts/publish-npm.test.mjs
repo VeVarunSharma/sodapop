@@ -4,7 +4,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { expectedExecutableModeDifference, publishPackages, validVersion } from "./publish-npm.mjs";
+import {
+  commandFailureDetail,
+  expectedExecutableModeDifference,
+  publishPackages,
+  validVersion
+} from "./publish-npm.mjs";
 
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
@@ -46,7 +51,7 @@ function registry(mode = "missing") {
       }
       return {
         status: 1,
-        stdout: JSON.stringify({ error: { code: mode === "missing" ? "E404" : "ENOTCONN" } })
+        stdout: JSON.stringify({ error: { code: ["missing", "publish-error"].includes(mode) ? "E404" : "ENOTCONN" } })
       };
     }
     if (args[0] === "diff") {
@@ -76,6 +81,13 @@ function registry(mode = "missing") {
     assert.ok(args.includes("--provenance"));
     assert.ok(args.includes("--ignore-scripts"));
     published.push(path.basename(args[1]));
+    if (mode === "publish-error") {
+      return {
+        status: 1,
+        stdout: "",
+        stderr: "npm error E403 Trusted publisher rejected npm_secretTokenValue1234567890"
+      };
+    }
     return { status: 0, stdout: "" };
   };
   return { runner, published, compared };
@@ -144,6 +156,24 @@ test("published-package comparison failures stop without publishing", (t) => {
     /Could not compare published contents/
   );
   assert.deepEqual(failed.published, []);
+});
+
+test("publication failures retain actionable registry diagnostics without tokens", (t) => {
+  const directory = fixture(t);
+  const failed = registry("publish-error");
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, failed.runner, () => {}),
+    (error) => {
+      assert.match(error.message, /E403 Trusted publisher rejected/);
+      assert.match(error.message, /\[redacted npm token\]/);
+      assert.doesNotMatch(error.message, /npm_secretTokenValue/);
+      return true;
+    }
+  );
+  assert.equal(
+    commandFailureDetail({ status: 1, stderr: "//registry.npmjs.org/:_authToken=secret" }),
+    "//registry.npmjs.org/:_authToken=[redacted]"
+  );
 });
 
 test("network failure is not mistaken for an unpublished package", (t) => {
