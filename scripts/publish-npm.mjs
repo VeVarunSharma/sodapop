@@ -24,8 +24,12 @@ export function validVersion(version) {
   );
 }
 
-function npm(args) {
-  return spawnSync("npm", args, { encoding: "utf8", timeout: 300_000 });
+function npm(args, options = {}) {
+  return spawnSync("npm", args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    timeout: 300_000
+  });
 }
 
 function readPackages(directory, version) {
@@ -87,14 +91,15 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
           throw new Error(`${specification} does not expose a valid registry integrity`);
         }
         const comparison = runner([
-          "diff", `--diff=${specification}`, `--diff=${packageDirectory}`,
+          "diff", `--diff=${specification}`,
           "--diff-name-only", "--registry=https://registry.npmjs.org"
-        ]);
+        ], { cwd: packageDirectory });
         if (comparison.error || comparison.status !== 0) {
           throw new Error(`Could not compare published contents for ${specification}`);
         }
         if (comparison.stdout.trim() !== "") {
-          throw new Error(`Refusing to replace different published package contents for ${specification}`);
+          const detail = comparison.stdout.trim().slice(0, 4096);
+          throw new Error(`Refusing to replace different published package contents for ${specification}: ${detail}`);
         }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
