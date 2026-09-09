@@ -54,7 +54,7 @@ jobs:
             tag="$AUTOMATIC_TAG"
             version="${tag#v}"
             publish_npm=true
-            publish_homebrew=true
+            publish_homebrew=false
           else
             tag="v$INPUT_VERSION"
             version="$INPUT_VERSION"
@@ -69,9 +69,10 @@ jobs:
           metadata="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
             --json isDraft,isImmutable,isPrerelease)"
           jq -e 'select(.isDraft == false and .isImmutable == true)' <<<"$metadata" >/dev/null
-          if [[ "$EVENT_NAME" == workflow_run ]] &&
+          if [[ "$publish_homebrew" == true ]] &&
             jq -e '.isPrerelease == true' <<<"$metadata" >/dev/null; then
-            publish_homebrew=false
+            printf 'Homebrew publication requires a stable release.\n' >&2
+            exit 1
           fi
           if [[ "$publish_npm" != true && "$publish_homebrew" != true ]]; then
             printf 'Select at least one channel to publish.\n' >&2

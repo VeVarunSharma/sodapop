@@ -196,15 +196,13 @@ Stable npm publication is bound to a stable, immutable, attested GitHub release,
 the protected npm environment, and the five-platform public-registry installation
 checks. It does not claim Apple notarization, Homebrew readiness, or live Copilot
 qualification; those gates may complete independently after npm publication.
+The Windows npm package uses the verified portable release archive. Production
+Authenticode, MSI, WinGet, and Scoop publication remain deferred and are not
+implied by npm availability.
 Stable tap updates still require `SODAPOP_STABLE_RELEASE_QUALIFIED=true`. This
 records owner sign-off after the broader native, signing/notarization, and sign-in
 qualification; it is not an automated signature validator. Leave it unset until
 that evidence exists.
-The Windows release job uses the protected `release-signing` environment and
-GitHub OIDC to sign `sodapop.exe` with Azure Artifact Signing, then requires a
-valid Authenticode signature and RFC 3161 timestamp before packaging or manifest
-generation. The generated archive, npm package, and release manifest therefore
-bind the exact signed executable; they never patch a published archive.
 Registering WinGet/Scoop channels, configuring signing credentials, and obtaining
 native ARM64 evidence remain separate external/platform gates.
 

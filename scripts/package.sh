@@ -5,7 +5,6 @@ cd "$(dirname "$0")/.."
 target="${SODAPOP_TARGET:-$(go env GOHOSTOS)/$(go env GOHOSTARCH)}"
 version="${SODAPOP_VERSION:-dev}"
 client_id="${SODAPOP_GITHUB_CLIENT_ID:-}"
-prebuilt_binary="${SODAPOP_PREBUILT_BINARY:-}"
 case "$target" in
   darwin/arm64|darwin/amd64|linux/arm64|linux/amd64|windows/amd64) ;;
   *) printf 'Unsupported Sodapop target: %s\n' "$target" >&2; exit 1 ;;
@@ -47,20 +46,7 @@ binary="sodapop"
 if [[ "${target%/*}" == "windows" ]]; then
   binary="sodapop.exe"
 fi
-if [[ -n "$prebuilt_binary" ]]; then
-  if [[ "$target" != "windows/amd64" ]]; then
-    printf 'SODAPOP_PREBUILT_BINARY is supported only for windows/amd64 release signing\n' >&2
-    exit 1
-  fi
-  if [[ ! -f "$prebuilt_binary" || -L "$prebuilt_binary" ]]; then
-    printf 'SODAPOP_PREBUILT_BINARY must name an existing regular non-symlink file\n' >&2
-    exit 1
-  fi
-  COPYFILE_DISABLE=1 cp -- "$prebuilt_binary" "$stage/$binary"
-  chmod 0755 "$stage/$binary"
-else
-  SODAPOP_TARGET="$target" SODAPOP_OUTPUT="$stage/$binary" bash scripts/build.sh
-fi
+SODAPOP_TARGET="$target" SODAPOP_OUTPUT="$stage/$binary" bash scripts/build.sh
 COPYFILE_DISABLE=1 cp README.md THIRD_PARTY_NOTICES.md LICENSE "$stage/"
 mkdir -p "$stage/docs"
 COPYFILE_DISABLE=1 cp docs/authentication.md docs/architecture.md docs/live-qualification.md docs/branding.md "$stage/docs/"

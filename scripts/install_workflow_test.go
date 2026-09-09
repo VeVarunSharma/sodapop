@@ -108,36 +108,6 @@ func TestCIAndReleaseExerciseTheSameWindowsPackages(t *testing.T) {
 	}
 }
 
-func TestReleaseSignsWindowsBeforePackaging(t *testing.T) {
-	data, err := os.ReadFile("../.github/workflows/release.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	for _, required := range []string{
-		"package-windows:",
-		"environment: release-signing",
-		"id-token: write",
-		"azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43",
-		"azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82",
-		"SODAPOP_SIGNING_PROFILE",
-		"Get-AuthenticodeSignature",
-		"TimeStamperCertificate",
-		"SODAPOP_PREBUILT_BINARY: .release-signing/sodapop.exe",
-	} {
-		if !strings.Contains(text, required) {
-			t.Errorf("release signing workflow is missing %q", required)
-		}
-	}
-	build := strings.Index(text, "Build Windows release command for signing")
-	sign := strings.Index(text, "Sign the Windows release command")
-	verify := strings.Index(text, "Verify the Windows signature and timestamp")
-	pack := strings.Index(text, "Package the signed Windows command")
-	if build < 0 || sign <= build || verify <= sign || pack <= verify {
-		t.Fatalf("Windows signing order is unsafe: build=%d sign=%d verify=%d package=%d", build, sign, verify, pack)
-	}
-}
-
 func TestCISeparatesPortableQualityAndNPMDistribution(t *testing.T) {
 	data, err := os.ReadFile("../.github/workflows/ci.yml")
 	if err != nil {
@@ -309,7 +279,7 @@ esac
 		{
 			name: "automatic stable", event: "workflow_run", tag: "v1.2.3",
 			metadata:   `{"isDraft":false,"isImmutable":true,"isPrerelease":false}`,
-			wantOutput: "version=1.2.3\ntag=v1.2.3\npublish_npm=true\npublish_homebrew=true\n",
+			wantOutput: "version=1.2.3\ntag=v1.2.3\npublish_npm=true\npublish_homebrew=false\n",
 			wantOK:     true,
 		},
 		{
@@ -318,6 +288,12 @@ esac
 			metadata:   `{"isDraft":false,"isImmutable":true,"isPrerelease":false}`,
 			wantOutput: "version=1.2.3\ntag=v1.2.3\npublish_npm=false\npublish_homebrew=true\n",
 			wantOK:     true,
+		},
+		{
+			name: "manual prerelease Homebrew", event: "workflow_dispatch", version: "1.2.3-rc.1",
+			npm: "false", homebrew: "true",
+			metadata: `{"isDraft":false,"isImmutable":true,"isPrerelease":true}`,
+			wantOK:   false,
 		},
 		{
 			name: "invalid automatic tag", event: "workflow_run", tag: "main",

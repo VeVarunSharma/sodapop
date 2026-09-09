@@ -17,11 +17,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  version:
-    runs-on: ubuntu-24.04
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin/arm64
+            artifact: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin/amd64
+            artifact: darwin-amd64
+          - runner: ubuntu-24.04
+            target: linux/amd64
+            artifact: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+            artifact: linux-arm64
+          - runner: windows-2025
+            target: windows/amd64
+            artifact: windows-amd64
+    runs-on: ${{ matrix.runner }}
     outputs:
       version: ${{ steps.version.outputs.version }}
+    env:
+      SODAPOP_TARGET: ${{ matrix.target }}
+      SODAPOP_GITHUB_CLIENT_ID: ${{ vars.SODAPOP_GITHUB_CLIENT_ID }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Set release version
         id: version
         shell: bash
@@ -42,34 +67,6 @@ jobs:
           fi
           printf 'SODAPOP_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
-
-  package:
-    needs: version
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-15
-            target: darwin/arm64
-            artifact: darwin-arm64
-          - runner: macos-15-intel
-            target: darwin/amd64
-            artifact: darwin-amd64
-          - runner: ubuntu-24.04
-            target: linux/amd64
-            artifact: linux-amd64
-          - runner: ubuntu-24.04-arm
-            target: linux/arm64
-            artifact: linux-arm64
-    runs-on: ${{ matrix.runner }}
-    env:
-      SODAPOP_TARGET: ${{ matrix.target }}
-      SODAPOP_VERSION: ${{ needs.version.outputs.version }}
-      SODAPOP_GITHUB_CLIENT_ID: ${{ vars.SODAPOP_GITHUB_CLIENT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -78,7 +75,14 @@ jobs:
         shell: bash
         run: bash scripts/bundle.sh
       - name: Test
+        if: runner.os != 'Windows'
         run: go test -race ./...
+      - name: Test Windows
+        if: runner.os == 'Windows'
+        run: go test -race ./internal/... ./scripts/installcheck ./scripts/releasectl ./scripts/windows
+      - name: Build Windows command
+        if: runner.os == 'Windows'
+        run: go build ./cmd/sodapop
       - name: Package pinned native runtime
         shell: bash
         run: bash scripts/package.sh
@@ -104,102 +108,19 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  package-windows:
-    needs: version
-    runs-on: windows-2025
-    environment: release-signing
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      SODAPOP_TARGET: windows/amd64
-      SODAPOP_VERSION: ${{ needs.version.outputs.version }}
-      SODAPOP_GITHUB_CLIENT_ID: ${{ vars.SODAPOP_GITHUB_CLIENT_ID }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
-      - name: Bundle pinned native runtime
-        shell: bash
-        run: bash scripts/bundle.sh
-      - name: Test Windows
-        run: go test -race ./internal/... ./scripts/installcheck ./scripts/releasectl ./scripts/windows
-      - name: Build Windows command
-        run: go build ./cmd/sodapop
-      - name: Build Windows release command for signing
-        shell: bash
-        run: SODAPOP_PREPARED_RUNTIME=1 SODAPOP_OUTPUT=.release-signing/sodapop.exe bash scripts/build.sh
-      - name: Authenticate to Azure with GitHub OIDC
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Sign the Windows release command
-        uses: azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
-        with:
-          endpoint: ${{ vars.SODAPOP_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.SODAPOP_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.SODAPOP_SIGNING_PROFILE }}
-          files: ${{ github.workspace }}\.release-signing\sodapop.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-          description: Sodapop
-          description-url: https://sodapop.sh
-      - name: Verify the Windows signature and timestamp
-        shell: pwsh
-        run: |
-          $path = Join-Path $env:GITHUB_WORKSPACE '.release-signing\sodapop.exe'
-          $signature = Get-AuthenticodeSignature -LiteralPath $path
-          if ($signature.Status -ne 'Valid' -or
-              $null -eq $signature.SignerCertificate -or
-              $null -eq $signature.TimeStamperCertificate) {
-            throw "The production Windows signature or timestamp is invalid: $($signature.Status)"
-          }
-      - name: Package the signed Windows command
-        shell: bash
-        env:
-          SODAPOP_PREBUILT_BINARY: .release-signing/sodapop.exe
-        run: bash scripts/package.sh
-      - name: Test bundled native runtime
-        shell: bash
-        run: SODAPOP_RUNTIME_SMOKE=1 go test -count=1 ./internal/runtimebundle -run '^TestBundledRuntimeSmoke$'
-      - name: Exercise the archived Sodapop executable
-        shell: bash
-        run: |
-          helper="$RUNNER_TEMP/releasectl$(go env GOEXE)"
-          go build -o "$helper" ./scripts/releasectl
-          "$helper" manifest --dir dist --version "$SODAPOP_VERSION" --commit "$GITHUB_SHA" --platforms "$SODAPOP_TARGET"
-          go run ./scripts/installcheck --release-dir dist \
-            --manifest "dist/sodapop-$SODAPOP_VERSION-manifest.json" --tool "$helper"
-      - name: Upload release archives and checksums
-        uses: actions/upload-artifact@v4
-        with:
-          name: sodapop-windows-amd64
-          path: |
-            dist/*.zip
-            dist/*.sha256
-          if-no-files-found: error
-          retention-days: 7
-
   installations:
-    needs: [version, package, package-windows]
+    needs: package
     uses: ./.github/workflows/install-tests.yml
     with:
       artifact_pattern: sodapop-*
-      version: ${{ needs.version.outputs.version }}
+      version: ${{ needs.package.outputs.version }}
       commit: ${{ github.sha }}
 
   channels:
-    needs: [version, package, package-windows, installations]
+    needs: [package, installations]
     runs-on: ubuntu-24.04
     env:
-      SODAPOP_VERSION: ${{ needs.version.outputs.version }}
+      SODAPOP_VERSION: ${{ needs.package.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -228,7 +149,7 @@ jobs:
       - name: Generate Homebrew formula
         env:
           SODAPOP_HOMEBREW_RELEASE_DIR: ${{ github.workspace }}/install-inputs/current
-          SODAPOP_HOMEBREW_MANIFEST: ${{ github.workspace }}/install-inputs/current/sodapop-${{ needs.version.outputs.version }}-manifest.json
+          SODAPOP_HOMEBREW_MANIFEST: ${{ github.workspace }}/install-inputs/current/sodapop-${{ needs.package.outputs.version }}-manifest.json
         run: bash scripts/generate-homebrew-formula.sh "$SODAPOP_VERSION" "$RUNNER_TEMP/homebrew/Formula/sodapop.rb"
       - name: Upload npm packages for optional publication
         uses: actions/upload-artifact@v4
@@ -246,7 +167,7 @@ jobs:
           retention-days: 7
 
   release:
-    needs: [version, package, package-windows, installations, channels]
+    needs: [package, installations, channels]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -257,7 +178,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Export release version
+      - name: Set release version
         run: printf 'SODAPOP_VERSION=%s\n' "${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
       - name: Download verified release assets
         uses: actions/download-artifact@v4
