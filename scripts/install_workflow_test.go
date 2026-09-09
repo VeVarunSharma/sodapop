@@ -91,7 +91,6 @@ func TestCISeparatesPortableQualityAndNPMDistribution(t *testing.T) {
 		"quality:",
 		"- name: Vet\n        run: go vet ./...",
 		"- name: Check formatting\n        shell: bash",
-		"run: make npm-test",
 	} {
 		if !strings.Contains(text, required) {
 			t.Errorf("CI is missing %q", required)
@@ -101,8 +100,16 @@ func TestCISeparatesPortableQualityAndNPMDistribution(t *testing.T) {
 	if index < 0 {
 		t.Fatal("CI distribution job is missing")
 	}
-	if strings.Contains(text[index:], "actions/setup-go") {
-		t.Error("npm-only distribution job unnecessarily installs Go")
+	distribution := text[index:]
+	for _, required := range []string{
+		"actions/setup-go@v5",
+		"go-version-file: go.mod",
+		"actions/setup-node@v4",
+		"run: make npm-test",
+	} {
+		if !strings.Contains(distribution, required) {
+			t.Errorf("CI distribution job is missing %q", required)
+		}
 	}
 }
 
