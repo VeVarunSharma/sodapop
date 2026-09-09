@@ -72,10 +72,10 @@ function resultJSON(result, operation) {
   }
 }
 
-export function expectedNativeModeDifference(output) {
+export function expectedExecutableModeDifference(output) {
   const lines = output.trim().split(/\r?\n/).map((line) => line.trimEnd());
   if (lines.length !== 6) return false;
-  const match = lines[0].match(/^diff --git a\/(bin\/sodapop(?:\.exe)?) b\/\1$/);
+  const match = lines[0].match(/^diff --git a\/(bin\/sodapop(?:\.exe|\.js)?) b\/\1$/);
   const oldMode = lines[1].match(/^old mode (100644|100755)$/)?.[1];
   const newMode = lines[2].match(/^new mode (100644|100755)$/)?.[1];
   if (!match || !oldMode || !newMode || oldMode === newMode ||
@@ -112,12 +112,12 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
           throw new Error(`Could not compare published contents for ${specification}`);
         }
         const difference = comparison.stdout.trim();
-        if (difference !== "" && !expectedNativeModeDifference(difference)) {
+        if (difference !== "" && !expectedExecutableModeDifference(difference)) {
           const detail = difference.slice(0, 4096);
           throw new Error(`Refusing to replace different published package contents for ${specification}: ${detail}`);
         }
         if (difference !== "") {
-          log(`Published payload differs only by npm's native executable mode normalization: ${specification}`);
+          log(`Published payload differs only by npm's executable mode normalization: ${specification}`);
         }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
