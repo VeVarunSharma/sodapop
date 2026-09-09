@@ -85,6 +85,17 @@ export function selectTargetManifest(manifest, platform) {
   return { ...manifest, artifacts };
 }
 
+export function removeVerifiedOptionalPayload(sandbox, manifest, target) {
+  try {
+    const directory = assertInstalledHash(sandbox, manifest, target);
+    rmSync(directory, { recursive: true });
+    return true;
+  } catch (error) {
+    if (error.code === "SODAPOP_MISSING_PAYLOAD") return false;
+    throw error;
+  }
+}
+
 function nativeEnvironment(sandbox) {
   const bin = path.join(sandbox.root, "runtime-bin");
   mkdirSync(bin);
@@ -176,8 +187,11 @@ export function testNativeInstall(options) {
     preserve();
     if (options.registryInstall) {
       installRegistry(sandbox, newer.manifest.version, { omitOptional: true });
+      removeVerifiedOptionalPayload(sandbox, newer.manifest, target);
       // Never execute registry-supplied JS when the native payload cannot first
-      // be checked against the trusted archive's manifest.
+      // be checked against the trusted archive's manifest. npm may retain an
+      // optional package during a global omit, so remove only the verified
+      // package inside this isolated prefix before exercising the missing path.
       assert.throws(() => assertInstalledHash(sandbox, newer.manifest, target), { code: "SODAPOP_MISSING_PAYLOAD" });
     } else {
       runNpm(sandbox, ["install", "--global", "--prefix", sandbox.prefix, "--omit=optional", newer.cli]);

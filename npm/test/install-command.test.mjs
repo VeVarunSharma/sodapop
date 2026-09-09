@@ -4,7 +4,9 @@ import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { parseInstallArguments, selectTargetManifest, upgradeNotRun } from "../scripts/test-install.mjs";
+import {
+  parseInstallArguments, removeVerifiedOptionalPayload, selectTargetManifest, upgradeNotRun
+} from "../scripts/test-install.mjs";
 import {
   assertInstalledHash, createNpmSandbox, globalPackage, globalShim, installLocal,
   installRegistry, packPackage, publicRegistry, runNpm, temporaryRoot
@@ -194,4 +196,31 @@ test("registry hash gate rejects changed bytes, versions, missing optional packa
   writeFileSync(path.join(external, "bin", host.binary), bytes);
   symlinkSync(external, payload, process.platform === "win32" ? "junction" : "dir");
   assert.throws(() => assertInstalledHash(sandbox, manifest, host), /outside the isolated npm prefix/);
+});
+
+test("missing-payload checks remove only a manifest-verified optional package", (t) => {
+  const sandbox = sandboxFixture(t, true);
+  const cli = globalPackage(sandbox, "@sodapop-sh/cli");
+  const payload = path.join(cli, "node_modules", ...host.package.split("/"));
+  mkdirSync(path.join(payload, "bin"), { recursive: true });
+  writeJSON(path.join(cli, "package.json"), { name: "@sodapop-sh/cli", version: "1.2.3" });
+  writeJSON(path.join(payload, "package.json"), { name: host.package, version: "1.2.3" });
+  const binary = path.join(payload, "bin", host.binary);
+  const bytes = Buffer.from("verified optional payload fixture");
+  writeFileSync(binary, bytes);
+  const manifest = {
+    version: "1.2.3",
+    artifacts: [{
+      platform: host.platform,
+      binary_sha256: createHash("sha256").update(bytes).digest("hex")
+    }]
+  };
+
+  writeFileSync(binary, "tampered payload");
+  assert.throws(() => removeVerifiedOptionalPayload(sandbox, manifest, host), /does not match/);
+  assert.equal(existsSync(payload), true);
+  writeFileSync(binary, bytes);
+  assert.equal(removeVerifiedOptionalPayload(sandbox, manifest, host), true);
+  assert.equal(existsSync(payload), false);
+  assert.equal(removeVerifiedOptionalPayload(sandbox, manifest, host), false);
 });

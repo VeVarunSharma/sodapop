@@ -116,8 +116,11 @@ references without downloading a release or accessing account state.
 Native installation checks create isolated homes and state directories. Direct
 archive checks deliberately remove Go, Node, and Copilot from the installed
 command's PATH. npm tests additionally require Node and must not fetch a missing
-native payload at first run. Local-tarball npm tests and published-registry tests
-are separate evidence; only the latter establish that the public command works.
+native payload at first run. If npm retains an optional package during a global
+omit, the negative check removes only the manifest-verified host package inside
+its isolated prefix before testing that failure path. Local-tarball npm tests and
+published-registry tests are separate evidence; only the latter establish that
+the public command works.
 
 Use `make release-tools` to build `bin/releasectl` and `bin/installcheck`.
 For a local single-platform candidate, generate its manifest explicitly:
