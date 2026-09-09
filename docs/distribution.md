@@ -171,10 +171,14 @@ revoke the registry token. Configure all generated packages to trust
 `publish-channels.yml` in the `npm-publish` environment before normal publication.
 The bootstrap workflow is not a fallback for later releases.
 
-The npm publisher creates actual tarballs, compares their integrity with any
-already-published version, and publishes native packages before the launcher.
-A retry may reuse identical published bytes; different bytes or an ambiguous
-registry/network failure are fatal. Prereleases use `preview`, never `latest`.
+The verified release tag generates the npm package directories, while the
+reviewed default branch supplies the publisher control-plane script so an
+immutable release can benefit from publication recovery fixes. The publisher
+compares an already-published version's packaged contents with those generated
+directories, and creates verified tarballs only for versions that do not exist.
+A retry may reuse identical published contents; different contents or an
+ambiguous registry/network failure are fatal. Native packages publish before
+the launcher. Prereleases use `preview`, never `latest`.
 
 The Homebrew job uses a GitHub App limited to the existing `homebrew-sodapop`
 repository with contents and pull-request write permissions. Configure the
