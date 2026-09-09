@@ -49,7 +49,7 @@ export function installMethods(catalog) {
         command: channel.command,
         description: id === 'homebrew'
           ? `The owned Homebrew tap. This version supports ${supported}.`
-          : `Requires Node.js. This published package supports ${supported}.`,
+          : `Requires Node.js 18 or newer. This published package supports ${supported}.`,
       });
     }
   }
@@ -75,6 +75,15 @@ export function installationReference(catalog) {
       { type: 'paragraph', children: [{ type: 'text', value: method.description }] },
       { type: 'code', lang: 'sh', value: method.command },
     );
+    if (method.id === 'npm') {
+      tree.children.push(
+        { type: 'paragraph', children: [{ type: 'text', value: 'Verify the installed command and bundled runtime before signing in:' }] },
+        { type: 'code', lang: 'sh', value: 'sodapop --version\nsodapop --check-runtime' },
+        { type: 'paragraph', children: [{ type: 'text', value: 'Update to the newest stable release or remove the npm-owned command:' }] },
+        { type: 'code', lang: 'sh', value: 'npm install --global @sodapop-sh/cli@latest\nnpm uninstall --global @sodapop-sh/cli' },
+        { type: 'paragraph', children: [{ type: 'text', value: 'Installing @latest replaces an older @preview installation. If sodapop is not found after a successful install, run npm prefix --global and ensure npm’s global executable directory is on your user PATH. Use a user-owned Node.js/npm installation instead of sudo.' }] },
+      );
+    }
   }
   return unified().use(remarkStringify, { fences: true }).stringify(tree);
 }

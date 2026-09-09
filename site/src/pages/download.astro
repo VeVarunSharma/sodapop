@@ -27,7 +27,7 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
       {prerelease || publishedPreview ? <FlaskConical size={25} aria-hidden="true" /> : <ShieldCheck size={25} aria-hidden="true" />}
       <div>
         <h2 id="release-status">{prerelease ? 'Still in the soda lab.' : `${publishedPreview ? 'Sodapop preview' : 'Sodapop'} ${catalog.version}`}</h2>
-        <p>{prerelease ? 'Public binary downloads and package-manager installs are not enabled on this site yet. The source-build path is available for developers; it needs the prerequisites below.' : publishedPreview ? 'This published preview is available through verified native downloads and npm. Homebrew remains unavailable until the stable release is signed and qualified.' : 'Download the archive for your operating system and processor. Compare its checksum before extracting the executable.'}</p>
+        <p>{prerelease ? 'Public binary downloads and package-manager installs are not enabled on this site yet. The source-build path is available for developers; it needs the prerequisites below.' : publishedPreview ? 'This published preview is available through verified native downloads and npm. Homebrew remains unavailable until the stable release is signed and qualified.' : 'Install the stable release with npm on macOS, glibc-based Linux, or Windows x64. Native archives are also available; Homebrew and operating-system installers remain unpublished.'}</p>
         {!prerelease && catalog.releaseUrl && <a class="text-link" href={catalog.releaseUrl}>Read the release notes <ArrowUpRight size={14} aria-hidden="true" /></a>}
       </div>
     </section>
@@ -74,13 +74,13 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
         <table>
           <thead><tr><th scope="col">Platform</th><th scope="col">Processors</th><th scope="col">Distribution design</th></tr></thead>
           <tbody>
-            <tr><th scope="row">macOS</th><td>Apple silicon / Intel</td><td>Native archive, Homebrew, npm</td></tr>
-            <tr><th scope="row">Linux</th><td>ARM64 / x64, glibc</td><td>Native archive, Homebrew, npm</td></tr>
+            <tr><th scope="row">macOS</th><td>Apple silicon / Intel</td><td>Native archive, npm</td></tr>
+            <tr><th scope="row">Linux</th><td>ARM64 / x64, glibc</td><td>Native archive, npm</td></tr>
             <tr><th scope="row">Windows</th><td>x64</td><td>Native ZIP; npm when included in the published release</td></tr>
           </tbody>
         </table>
       </div>
-      <p>This table describes supported build targets, not a claim that every channel is published. npm installs only the native platforms declared by that published package version; Windows requires its qualified ZIP payload. Node.js is required for the npm launcher. Native downloads and Homebrew do not require Go or a separate Copilot installation. Windows ARM64 and musl-based Linux are not supported targets.</p>
+      <p>npm installs only the native platforms declared by the published package version; Windows requires its matching ZIP payload. Node.js 18 or newer is required for the npm launcher. npm and native downloads do not require Go or a separate Copilot installation. Homebrew, MSI, WinGet, and Scoop are not currently published. Windows ARM64 and musl-based Linux are not supported targets.</p>
     </section>
     <section class="faq-section" aria-labelledby="questions-title">
       <h2 id="questions-title">Before your first prompt</h2>

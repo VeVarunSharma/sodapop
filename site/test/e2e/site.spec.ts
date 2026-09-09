@@ -95,6 +95,11 @@ test('availability is honest and denied clipboard access has a visible fallback'
     const heading = catalog.version.includes('-') ? `Sodapop preview ${catalog.version}` : `Sodapop ${catalog.version}`;
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Download archive' })).toHaveCount(catalog.artifacts.length);
+    if (!catalog.version.includes('-')) {
+      await expect(page.locator('code').filter({ hasText: 'npm install --global @sodapop-sh/cli' }).first()).toBeVisible();
+      await expect(page.locator('code').filter({ hasText: '@preview' })).toHaveCount(0);
+      await expect(page.getByRole('tab', { name: 'Homebrew' })).toHaveCount(0);
+    }
   }
   await page.getByRole('button', { name: 'Copy installation command' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Could not copy' })).toBeVisible();

@@ -471,7 +471,7 @@ test('the real curated prose generates all approved routes using isolated fixtur
   assert.match(generated['installation.md'].toString(), /\[download page\]\(\/sodapop\/download\/\)/);
   assert.doesNotMatch(generated['installation.md'].toString(), /\b(?:npm install|brew install)\b/);
   const installation = generated['installation.md'].toString().replace(/\s+/g, ' ');
-  assert.match(installation, /Homebrew is scoped to the four macOS\/Linux targets/);
+  assert.match(installation, /Homebrew is not currently published/);
   assert.match(installation, /Windows x64 npm support is conditional/);
   assert.match(installation, /qualified Windows ZIP and the matching npm package version is actually published/);
   assert.match(installation, /Matching hashes do not verify release attestations/);

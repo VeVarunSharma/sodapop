@@ -7,11 +7,11 @@ channel is published. An unavailable method is not a working installation
 command.
 
 The generated installation choices below come from the same public release
-catalog as the download page, including an exact preview dist-tag when a
-prerelease is selected. Channels that have not passed public verification are
-omitted. The [source-build guide](development.md) remains available for
-developers. Local builds need the existing Sodapop public-client configuration
-to sign in; they do not need a new OAuth app.
+catalog as the download page. Stable npm releases use the registry's verified
+`latest` dist-tag; prereleases use `preview`. Channels that have not passed
+public verification are omitted. The [source-build guide](development.md)
+remains available for developers. Local builds need the existing Sodapop
+public-client configuration to sign in; they do not need a new OAuth app.
 
 <!-- SODAPOP_INSTALLATION_REFERENCE -->
 
@@ -27,9 +27,9 @@ These are application build targets, not a claim that every channel is public.
 | Linux with glibc | x64 | `linux/amd64` | `.tar.gz` |
 | Windows | x64 | `windows/amd64` | `.zip` |
 
-Homebrew is scoped to the four macOS/Linux targets. npm's supported platform set
-comes from the exact release manifest and matching package version, not from
-the repository's development package template.
+Homebrew is not currently published. npm's supported platform set comes from
+the exact release manifest and matching package version, not from the
+repository's development package template.
 
 Windows x64 npm support is conditional: `@sodapop-sh/windows-amd64` is available only
 when the release manifest includes the qualified Windows ZIP and the matching
@@ -42,10 +42,10 @@ Windows ARM64 and musl-based Linux are not supported native targets. Do not
 substitute an archive or npm package for a different operating system or
 architecture.
 
-Native executables include the pinned Copilot runtime. End users of native or
-Homebrew installations do not need Go, Node.js, or a separately installed
-Copilot executable. The npm launcher requires Node.js; it is an installation
-channel, not a different application.
+Native executables include the pinned Copilot runtime. Native archive users do
+not need Go, Node.js, or a separately installed Copilot executable. The npm
+launcher requires Node.js; it is an installation channel, not a different
+application.
 
 ## Install a native archive when available
 

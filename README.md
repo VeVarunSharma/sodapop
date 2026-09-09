@@ -48,49 +48,58 @@ sodapop
 
 `SODAPOP_INSTALL_DIR` overrides the installation directory. Relative paths resolve from the repository root; the installer prints an absolute directory for PATH setup. Installation does not edit your shell profile.
 
-## Install the published preview
+## Install from npm
 
-The current public release is
-[`v0.1.0-rc.9`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.0-rc.9).
-Its native archives are available from that release, and the npm launcher is
-published under the `preview` dist-tag:
+Sodapop's primary installation channel is npm. Install Node.js 18 or newer,
+then install the current stable release:
 
 ```sh
-# npm launcher (macOS, glibc-based Linux, and Windows x64)
-npm install --global @sodapop-sh/cli@preview
-
-# Windows x64: download the matching .zip from the GitHub Release,
-# verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.
+npm install --global @sodapop-sh/cli
+sodapop --version
+sodapop --check-runtime
 ```
 
-Homebrew is **not published yet**. The tap remains gated on a signed, notarized,
-owner-qualified stable release; do not use or redistribute a generated formula
-as if it were public. Direct archives remain available for every supported
-platform. Package-manager installs do not require Go or a separate Copilot
-installation; the npm launcher does require Node.js. The exact asset, checksum,
-manifest, and installed-command checks are defined in
-[distribution testing](docs/distribution.md). Windows MSI, WinGet, and Scoop
-publication have additional native installation and ownership gates; generated
-installer metadata alone does not mean a public channel is available.
-See [Windows delivery](packaging/windows/README.md) for verified ZIP extraction,
-per-user MSI recipes, and WinGet/Scoop manifests.
+The package selects the matching native payload for macOS Apple silicon or
+Intel, glibc-based Linux ARM64 or x64, and Windows x64. It includes the pinned
+Copilot runtime, so Go and a separate Copilot installation are not required.
 
-### Native sign-in prerequisite
-
-Sodapop uses its **own registered GitHub OAuth client**, with device flow enabled. Configure its **public Client ID** at launch:
+Update or remove the npm-owned installation with:
 
 ```sh
-export SODAPOP_GITHUB_CLIENT_ID="your_registered_public_client_id"
+npm install --global @sodapop-sh/cli@latest
+npm uninstall --global @sodapop-sh/cli
+```
+
+If you previously installed `@preview`, installing `@latest` replaces it.
+Homebrew, MSI, WinGet, and Scoop are **not published yet**. Direct archives
+remain available from the matching GitHub Release. The exact asset, checksum,
+manifest, and installed-command checks are defined in
+[distribution testing](docs/distribution.md).
+
+### Sign in after installing
+
+Published npm and native releases include Sodapop's **own registered public
+GitHub OAuth client ID**. Open a project directory, start the app, and run
+`/login`:
+
+```sh
+cd path/to/your/project
 sodapop
 ```
 
-A distributor can set the same variable at build time to bake the public ID into the executable. **Never supply a client secret or access token in this variable.** Do not copy another application's client ID.
+Source builders and distributors can set `SODAPOP_GITHUB_CLIENT_ID` at build
+time. End users of the published npm package should not need to set it.
+**Never supply a client secret or access token in this variable.** Do not copy
+another application's client ID.
 
 Sign-in stays inside Sodapop: it displays a verification code/link and waits while you authorize in the browser. Sodapop stores credentials in the macOS Keychain, Linux Secret Service, or Windows Credential Manager. Session-only sign-in is an explicit alternative when secure persistence is unavailable; there is no plaintext fallback.
 
 GitHub sign-in and Copilot access are separate. If Copilot access is unavailable, Sodapop keeps your account, draft, and local commands available. Open `/login` for **Get Copilot**, usage/billing guidance, or **Check access again**, depending on the failure. Plan links open only when selected, and access rechecks are manual: no failed prompt is replayed. An eligible Free plan is not treated as missing a paid subscription; organization policy, credentials, quota, and connectivity have distinct recovery guidance.
 
-**Current release gate:** a Sodapop-owned client ID and a successful real Copilot entitlement/session check are required before native sign-in can be considered qualified. Without a client ID, the interface and local commands remain available, but the application does not pretend to be connected. See [authentication setup](docs/authentication.md).
+Installation and account eligibility are separate checks. `sodapop
+--check-runtime` verifies the local bundled runtime but does not prove GitHub
+sign-in, Copilot entitlement, or model availability. See
+[authentication setup](docs/authentication.md).
 
 ## Commands
 
