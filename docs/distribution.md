@@ -157,6 +157,17 @@ publisher. The pinned npm publishing CLI supports OIDC; no npm write token is
 stored in source. `SODAPOP_NPM_PUBLISH_ENABLED=true` is an explicit owner switch,
 not a substitute for registry permission.
 
+Because npm trusted publishers and staged publishing require an existing package,
+the first `@sodapop-sh` versions use the separate, manually dispatched
+`bootstrap-npm.yml` workflow. It is restricted to a published immutable prerelease,
+the protected `npm-publish` environment, the exact confirmation phrase, and the
+temporary `SODAPOP_NPM_BOOTSTRAP_ENABLED=true` owner switch. Configure a short-lived
+`NPM_BOOTSTRAP_TOKEN` environment secret with package write access and 2FA bypass,
+run the workflow once, then immediately delete the secret and owner switch and
+revoke the registry token. Configure all generated packages to trust
+`publish-channels.yml` in the `npm-publish` environment before normal publication.
+The bootstrap workflow is not a fallback for later releases.
+
 The npm publisher creates actual tarballs, compares their integrity with any
 already-published version, and publishes native packages before the launcher.
 A retry may reuse identical published bytes; different bytes or an ambiguous

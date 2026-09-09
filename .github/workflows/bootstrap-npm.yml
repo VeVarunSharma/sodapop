@@ -1,0 +1,91 @@
+name: Bootstrap npm packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: An already published, immutable prerelease version without v
+        type: string
+        required: true
+      confirmation:
+        description: Type BOOTSTRAP @sodapop-sh to confirm the one-time direct publication
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-npm-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-24.04
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      BOOTSTRAP_ENABLED: ${{ vars.SODAPOP_NPM_BOOTSTRAP_ENABLED }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - name: Require explicit one-time bootstrap approval
+        shell: bash
+        run: |
+          if [[ "$BOOTSTRAP_ENABLED" != true || "$CONFIRMATION" != 'BOOTSTRAP @sodapop-sh' ]]; then
+            printf 'npm bootstrap requires the temporary owner switch and exact confirmation phrase.\n' >&2
+            exit 1
+          fi
+          if [[ -z "$NODE_AUTH_TOKEN" ]]; then
+            printf 'NPM_BOOTSTRAP_TOKEN is not configured in the npm-publish environment.\n' >&2
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*$ ]]; then
+            printf 'Bootstrap is restricted to an exact prerelease version without v or build metadata.\n' >&2
+            exit 1
+          fi
+          gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isImmutable,isPrerelease \
+            --jq 'select(.isDraft == false and .isImmutable == true and .isPrerelease == true)' |
+            grep -q .
+          gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"
+      - name: Download and verify the published release bytes
+        shell: bash
+        run: |
+          mkdir -p publication/release
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir publication/release \
+            --pattern '*.tar.gz' --pattern '*.zip' --pattern '*.sha256' \
+            --pattern "sodapop-$VERSION-manifest.json"
+          manifest="publication/release/sodapop-$VERSION-manifest.json"
+          gh release verify-asset "v$VERSION" "$manifest" --repo "$GITHUB_REPOSITORY"
+          jq -e --arg version "$VERSION" --arg commit "$(git rev-parse HEAD)" \
+            '.version == $version and .commit == $commit' "$manifest" >/dev/null
+          go run ./scripts/releasectl verify --dir publication/release --manifest "$manifest"
+      - name: Generate npm packages without rebuilding the application
+        shell: bash
+        run: |
+          npm run build --prefix npm -- --version "$VERSION" \
+            --release-dir "$GITHUB_WORKSPACE/publication/release" \
+            --manifest "$GITHUB_WORKSPACE/publication/release/sodapop-$VERSION-manifest.json" \
+            --output "$GITHUB_WORKSPACE/publication/npm"
+      - name: Install the pinned publishing CLI
+        run: npm install --global npm@11.15.0 --ignore-scripts
+      - name: Publish the first package versions under preview
+        shell: bash
+        run: node scripts/publish-npm.mjs "$GITHUB_WORKSPACE/publication/npm" "$VERSION" preview
