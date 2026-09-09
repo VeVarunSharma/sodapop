@@ -175,16 +175,16 @@ revoke the registry token. Configure all generated packages to trust
 The bootstrap workflow is not a fallback for later releases.
 
 The verified release tag generates the npm package directories, while the
-reviewed default branch supplies the publisher control-plane script so an
-immutable release can benefit from publication recovery fixes. The publisher
+reviewed default branch supplies publisher and public-install verification
+tooling so an immutable release can benefit from recovery fixes. The publisher
 compares an already-published version's packaged contents with those generated
 directories, and creates verified tarballs only for versions that do not exist.
 A retry may reuse identical published contents. The only accepted metadata-only
 difference is npm reporting the native executable or CLI launcher modes as
 `0644` and `0755` between the published and verified generated packages; public
-installation checks must still prove that the installed command runs. Different contents or
-an ambiguous registry/network failure are fatal. Native packages publish before
-the launcher. Prereleases use `preview`, never `latest`.
+installation checks must still prove that the installed command runs. Different
+contents or an ambiguous registry/network failure are fatal. Native packages
+publish before the launcher. Prereleases use `preview`, never `latest`.
 
 The Homebrew job uses a GitHub App limited to the existing `homebrew-sodapop`
 repository with contents and pull-request write permissions. Configure the

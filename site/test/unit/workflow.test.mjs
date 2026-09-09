@@ -33,6 +33,9 @@ test('Pages separates read-only review from trusted static publication', () => {
   const resolve = steps.find((step) => step.run === 'npm --prefix site run release:sync');
   assert.equal(resolve.if, "env.SODAPOP_SITE_PREVIEW == '0'");
   assert.equal(resolve.env, undefined);
+  const browser = steps.find((step) => step.name === 'Install browser for website checks');
+  assert.equal(browser.run, 'npm --prefix site exec -- playwright install chromium');
+  assert.doesNotMatch(browser.run, /--with-deps/);
   assert.ok(steps.some((step) => step.run === 'npm --prefix site run check:artifact -- --public'));
 });
 
