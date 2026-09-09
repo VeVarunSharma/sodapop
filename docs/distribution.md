@@ -147,13 +147,14 @@ credential-free installation commands grants permission for live model usage.
 ## Owner-controlled publication
 
 `publish-channels.yml` starts automatically only after the release-triggered
-public-download workflow succeeds. Prereleases select npm only; stable releases
-select npm and Homebrew. Manual dispatch remains available for an owner-reviewed
-recovery or retry. Manual public-download runs do not trigger publication. The
-workflow verifies GitHub's release attestation, the downloaded manifest's
-attestation, and the archive/binary hashes before generating channel packages.
-It never rebuilds the application for another channel. Enable immutable releases
-on the repository before using this workflow.
+public-download workflow succeeds. Prereleases and stable releases select npm;
+Homebrew requires an explicit manual dispatch and remains subject to its broader
+stable qualification gate. Manual dispatch also remains available for an
+owner-reviewed npm recovery or retry. Manual public-download runs do not trigger
+publication. The workflow verifies GitHub's release attestation, the downloaded
+manifest's attestation, and the archive/binary hashes before generating channel
+packages. It never rebuilds the application for another channel. Enable
+immutable releases on the repository before using this workflow.
 
 Configure protected `npm-publish` and `homebrew-publish` environments with required
 reviewers. Creating a workflow that names an environment does not configure those

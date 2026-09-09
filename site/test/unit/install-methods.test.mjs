@@ -21,7 +21,11 @@ test('UI and documentation share verified channel commands', () => {
   catalog.channels.npm = { status: 'published', command: 'npm install --global @sodapop-sh/cli', platforms: ['darwin/arm64', 'windows/amd64'] };
   const methods = installMethods(catalog);
   assert.equal(methods[0].id, 'npm');
-  assert.ok(installationReference(catalog).includes(methods[0].command));
+  const reference = installationReference(catalog);
+  assert.ok(reference.includes(methods[0].command));
+  assert.match(reference, /sodapop --version/);
+  assert.match(reference, /npm install --global @sodapop-sh\/cli@latest/);
+  assert.match(reference, /npm uninstall --global @sodapop-sh\/cli/);
   assert.equal(methods.some(({ id }) => id === 'homebrew'), false);
   assert.match(methods[0].description, /Windows x64/);
   assert.doesNotMatch(methods[0].description, /Linux/);
