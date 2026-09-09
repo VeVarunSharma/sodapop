@@ -1,6 +1,9 @@
 name: Publish approved package channels
 
 on:
+  workflow_run:
+    workflows: [Verify public native downloads]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -20,21 +23,70 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-channels-${{ inputs.version }}
+  group: publish-channels-${{ github.event.workflow_run.head_branch || inputs.version }}
   cancel-in-progress: false
 
 jobs:
   prepare:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'release')
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      publish_npm: ${{ steps.release.outputs.publish_npm }}
+      publish_homebrew: ${{ steps.release.outputs.publish_homebrew }}
     env:
-      VERSION: ${{ inputs.version }}
-      PUBLISH_NPM: ${{ inputs.npm }}
-      PUBLISH_HOMEBREW: ${{ inputs.homebrew }}
+      EVENT_NAME: ${{ github.event_name }}
+      AUTOMATIC_TAG: ${{ github.event.workflow_run.head_branch }}
+      INPUT_VERSION: ${{ inputs.version }}
+      INPUT_NPM: ${{ inputs.npm }}
+      INPUT_HOMEBREW: ${{ inputs.homebrew }}
       GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Resolve an approved public release and channel selection
+        id: release
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" == workflow_run ]]; then
+            tag="$AUTOMATIC_TAG"
+            version="${tag#v}"
+            publish_npm=true
+            publish_homebrew=true
+          else
+            tag="v$INPUT_VERSION"
+            version="$INPUT_VERSION"
+            publish_npm="$INPUT_NPM"
+            publish_homebrew="$INPUT_HOMEBREW"
+          fi
+          if [[ "$tag" != "v$version" ||
+                ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]]; then
+            printf 'An exact release tag with npm-compatible SemVer is required.\n' >&2
+            exit 1
+          fi
+          metadata="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,isImmutable,isPrerelease)"
+          jq -e 'select(.isDraft == false and .isImmutable == true)' <<<"$metadata" >/dev/null
+          if [[ "$EVENT_NAME" == workflow_run ]] &&
+            jq -e '.isPrerelease == true' <<<"$metadata" >/dev/null; then
+            publish_homebrew=false
+          fi
+          if [[ "$publish_npm" != true && "$publish_homebrew" != true ]]; then
+            printf 'Select at least one channel to publish.\n' >&2
+            exit 1
+          fi
+          gh release verify "$tag" --repo "$GITHUB_REPOSITORY"
+          {
+            printf 'version=%s\n' "$version"
+            printf 'tag=%s\n' "$tag"
+            printf 'publish_npm=%s\n' "$publish_npm"
+            printf 'publish_homebrew=%s\n' "$publish_homebrew"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ steps.release.outputs.tag }}
           persist-credentials: false
       - uses: actions/setup-go@v5
         with:
@@ -43,20 +95,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Require explicit channel selection and a public attested release
-        shell: bash
-        run: |
-          if [[ "$PUBLISH_NPM" != true && "$PUBLISH_HOMEBREW" != true ]]; then
-            printf 'Select at least one channel to publish.\n' >&2
-            exit 1
-          fi
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]]; then
-            printf 'An exact release version without v or build metadata is required.\n' >&2
-            exit 1
-          fi
-          gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' | grep -Fx false
-          gh release verify "v$VERSION" --repo "$GITHUB_REPOSITORY"
       - name: Download and verify the approved bytes
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
         shell: bash
         run: |
           mkdir -p publication/release
@@ -71,6 +112,7 @@ jobs:
       - name: Generate packages without rebuilding the application
         shell: bash
         env:
+          VERSION: ${{ steps.release.outputs.version }}
           SODAPOP_HOMEBREW_RELEASE_DIR: ${{ github.workspace }}/publication/release
         run: |
           npm run build --prefix npm -- --version "$VERSION" \
@@ -87,7 +129,7 @@ jobs:
           retention-days: 7
 
   npm:
-    if: inputs.npm
+    if: needs.prepare.outputs.publish_npm == 'true'
     needs: prepare
     runs-on: ubuntu-24.04
     environment: npm-publish
@@ -95,13 +137,13 @@ jobs:
       contents: read
       id-token: write
     env:
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.prepare.outputs.version }}
       PUBLISH_ENABLED: ${{ vars.SODAPOP_NPM_PUBLISH_ENABLED }}
       STABLE_QUALIFIED: ${{ vars.SODAPOP_STABLE_RELEASE_QUALIFIED }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ needs.prepare.outputs.tag }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -131,12 +173,12 @@ jobs:
           node scripts/publish-npm.mjs "$GITHUB_WORKSPACE/publication/npm" "$VERSION" "$tag"
 
   homebrew:
-    if: inputs.homebrew
+    if: needs.prepare.outputs.publish_homebrew == 'true'
     needs: prepare
     runs-on: ubuntu-24.04
     environment: homebrew-publish
     env:
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.prepare.outputs.version }}
       STABLE_QUALIFIED: ${{ vars.SODAPOP_STABLE_RELEASE_QUALIFIED }}
     steps:
       - name: Require a qualified stable release
@@ -190,7 +232,7 @@ jobs:
             --body "Generated from the verified, immutable Sodapop v$VERSION release. Review and merge before claiming the public tap is updated."
 
   npm-installations:
-    if: inputs.npm
+    if: needs.prepare.outputs.publish_npm == 'true'
     needs: [prepare, npm]
     strategy:
       fail-fast: false
@@ -203,13 +245,13 @@ jobs:
           - runner: windows-2025
     runs-on: ${{ matrix.runner }}
     env:
-      VERSION: ${{ inputs.version }}
+      VERSION: ${{ needs.prepare.outputs.version }}
       SODAPOP_LIVE_QUALIFY: '0'
       SODAPOP_RUNTIME_SMOKE: '0'
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: v${{ inputs.version }}
+          ref: ${{ needs.prepare.outputs.tag }}
           persist-credentials: false
       - uses: actions/setup-go@v5
         with:
