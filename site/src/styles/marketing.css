@@ -146,7 +146,8 @@ sodapop-demo > img { width: 100%; height: auto; }
 .install-copy .eyebrow { margin-bottom: 15px; }
 .install-copy p { color: var(--sp-muted); font-size: 15px; margin-top: 16px; }
 .install-panel { min-width: 0; padding: 24px; border-radius: 18px; background: var(--sp-panel); border: 1px solid var(--sp-line); box-shadow: var(--sp-shadow); }
-.install-tabs { min-height: 44px; height: auto; max-width: 100%; flex-wrap: wrap; padding: 4px; border-radius: 999px; margin-bottom: 13px; }
+.install-options, .download-grid > * { min-width: 0; }
+.install-tabs { width: 100%; min-height: 44px; height: auto; max-width: 100%; flex-wrap: wrap; padding: 4px; border-radius: 999px; margin-bottom: 13px; }
 .install-tabs [data-slot="tabs-trigger"] { min-height: 36px; padding: 7px 14px; border-radius: 999px; font-size: 12px; font-weight: 800; color: var(--sp-muted); }
 .install-tabs [data-slot="tabs-trigger"][data-state="active"] { color: var(--sp-text); }
 .install-tabs [data-slot="tabs-trigger"] svg { width: 14px; height: 14px; }
