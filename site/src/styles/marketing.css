@@ -128,9 +128,7 @@ sodapop-demo { display: block; border: 1px solid #3f344c; border-radius: 16px; o
 [data-playing="true"] .stop-demo-icon { display: block; }
 [data-playing="true"] .play-demo-icon { display: none; }
 sodapop-demo > img { width: 100%; height: auto; }
-.demo-figure figcaption { color: var(--sp-muted); margin-top: 14px; font-size: 11px; text-align: center; line-height: 1.6; }
 .overview-frame { padding: 20px; background: var(--sp-lilac); border: 1px solid var(--sp-line); border-radius: 26px; }
-.overview-frame figcaption { margin-bottom: 1px; }
 .features-section { padding-top: 100px; }
 .story { display: grid; grid-template-columns: .83fr 1.17fr; align-items: center; gap: 62px; padding-block: 38px; }
 .story + .story { margin-top: 36px; }

@@ -59,6 +59,11 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	case "f1":
 		return m.runLocal("help")
+	case "f2":
+		if m.overlay == nil || m.overlay.kind == dialogPermission {
+			return m.toggleAutopilot()
+		}
+		return nil
 	case "ctrl+p":
 		m.showActions()
 		return nil
@@ -167,7 +172,7 @@ func (m *Model) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "enter":
 		return m.submit()
 	case "shift+tab":
-		m.setPlanning(!m.planning)
+		m.cycleComposerMode()
 		m.notice = notice{}
 		return nil
 	case "esc":
@@ -249,6 +254,20 @@ func (m *Model) showActions() {
 	}
 }
 
+func (m *Model) showVendingMachine() {
+	d := m.newDialog(
+		dialogVending,
+		"VENDING MACHINE / choose a can",
+		"Curated Sodapop workflows and settings. Ctrl+P remains the complete local action palette.",
+	)
+	for _, command := range commands.Vending() {
+		d.items = append(d.items, menuItem{
+			id: "command:" + command.Name, label: command.Usage, detail: command.Summary,
+			group: command.VendingCategory, disabled: m.busy() && !command.AllowedWhileBusy,
+		})
+	}
+}
+
 func (m *Model) handleDialogKey(msg tea.KeyPressMsg) tea.Cmd {
 	d := m.overlay
 	if msg.String() == "esc" {
@@ -275,7 +294,7 @@ func (m *Model) handleDialogKey(msg tea.KeyPressMsg) tea.Cmd {
 		case "a":
 			return m.answerDecision(answer{allow: true})
 		case "A", "shift+a":
-			return m.answerAllPermissions()
+			return m.enableAutopilotForPermissions()
 		case "d":
 			return m.answerDecision(answer{cancel: true})
 		}
@@ -385,7 +404,7 @@ func (m *Model) handleDialogKey(msg tea.KeyPressMsg) tea.Cmd {
 
 func (m *Model) chooseItem(d *dialog, item menuItem) tea.Cmd {
 	switch d.kind {
-	case dialogActions:
+	case dialogActions, dialogVending:
 		m.overlay = nil
 		return m.runLocal(strings.TrimPrefix(item.id, "command:"))
 	case dialogAccount:
@@ -396,6 +415,14 @@ func (m *Model) chooseItem(d *dialog, item menuItem) tea.Cmd {
 			return m.startLogin(true)
 		case "reconnect":
 			return m.connect()
+		case "copilot-plans":
+			return m.copilotLinkCommand(copilotPlans, false)
+		case "copy-copilot-plans":
+			return m.copilotLinkCommand(copilotPlans, true)
+		case "copilot-settings":
+			return m.copilotLinkCommand(copilotSettings, false)
+		case "copy-copilot-settings":
+			return m.copilotLinkCommand(copilotSettings, true)
 		case "signout":
 			if m.busy() || len(m.requests) > 0 {
 				m.confirm("signout", "", "Stop and sign out?", "Pending permissions will be denied and unanswered questions cancelled. History, your draft, and completed edits are kept.", "Stop and sign out")
@@ -428,8 +455,8 @@ func (m *Model) chooseItem(d *dialog, item menuItem) tea.Cmd {
 		cmd, _ := m.selectTheme(item.id)
 		return cmd
 	case dialogPermission:
-		if item.id == "allow-all" {
-			return m.answerAllPermissions()
+		if item.id == "autopilot" {
+			return m.enableAutopilotForPermissions()
 		}
 		return m.answerDecision(answer{allow: item.id == "allow", cancel: item.id != "allow"})
 	case dialogQuestion:

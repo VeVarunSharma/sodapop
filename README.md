@@ -9,14 +9,14 @@
   </a>
 </p>
 
-A polished terminal coding companion, built with Go and Charm and powered by the GitHub Copilot SDK.
+A little can of "let's build that." Sodapop is an independent terminal coding companion, built with Go and Charm and powered by the GitHub Copilot SDK.
 
 [Website](https://sodapop.sh) | [Source](https://github.com/VeVarunSharma/sodapop)
 
-Run `sodapop` from a project directory for a colorful conversation, streamed tool activity, explicit approvals, and a discoverable `/` command palette. Sodapop provides its own interface and OAuth onboarding; it does not wrap the Copilot CLI's screen or fork Crush.
+Bring a project: run `sodapop` from its directory to explore code, compare approaches, work through a change, and inspect or taste-test the evidence. Type `/` to find every command, or open `/vending-machine` for a curated shelf of workflows and settings. Tool activity streams alongside your conversation; edits and shell commands need approval by default. Sodapop provides its own interface and OAuth onboarding; it does not wrap the Copilot CLI's screen or fork Crush.
 
 <p align="center">
-  <img src="docs/assets/demos/overview.gif" width="800" alt="Sodapop's soda-can welcome animation, command palette, chat-to-plan toggle, and read-only Git diff in a local example project." />
+  <img src="docs/assets/demos/overview.gif" width="800" alt="Sodapop's soda-can welcome animation, command palette, Chat-to-Plan-to-Autopilot mode cycle, and read-only Git diff in a local example project." />
 </p>
 
 [View a still image](docs/assets/demos/overview.png). This local-only demo uses prepared Git changes and stays signed out; no AI responses are simulated.
@@ -90,6 +90,8 @@ A distributor can set the same variable at build time to bake the public ID into
 
 Sign-in stays inside Sodapop: it displays a verification code/link and waits while you authorize in the browser. Sodapop stores credentials in the macOS Keychain, Linux Secret Service, or Windows Credential Manager. Session-only sign-in is an explicit alternative when secure persistence is unavailable; there is no plaintext fallback.
 
+GitHub sign-in and Copilot access are separate. If Copilot access is unavailable, Sodapop keeps your account, draft, and local commands available. Open `/login` for **Get Copilot**, usage/billing guidance, or **Check access again**, depending on the failure. Plan links open only when selected, and access rechecks are manual: no failed prompt is replayed. An eligible Free plan is not treated as missing a paid subscription; organization policy, credentials, quota, and connectivity have distinct recovery guidance.
+
 **Current release gate:** a Sodapop-owned client ID and a successful real Copilot entitlement/session check are required before native sign-in can be considered qualified. Without a client ID, the interface and local commands remain available, but the application does not pretend to be connected. See [authentication setup](docs/authentication.md).
 
 ## Commands
@@ -107,57 +109,103 @@ Type `/` to discover commands, then filter, navigate with arrows, and complete w
 | `/context` | Show context-window token usage and visualization |
 | `/compact [focus instructions]` | Summarize older model context while keeping the visible transcript |
 | `/plan [prompt]` | Enable advisory planning; `/plan off` returns to ordinary conversation |
-| `/allow-all` | Approve every tool request in this conversation; `/allow-all off` restores prompts |
-| `/diff [all\|staged\|unstaged]` | Inspect the current working tree without modifying it |
+| `/fizz [topic]` | Generate one burst of ideas, trade-offs, and a recommended direction |
+| `/taste-test [focus]` | Validate conversation changes and report passed, failed, and unverified evidence |
+| `/vending-machine` | Browse curated Sodapop workflows, settings, and extension actions |
+| `/autopilot` | Automatically approve tool requests in this conversation; `/autopilot off` restores prompts |
+| `/mcp [add\|enable\|disable\|remove\|reconnect] ...` | Manage explicit account-scoped stdio MCP servers |
+| `/skill [trust\|add\|enable\|disable\|remove] ...` | Install immutable skills and enable them for this project |
+| `/diff [all\|staged\|unstaged\|session]` | Inspect the working tree or changes observed during this conversation |
 | `/theme [name]` | Appearance, contrast, motion, and personality preferences |
 | `/exit` | Shut down gracefully |
 
-Planning is **advisory, not read-only**: normal tool approvals still apply. The diff view includes pre-existing changes, not only changes made by Sodapop. Opening Sodapop starts fresh; resuming is always explicit.
+### Built-in workflows
+
+Too many ideas? Excellent. `/vending-machine` opens a curated launcher grouped
+into Create, Inspect & Validate, Customize, and Connect & Extend. It does not
+replace Ctrl+P, which remains the complete local action palette.
+
+`/fizz` sends a one-shot ideation prompt that requests distinct approaches,
+trade-offs, risks, and a recommendation without beginning implementation. This
+is model guidance rather than a read-only safety boundary: normal approvals and
+Autopilot still apply.
+
+`/taste-test` uses bounded conversation-baseline evidence to ask the current
+model for focused, report-only validation. Checks run through normal approvals,
+and the workflow instructs the model not to edit or automatically fix failures.
+Missing, partial, or truncated session evidence is disclosed instead of silently
+falling back to the whole working tree. Perfect Pour still requires observed,
+successful validation commands; a positive model narrative is not sufficient.
+
+### Conversation, models, and changes
+
+Planning is **advisory, not read-only**: normal tool approvals still apply. The ordinary diff views include pre-existing changes, not only changes made by Sodapop. `/diff session` compares the current tree with the conversation baseline; it reports observed changes without claiming whether Sodapop, you, or another process made them. Opening Sodapop starts fresh; resuming is always explicit.
+
+Conversation baselines retain complete tracked files up to 64 KiB each, 16 MiB
+of content total, and 1,024 files. Oversized files and other excluded paths do
+not cause a startup error; `/diff session` identifies partial coverage and lists
+bounded exclusion details. No changes in captured files does not mean excluded
+files are unchanged. Normal whole-working-tree diff modes are unaffected.
 
 `/compact` asks the current model to summarize older conversation context and may consume model tokens. Optional focus instructions tell the summary what to preserve. Sodapop keeps the rendered transcript visible and reports the context reduction when compaction completes.
 
-The composer stays one line tall until a wrapped or multiline draft needs more room. Enter sends, Ctrl+J adds a newline, and Shift+Tab switches between normal chat and advisory plan mode; the composer border, prompt and cursor turn amber in plan mode and cyan in chat mode. A bubble to the left of the `chat>` / `plan>` prompt pulses while Sodapop is working (it stays still when reduced motion is on). Use the mouse wheel, PgUp/PgDown, or Alt+Up/Alt+Down to review conversation history; scrolling up pauses live-follow and Ctrl+End returns to current output. The wheel also scrolls long dialog details. Escape dismisses menus, and Ctrl+C cancels active work. Use `/login` for account actions, `/logout` to sign out, and `//` at the start of a message to send a literal leading slash rather than a command. The in-app help describes available actions.
+`/model` opens a responsive Model, Context, and Thinking table. Up/Down changes
+the model, Tab or Shift+Tab changes context size, and Left/Right changes
+thinking effort. The selected row updates immediately, while Enter applies the
+complete selection and Esc discards it. Narrow terminals stack Context and
+Thinking beneath the selected model rather than hiding those settings.
 
-<details>
-<summary>Watch: command discovery and advisory planning</summary>
+### Connect and extend
 
-<p><img src="docs/assets/demos/commands.gif" width="800" alt="Filter the slash-command palette, complete with Tab, and preserve an unsent draft while switching between amber plan mode and cyan chat mode." /></p>
+Bring the right extras, not the whole attic. MCP servers are opt-in and
+account-scoped. Add a disabled server with `/mcp add <name> <JSON>`, enable it
+explicitly, then run `/mcp reconnect` to apply the new engine configuration.
+JSON accepts `command` and optional `args`, environment-variable names in `env`,
+tool filters in `tools`, and `timeout_seconds`. Secret values are never stored
+in the MCP registry, ambient Copilot MCP configuration is not imported, and
+every MCP tool call still follows the normal approval policy.
 
-[Static command-palette image](docs/assets/demos/commands.png). Planning is advisory, not a read-only permission boundary.
+Skills are opt-in and project-scoped. Sodapop includes a disabled verification
+skill and can import a Copilot-native skill directory or public Git repository.
+Run `/skill trust <source>`, `/skill add <source>`, and `/skill enable <name>`.
+Git sources may include `#branch`, `#tag`, or `#commit`; the resolved commit and
+content digest are retained. Imported files are copied into private immutable
+state, ambient Copilot skills are not discovered, and skill instructions never
+bypass normal tool approvals. Activation changes start a fresh conversation.
 
-</details>
+The composer stays one line tall until a wrapped or multiline draft needs more room. Enter sends; Ctrl+J, Shift+Enter, or Alt+Enter adds a newline; and Shift+Tab cycles normal chat, advisory plan, and Autopilot modes. The composer border, prompt, and cursor are cyan with `chat>`, amber with `plan>`, and magenta with `auto>`. These modes are mutually exclusive: entering Plan restores normal approvals, while entering Autopilot leaves planning and approves tool requests automatically for the conversation. A bubble to the left of the prompt pulses while Sodapop is working (it stays still when reduced motion is on). Use the mouse wheel, PgUp/PgDown, or Alt+Up/Alt+Down to review conversation history; scrolling up pauses live-follow and Ctrl+End returns to current output. The wheel also scrolls long dialog details. Hold Shift while dragging across text to select it, then use your terminal emulator's usual copy shortcut. Escape dismisses menus, and Ctrl+C cancels active work. Use `/login` for account actions, `/logout` to sign out, and `//` at the start of a message to send a literal leading slash rather than a command. The in-app help describes available actions.
+
+### Watch: workflows and composer modes
+
+<p><img src="docs/assets/demos/commands.gif" width="800" alt="Open Sodapop's vending-machine workflow launcher, then preserve an unsent draft while cycling through Plan, Autopilot, and Chat modes." /></p>
+
+[Static workflow-launcher image](docs/assets/demos/commands.png). The signed-out recording shows discovery and mode changes, not a live model result. Planning is advisory, and Autopilot is not a sandbox.
 
 Wide terminals show a right sidebar with a static three-row Sodapop wordmark surrounded above, below, and on both sides by colorful diagonal fields, plus independently scrollable workspace, model, MCP server, and skill details. The title and surrounding fields share a continuous pink-to-purple gradient, place the current version directly above the title, and fall back to compact or ASCII-safe art when terminal space or capabilities require it. Active-work motion remains beside the chat composer rather than in the sidebar. Green capability dots mean active and red dots mean inactive. F3 focuses the sidebar for keyboard scrolling and Esc returns to the composer. The sidebar automatically disappears when the terminal narrows so conversation and composer space always take priority.
 
 Sodapop includes Neon Arcade, Graphite, Midnight, High Contrast, and Daylight themes. Graphite is the most restrained option; Neon Arcade keeps the product's color identity while reserving saturated color for active and semantic accents. Terminal font selection belongs to the terminal emulator rather than Sodapop; a modern monospace font with clear punctuation and Unicode coverage produces the best result.
 
-<details>
-<summary>Watch: Neon Arcade, Graphite, and Daylight</summary>
+### Watch: Neon Arcade, Graphite, and Daylight
 
 <p><img src="docs/assets/demos/themes.gif" width="800" alt="Change Sodapop's appearance from Neon Arcade to Graphite and Daylight, then return to Neon Arcade." /></p>
 
 [Static Daylight image](docs/assets/demos/themes.png).
 
-</details>
-
 `/theme` also offers quiet, playful, and extra personality modes. Personality can add light carbonation and reactions to interactions, contextual startup and recovery copy, and a bottle-cap recap in exit confirmation. The **Perfect Pour** celebration is deliberately conservative: it appears only after Sodapop recognizes a successful validation result, not merely a completed response. Reduced motion, no-color, and ASCII settings remain independent, so personality never requires animation, color, or Unicode.
 
 ## Permissions and privacy
 
-<details>
-<summary>Watch: inspect staged and unstaged changes without modifying them</summary>
+### Watch: inspect staged and unstaged changes
 
 <p><img src="docs/assets/demos/diff.gif" width="800" alt="Inspect prepared staged and unstaged changes in a small Go project, then scroll the combined read-only working-tree diff." /></p>
 
 [Static diff image](docs/assets/demos/diff.png). The example changes are prepared fixtures, not edits made by an AI session.
 
-</details>
-
-Only structured reads contained in the canonical project directory are approved automatically by default. File edits, shell commands, outside-project reads, and external tool access offer **Deny**, **Allow once**, and **Allow all**. Allow all applies only to the current conversation and can also be toggled with `/allow-all` and `/allow-all off`. An approved shell command is **not sandboxed**.
+Only structured reads contained in the canonical project directory are approved automatically by default. File edits, shell commands, outside-project reads, and external tool access offer **Deny**, **Allow once**, and **Enable Autopilot**. Autopilot applies only to the current conversation and can be toggled with F2, `/autopilot`, and `/autopilot off`; `/allow-all` remains a compatibility alias. It does not answer agent questions. An approved shell command is **not sandboxed**.
 
 Cancellation does not roll back completed file changes. Sodapop never automatically stages, resets, commits, or pushes the worktree.
 
-Conversations are persisted by the Copilot runtime in Sodapop-scoped account state, separate from the default Copilot configuration. Sodapop does not import your existing MCP servers, plugins, or skills by default. OAuth/Copilot connections use GitHub services and normal Copilot entitlement and usage rules; see [architecture](docs/architecture.md) for boundaries.
+Conversations and explicit MCP server definitions are persisted in Sodapop-scoped account state, while immutable skills and project activation live in separate private Sodapop state. Sodapop does not import your existing MCP servers, plugins, or skills. OAuth/Copilot connections use GitHub services and normal Copilot entitlement and usage rules; see [architecture](docs/architecture.md) for boundaries.
 
 ## Terminal options
 
@@ -186,7 +234,7 @@ SODAPOP_TARGET=linux/amd64 SODAPOP_VERSION=0.0.2 make package
 
 Windows builds use `bin/sodapop.exe` by default. Cross-compilation checks build tags and packaging, but Windows ACL enforcement, session locking, Credential Manager access, and the bundled runtime handshake must run on a native Windows x64 runner.
 
-Normal tests are credential-free. `make coverage` enforces both the committed total statement-coverage baseline and package floors for `internal/app`, `internal/engine`, and handwritten `internal/runtimebundle` code. Generated embedded-runtime sources are excluded from the runtime package floor but remain compiled and covered by native smoke checks. `make check` adds race testing and vet. Feature, bug-fix, and observable behavior changes should add or update focused tests in the same change. If the full suite genuinely raises coverage, run `make coverage-baseline` and review the baseline increase; the command refuses to keep or lower the existing value.
+Normal tests are credential-free. `make coverage` enforces both the committed total statement-coverage baseline and package floors for `internal/app`, `internal/engine`, `internal/skills`, and handwritten `internal/runtimebundle` code. Generated embedded-runtime sources are excluded from the runtime package floor but remain compiled and covered by native smoke checks. `make check` adds race testing and vet. Feature, bug-fix, and observable behavior changes should add or update focused tests in the same change. If the full suite genuinely raises coverage, run `make coverage-baseline` and review the baseline increase; the command refuses to keep or lower the existing value.
 
 `make demos` regenerates the README GIFs and PNG alternatives using a pinned VHS recorder and an isolated, signed-out instance of the real UI. Use `make demos SODAPOP_DEMO=themes` to regenerate one clip. See the [recording guide](docs/vhs/README.md) for dependencies, fixture isolation, and tape editing.
 
@@ -273,6 +321,6 @@ for content, release metadata, and deployment configuration.
 
 ## Boundaries
 
-The first release supports macOS, glibc-based Linux, and Windows x64 local coding. Windows ARM64, BYOK, explicit MCP/skills/plugin management, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
+The first release supports macOS, glibc-based Linux, Windows x64 local coding, explicit local stdio MCP servers, and explicit bundled/local/public-Git skills. Windows ARM64, BYOK, remote MCP transports and OAuth, plugin management, private Git skill authentication, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
 
 Sodapop is an independent application, not the official GitHub Copilot CLI. See [third-party notices](THIRD_PARTY_NOTICES.md).

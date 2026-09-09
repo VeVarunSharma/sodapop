@@ -109,6 +109,8 @@ type fakeSDKSessionBackend struct {
 	toolsErr        error
 	mcp             *rpc.MCPServerList
 	mcpErr          error
+	skills          *rpc.SkillList
+	skillsErr       error
 	sendID          string
 	sendErr         error
 	compactResult   *rpc.HistoryCompactResult
@@ -157,6 +159,7 @@ func newFakeSDKSessionBackend() *fakeSDKSessionBackend {
 			{Name: "view"}, {Name: "edit"}, {Name: "bash"}, {Name: "ask_user"},
 		}},
 		mcp:           &rpc.MCPServerList{},
+		skills:        &rpc.SkillList{},
 		sendID:        "message-a",
 		compactResult: &rpc.HistoryCompactResult{Success: true},
 		credentials:   &rpc.SessionSetCredentialsResult{Success: true, CopilotUserResolved: copilot.Bool(true)},
@@ -202,6 +205,10 @@ func (f *fakeSDKSessionBackend) CurrentTools(context.Context) (*rpc.ToolsGetCurr
 
 func (f *fakeSDKSessionBackend) MCPServers(context.Context) (*rpc.MCPServerList, error) {
 	return f.mcp, f.mcpErr
+}
+
+func (f *fakeSDKSessionBackend) Skills(context.Context) (*rpc.SkillList, error) {
+	return f.skills, f.skillsErr
 }
 
 func (f *fakeSDKSessionBackend) Send(_ context.Context, options copilot.MessageOptions) (string, error) {

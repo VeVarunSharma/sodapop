@@ -2,16 +2,42 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
   SODAPOP_LIVE_QUALIFY: '0'
   SODAPOP_RUNTIME_SMOKE: '0'
 
 jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Vet
+        run: go vet ./...
+      - name: Check formatting
+        shell: bash
+        run: |
+          unformatted="$(find cmd internal scripts -type f -name '*.go' ! -name 'zcopilot*.go' -print0 | xargs -0 gofmt -l)"
+          if [[ -n "$unformatted" ]]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+
   coverage:
     strategy:
       fail-fast: false
@@ -56,17 +82,6 @@ jobs:
       - name: Build Windows command
         if: runner.os == 'Windows'
         run: go build ./cmd/sodapop
-      - name: Vet
-        run: go vet ./...
-      - name: Check formatting
-        if: runner.os != 'Windows'
-        shell: bash
-        run: |
-          unformatted="$(find cmd internal scripts -type f -name '*.go' ! -name 'zcopilot*.go' -print0 | xargs -0 gofmt -l)"
-          if [[ -n "$unformatted" ]]; then
-            printf '%s\n' "$unformatted"
-            exit 1
-          fi
 
   distribution:
     runs-on: ubuntu-24.04
@@ -74,12 +89,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Test release and package-manager contracts
-        run: make distribution-test
+      - name: Test npm packaging and launcher contracts
+        run: make npm-test

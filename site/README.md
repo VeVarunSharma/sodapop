@@ -5,6 +5,8 @@ project**. Starlight supplies documentation navigation and Pagefind search;
 selected shadcn/ui components use small React islands and Lucide icons.
 There is no application backend, analytics, live model demo, or credential access.
 
+For copy changes, follow the [bubbly-sidekick voice guide](../docs/brand-voice.md).
+
 ## Work locally
 
 Use a supported Node version (`.node-version` pins the CI toolchain), then run
@@ -43,14 +45,18 @@ Author documentation in root `docs/`. The explicit map in
 `scripts/prepare-content.mjs` adapts the selected sources into the ignored
 `src/content/docs/docs/` tree. Do not hand-edit that generated tree.
 
+The Markdown content component makes rendered tables keyboard-focusable at build
+time, including without JavaScript. Continue authoring tables in the canonical Markdown.
+
 `scripts/prepare-assets.mjs` stages only approved brand artwork and recordings
 under `public/assets/`. Do not copy the whole `images/`, repository, or dependency
 directory there. Original artwork stays unchanged. The font is self-hosted from
 its open-licensed package; locally licensed Avenir/Menlo font files are not shipped.
 
 The recorded demos are signed out and use prepared local changes. They are not
-live AI responses. GIFs use PNG posters until explicitly played; stopping restores
-the poster. Keep these controls and the reduced-motion behavior intact.
+live AI responses. A recording starts when it enters the viewport with motion
+enabled or when the user explicitly plays it; stopping restores the poster.
+Reduced-motion visitors keep the static poster. Preserve those controls.
 
 ## Pre-release and published downloads
 

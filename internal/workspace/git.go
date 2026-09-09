@@ -6,6 +6,8 @@
 // 512 KiB plus its truncation notice, previews at most 100 untracked files, and
 // reads at most 64 KiB plus one UTF-8 rune per untracked file. Omitted preview
 // content is explicitly labeled and sets Diff.Truncated.
+// Conversation baselines retain complete files up to 64 KiB each, 16 MiB of
+// contents total, and 1,024 files. Exclusions produce explicit partial coverage.
 //
 // Pagers, external diff, textconv, fsmonitor, hooks, executable content filters,
 // optional index writes, and lazy object fetching are disabled. Filtered content
@@ -32,6 +34,9 @@ const (
 	maxOutput           = 512 * 1024
 	maxUntrackedPreview = 64 * 1024
 	maxUntrackedFiles   = 100
+	maxBaselineBytes    = 16 * 1024 * 1024
+	maxBaselineFiles    = 1024
+	maxBaselineDetails  = 100
 )
 
 // ErrOutputLimit means complete Git metadata could not fit within the read cap.
@@ -41,6 +46,22 @@ var ErrOutputLimit = errors.New("Git inspection output exceeds the 512 KiB limit
 type Service struct {
 	directory string
 	git       string
+}
+
+type baseline struct {
+	service       *Service
+	directory     string
+	status        Status
+	protection    []string
+	tracked       []string
+	capturedBytes int
+	excludedCount int
+	exclusions    []baselineExclusion
+}
+
+type baselineExclusion struct {
+	path   string
+	reason string
 }
 
 // New resolves symlinks and requires an existing directory, but not a Git repo.
@@ -120,6 +141,10 @@ func gitEnvironment() []string {
 }
 
 func (service *Service) run(ctx context.Context, protection []string, args ...string) (string, bool, error) {
+	return service.runWithEnv(ctx, protection, nil, args...)
+}
+
+func (service *Service) runWithEnv(ctx context.Context, protection, extraEnv []string, args ...string) (string, bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	options := []string{
@@ -130,11 +155,12 @@ func (service *Service) run(ctx context.Context, protection []string, args ...st
 		"-c", "color.ui=false",
 		"-c", "diff.external=",
 	}
+
 	options = append(options, protection...)
 	options = append(options, args...)
 	cmd := exec.CommandContext(ctx, service.git, options...)
 	cmd.Dir = service.directory
-	cmd.Env = gitEnvironment()
+	cmd.Env = append(gitEnvironment(), extraEnv...)
 	cmd.WaitDelay = time.Second
 	output := &limitedBuffer{limit: maxOutput}
 	stderr := &limitedBuffer{limit: 8192}
@@ -152,6 +178,262 @@ func (service *Service) run(ctx context.Context, protection []string, args ...st
 		}
 	}
 	return output.String(), output.truncated, nil
+}
+
+func (service *Service) diffFiles(ctx context.Context, before, after string) (string, bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, service.git, "--no-pager", "diff", "--no-index", "--no-ext-diff", "--no-textconv", "--color=never", "--", before, after)
+	cmd.Env = gitEnvironment()
+	cmd.WaitDelay = time.Second
+	output := &limitedBuffer{limit: maxOutput}
+	stderr := &limitedBuffer{limit: 8192}
+	cmd.Stdout, cmd.Stderr = output, stderr
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		return "", false, fmt.Errorf("Git operation stopped: %w", ctx.Err())
+	}
+	if err != nil && !exitCode(err, 1) {
+		return "", false, fmt.Errorf("Git diff: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	return output.String(), output.truncated, nil
+}
+
+// CaptureBaseline copies bounded, complete tracked-file contents and records
+// status in private temporary state. Exclusions are reported by the session
+// diff; the repository index and working tree are never changed.
+func (service *Service) CaptureBaseline(ctx context.Context) (result Baseline, resultErr error) {
+	state, protection, err := service.inspect(ctx)
+	if err != nil {
+		return nil, err
+	}
+	snapshot := &baseline{service: service, status: state, protection: protection}
+	if !state.IsRepository {
+		return snapshot, nil
+	}
+	directory, err := os.MkdirTemp("", "sodapop-baseline-*")
+	if err != nil {
+		return nil, fmt.Errorf("create conversation baseline: %w", err)
+	}
+	snapshot.directory = directory
+	defer func() {
+		if resultErr != nil {
+			resultErr = errors.Join(resultErr, snapshot.Close())
+			result = nil
+		}
+	}()
+	if err := os.Chmod(directory, 0700); err != nil {
+		return nil, fmt.Errorf("protect conversation baseline: %w", err)
+	}
+	tracked, truncated, err := service.run(ctx, protection, "ls-files", "-z")
+	if err != nil {
+		return nil, err
+	}
+	if truncated || (tracked != "" && !strings.HasSuffix(tracked, "\x00")) {
+		return nil, fmt.Errorf("tracked conversation baseline: %w", ErrOutputLimit)
+	}
+	root, err := os.OpenRoot(state.Root)
+	if err != nil {
+		return nil, fmt.Errorf("open repository for conversation baseline: %w", err)
+	}
+	defer func() {
+		if err := root.Close(); err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("close conversation baseline source: %w", err))
+		}
+	}()
+	if err := snapshot.captureFiles(ctx, root, strings.Split(strings.TrimSuffix(tracked, "\x00"), "\x00")); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
+func (snapshot *baseline) captureFiles(ctx context.Context, root *os.Root, paths []string) error {
+	for _, name := range paths {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("conversation baseline stopped: %w", err)
+		}
+		if name == "" {
+			continue
+		}
+		if len(snapshot.tracked) == maxBaselineFiles {
+			snapshot.exclude(name, "1,024-file snapshot limit")
+			continue
+		}
+		info, err := root.Lstat(name)
+		if err != nil {
+			if os.IsNotExist(err) {
+				snapshot.exclude(name, "not present at capture")
+				continue
+			}
+			return fmt.Errorf("inspect baseline file %q: %w", name, err)
+		}
+		if !info.Mode().IsRegular() {
+			snapshot.exclude(name, "non-regular path; contents not followed")
+			continue
+		}
+		if reason := snapshot.limitReason(info.Size()); reason != "" {
+			snapshot.exclude(name, reason)
+			continue
+		}
+		data, cut, size, err := readPreview(root, name)
+		if err != nil {
+			return fmt.Errorf("read baseline file %q: %w", name, err)
+		}
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("conversation baseline stopped: %w", err)
+		}
+		if err := snapshot.saveFile(name, data, cut, size); err != nil {
+			return err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("conversation baseline stopped: %w", err)
+	}
+	return nil
+}
+
+func (snapshot *baseline) exclude(path, reason string) {
+	snapshot.excludedCount++
+	if len(snapshot.exclusions) < maxBaselineDetails {
+		snapshot.exclusions = append(snapshot.exclusions, baselineExclusion{path: path, reason: reason})
+	}
+}
+
+func (snapshot *baseline) limitReason(size int64) string {
+	switch {
+	case size > maxUntrackedPreview:
+		return "file exceeds the 64 KiB snapshot limit"
+	case len(snapshot.tracked) >= maxBaselineFiles:
+		return "1,024-file snapshot limit"
+	case size > int64(maxBaselineBytes-snapshot.capturedBytes):
+		return "16 MiB total snapshot limit"
+	default:
+		return ""
+	}
+}
+
+func (snapshot *baseline) saveFile(name string, data []byte, truncated bool, size int64) error {
+	if truncated || len(data) > maxUntrackedPreview {
+		snapshot.exclude(name, "file exceeds the 64 KiB snapshot limit")
+		return nil
+	}
+	if reason := snapshot.limitReason(size); reason != "" {
+		snapshot.exclude(name, reason)
+		return nil
+	}
+	if size != int64(len(data)) {
+		snapshot.exclude(name, "file changed size while being read")
+		return nil
+	}
+	target := filepath.Join(snapshot.directory, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(target), 0700); err != nil {
+		return fmt.Errorf("create baseline path %q: %w", name, err)
+	}
+	if err := os.WriteFile(target, data, 0600); err != nil {
+		return fmt.Errorf("save baseline file %q: %w", name, err)
+	}
+	snapshot.tracked = append(snapshot.tracked, name)
+	snapshot.capturedBytes += len(data)
+	return nil
+}
+
+func (snapshot *baseline) Close() error {
+	if snapshot.directory == "" {
+		return nil
+	}
+	err := os.RemoveAll(snapshot.directory)
+	snapshot.directory = ""
+	if err != nil {
+		return fmt.Errorf("remove conversation baseline: %w", err)
+	}
+	return nil
+}
+
+func (snapshot *baseline) Diff(ctx context.Context) (Diff, error) {
+	if !snapshot.status.IsRepository {
+		return Diff{Text: "Not a Git working tree. Session change attribution is unavailable."}, nil
+	}
+	if snapshot.directory == "" {
+		return Diff{}, errors.New("conversation baseline is closed")
+	}
+	output := &limitedBuffer{limit: maxOutput}
+	fmt.Fprintln(output, "OBSERVED SINCE THIS CONVERSATION'S BASELINE")
+	fmt.Fprintln(output, "Changes may come from Sodapop, you, or another process; authorship is not inferred.")
+	fmt.Fprintln(output)
+	if snapshot.excludedCount != 0 {
+		fmt.Fprintf(output, "PARTIAL BASELINE / %d captured files (%d bytes); %d excluded paths.\n",
+			len(snapshot.tracked), snapshot.capturedBytes, snapshot.excludedCount)
+		fmt.Fprintln(output, "Snapshot limits: 64 KiB per file, 16 MiB total, 1,024 files.")
+		fmt.Fprintln(output, "Changes to excluded paths are not tracked by this baseline:")
+		for _, exclusion := range snapshot.exclusions {
+			fmt.Fprintf(output, "%q: %s\n", exclusion.path, exclusion.reason)
+		}
+		if remaining := snapshot.excludedCount - len(snapshot.exclusions); remaining != 0 {
+			fmt.Fprintf(output, "[%d additional excluded paths not listed.]\n", remaining)
+		}
+		fmt.Fprintln(output, "Use /diff all for whole-working-tree inspection, including pre-existing changes.")
+		fmt.Fprintln(output)
+	}
+	foundTracked := false
+	cut := false
+	for _, name := range snapshot.tracked {
+		if err := ctx.Err(); err != nil {
+			return Diff{}, fmt.Errorf("conversation diff stopped: %w", err)
+		}
+		if output.truncated {
+			break
+		}
+		before := filepath.Join(snapshot.directory, filepath.FromSlash(name))
+		after := filepath.Join(snapshot.status.Root, filepath.FromSlash(name))
+		if _, err := os.Lstat(after); os.IsNotExist(err) {
+			after = os.DevNull
+		} else if err != nil {
+			return Diff{}, fmt.Errorf("inspect current file %q: %w", name, err)
+		}
+		text, fileCut, err := snapshot.service.diffFiles(ctx, before, after)
+		if err != nil {
+			return Diff{}, err
+		}
+		if text != "" {
+			foundTracked = true
+			fmt.Fprint(output, text)
+		}
+		cut = cut || fileCut
+	}
+	if !foundTracked {
+		if snapshot.excludedCount != 0 {
+			fmt.Fprintln(output, "(no changes observed in captured files)")
+		} else {
+			fmt.Fprintln(output, "(no tracked file changes observed)")
+		}
+	}
+	current, _, err := snapshot.service.inspect(ctx)
+	if err != nil {
+		return Diff{}, err
+	}
+	baselineUntracked := make(map[string]bool)
+	for _, entry := range snapshot.status.Entries {
+		if entry.Code == "??" {
+			baselineUntracked[entry.Path] = true
+		}
+	}
+	fmt.Fprintln(output, "\nNEW UNTRACKED PATHS")
+	found := false
+	for _, entry := range current.Entries {
+		if entry.Code == "??" && !baselineUntracked[entry.Path] {
+			found = true
+			fmt.Fprintf(output, "%q\n", entry.Path)
+		}
+	}
+	if !found {
+		fmt.Fprintln(output, "(none)")
+	}
+	truncated := cut || output.truncated || snapshot.excludedCount != 0
+	result := output.String()
+	if cut || output.truncated {
+		result += "\n[Output truncated at 512 KiB; additional content may be omitted.]\n"
+	}
+	return Diff{Text: result, IsRepository: true, Truncated: truncated}, nil
 }
 
 func exitCode(err error, code int) bool {

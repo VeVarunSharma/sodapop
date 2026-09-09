@@ -25,16 +25,65 @@ func validateModelID(model string) error {
 	return nil
 }
 
-func sessionConfig(session *liveSession, home, token, instructions string) *copilot.SessionConfig {
+func validateMCPServers(servers []MCPServer) error {
+	seen := make(map[string]struct{}, len(servers))
+	for _, server := range servers {
+		name := strings.TrimSpace(server.Name)
+		if name == "" || name != server.Name || strings.IndexFunc(name, unicode.IsControl) >= 0 {
+			return errors.New("MCP server requires a valid name")
+		}
+		key := strings.ToLower(name)
+		if _, exists := seen[key]; exists {
+			return fmt.Errorf("MCP server %q is duplicated", name)
+		}
+		seen[key] = struct{}{}
+		if strings.TrimSpace(server.Command) == "" || strings.IndexFunc(server.Command, unicode.IsControl) >= 0 {
+			return fmt.Errorf("MCP server %q requires a valid command", name)
+		}
+		if server.TimeoutSeconds < 0 || server.TimeoutSeconds > 300 {
+			return fmt.Errorf("MCP server %q has an invalid timeout", name)
+		}
+		for key := range server.Env {
+			if strings.TrimSpace(key) == "" || strings.IndexFunc(key, unicode.IsControl) >= 0 {
+				return fmt.Errorf("MCP server %q has an invalid environment variable", name)
+			}
+		}
+	}
+	return nil
+}
+
+func sessionConfig(session *liveSession, home, token, instructions string, servers []MCPServer, skillDirectories []string) *copilot.SessionConfig {
+	available := copilot.NewToolSet().AddBuiltIn(codingTools...)
+	excluded := copilot.NewToolSet().AddCustom("*")
+	mcpServers := make(map[string]copilot.MCPServerConfig, len(servers))
+	if len(servers) == 0 {
+		excluded.AddMCP("*")
+	} else {
+		available.AddMCP("*")
+		for _, server := range servers {
+			tools := append([]string(nil), server.Tools...)
+			if tools == nil {
+				tools = []string{"*"}
+			}
+			mcpServers[server.Name] = copilot.MCPStdioServerConfig{
+				Command: server.Command, Args: append([]string(nil), server.Args...),
+				Env: cloneStrings(server.Env), Tools: tools, Timeout: server.TimeoutSeconds,
+				WorkingDirectory: session.meta.Project,
+			}
+		}
+	}
+	if len(skillDirectories) > 0 {
+		available.AddBuiltIn("skill")
+	}
 	return &copilot.SessionConfig{
 		SessionID: session.meta.ID, ClientName: "Sodapop", Model: session.meta.Model,
 		ReasoningEffort: session.meta.ReasoningEffort, ContextTier: copilot.ContextTier(session.meta.ContextTier),
 		GitHubToken: token, WorkingDirectory: session.meta.Project, ConfigDirectory: home,
 		Streaming: copilot.Bool(true), IncludeSubAgentStreamingEvents: copilot.Bool(false),
-		AvailableTools:        copilot.NewToolSet().AddBuiltIn(codingTools...).ToSlice(),
-		ExcludedTools:         copilot.NewToolSet().AddMCP("*").AddCustom("*").ToSlice(),
+		AvailableTools:        available.ToSlice(),
+		ExcludedTools:         excluded.ToSlice(),
 		EnableConfigDiscovery: copilot.Bool(false), EnableFileHooks: copilot.Bool(false),
-		EnableSkills: copilot.Bool(false), IncludedBuiltinSkills: []string{},
+		EnableSkills: copilot.Bool(len(skillDirectories) > 0), IncludedBuiltinSkills: []string{},
 		EnableSessionStore: copilot.Bool(false), SkipEmbeddingRetrieval: copilot.Bool(true),
 		EmbeddingCacheStorage:              copilot.String("in-memory"),
 		EnableOnDemandInstructionDiscovery: copilot.Bool(false), SkipCustomInstructions: copilot.Bool(true),
@@ -45,8 +94,9 @@ func sessionConfig(session *liveSession, home, token, instructions string) *copi
 		RequestCanvasRenderer: copilot.Bool(false), EnableManagedSettings: copilot.Bool(true),
 		Memory:     &copilot.MemoryConfiguration{Enabled: false},
 		ToolSearch: &copilot.ToolSearchConfig{Enabled: copilot.Bool(false)},
-		MCPServers: map[string]copilot.MCPServerConfig{}, DisabledMCPServers: []string{"github-mcp-server", "playwright"},
-		MCPOAuthTokenStorage: "in-memory", PluginDirectories: []string{}, SkillDirectories: []string{},
+		MCPServers: mcpServers, DisabledMCPServers: []string{},
+		MCPOAuthTokenStorage: "in-memory", PluginDirectories: []string{},
+		SkillDirectories: append([]string(nil), skillDirectories...), DisabledSkills: []string{},
 		InstructionDirectories: []string{}, AdditionalDirectories: []string{},
 		CustomAgents: []copilot.CustomAgentConfig{}, RemoteSession: rpc.RemoteSessionModeOff,
 		SystemMessage: &copilot.SystemMessageConfig{Mode: "append", Content: instructions},
@@ -54,6 +104,17 @@ func sessionConfig(session *liveSession, home, token, instructions string) *copi
 		OnUserInputRequest: session.onQuestion,
 		Hooks:              &copilot.SessionHooks{OnPreToolUse: session.onPreToolUse},
 	}
+}
+
+func cloneStrings(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(values))
+	for key, value := range values {
+		result[key] = value
+	}
+	return result
 }
 
 func resumeConfig(config *copilot.SessionConfig) *copilot.ResumeSessionConfig {
@@ -77,6 +138,7 @@ func resumeConfig(config *copilot.SessionConfig) *copilot.ResumeSessionConfig {
 		MCPServers: config.MCPServers, DisabledMCPServers: config.DisabledMCPServers,
 		MCPOAuthTokenStorage: config.MCPOAuthTokenStorage, PluginDirectories: config.PluginDirectories,
 		SkillDirectories: config.SkillDirectories, InstructionDirectories: config.InstructionDirectories,
+		DisabledSkills:        config.DisabledSkills,
 		AdditionalDirectories: config.AdditionalDirectories, CustomAgents: config.CustomAgents,
 		RemoteSession: config.RemoteSession, SystemMessage: config.SystemMessage,
 		OnEvent: config.OnEvent, OnPermissionRequest: config.OnPermissionRequest,

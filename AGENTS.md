@@ -20,6 +20,7 @@ boundaries, read each affected guide. Links are navigation, not automatic includ
 | OAuth and credential storage | [internal/auth/AGENTS.md](internal/auth/AGENTS.md) |
 | Slash commands, help, completion | [internal/commands/AGENTS.md](internal/commands/AGENTS.md) |
 | Preferences and account-scoped paths | [internal/config/AGENTS.md](internal/config/AGENTS.md) |
+| Skill installation, trust, and activation | [internal/skills/AGENTS.md](internal/skills/AGENTS.md) |
 | Read-only Git inspection | [internal/workspace/AGENTS.md](internal/workspace/AGENTS.md) |
 | Runtime pins, extraction, isolation | [internal/runtimebundle/AGENTS.md](internal/runtimebundle/AGENTS.md) |
 | Cross-package and opt-in live tests | [internal/integration/AGENTS.md](internal/integration/AGENTS.md) |

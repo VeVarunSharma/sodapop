@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -72,7 +73,7 @@ func TestIndexScopeAndPersistence(t *testing.T) {
 	if err := index.save(t.Context(), session); err != nil {
 		t.Fatal(err)
 	}
-	if result, err := index.find(t.Context(), session.ID); err != nil || result != session {
+	if result, err := index.find(t.Context(), session.ID); err != nil || !reflect.DeepEqual(result, session) {
 		t.Fatalf("find = %+v, %v", result, err)
 	}
 	for _, foreign := range []*sessionIndex{
@@ -143,7 +144,7 @@ func TestIndexConcurrentWritersDoNotLoseMetadata(t *testing.T) {
 
 func TestCorruptIndexIsNeverSilentlyReplaced(t *testing.T) {
 	project, _ := policyFixture(t)
-	for _, content := range []string{`broken`, `{"version":3,"sessions":[]}`, `{"version":1,"sessions":[{"id":"../escape"}]}`} {
+	for _, content := range []string{`broken`, `{"version":4,"sessions":[]}`, `{"version":1,"sessions":[{"id":"../escape"}]}`} {
 		home := t.TempDir()
 		path := filepath.Join(home, indexFilename)
 		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
@@ -198,7 +199,7 @@ func TestVersionOneIndexMigratesSelectionsOnNextWrite(t *testing.T) {
 	}
 	var document indexDocument
 	data, err := os.ReadFile(path)
-	if err != nil || json.Unmarshal(data, &document) != nil || document.Version != 2 ||
+	if err != nil || json.Unmarshal(data, &document) != nil || document.Version != 3 ||
 		document.Sessions[0].ReasoningEffort != "high" {
 		t.Fatalf("migration was not persisted on write: %s, %v", data, err)
 	}
@@ -218,6 +219,24 @@ func TestIndexRejectsMalformedModelSelections(t *testing.T) {
 				t.Fatal("stored malformed model selection")
 			}
 		})
+	}
+}
+
+func TestIndexPersistsExactSkillDigests(t *testing.T) {
+	project, _ := policyFixture(t)
+	index := &sessionIndex{home: t.TempDir(), project: project, account: "one"}
+	session := indexSession(t, project)
+	session.SkillDigests = []string{strings.Repeat("a", 64), strings.Repeat("b", 64)}
+	if err := index.save(t.Context(), session); err != nil {
+		t.Fatal(err)
+	}
+	got, err := index.find(t.Context(), session.ID)
+	if err != nil || !reflect.DeepEqual(got.SkillDigests, session.SkillDigests) {
+		t.Fatalf("skill digests = %#v, %v", got.SkillDigests, err)
+	}
+	session.SkillDigests = []string{"bad"}
+	if err := index.save(t.Context(), session); err == nil {
+		t.Fatal("invalid skill digest was stored")
 	}
 }
 

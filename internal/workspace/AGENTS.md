@@ -13,6 +13,10 @@ Scope: `internal/workspace/`. Apply the [repository rules](../../AGENTS.md) firs
   counts. A hostile or huge repository must not stall the UI or exhaust memory.
 - Fail incomplete status metadata and mark partial diffs/previews as truncated;
   never present omitted changes as a complete inspection.
+- Conversation baselines keep complete, bounded file snapshots. Size/budget
+  exclusions must preserve useful captures and appear in `/diff session`, not
+  fail startup. Real read errors still fail; partial coverage must not imply a
+  complete inspection.
 - Preserve filename, symlink, and submodule boundaries. Do not recursively inspect
   independently configured nested worktrees or let previews escape the project.
 
@@ -20,6 +24,7 @@ Scope: `internal/workspace/`. Apply the [repository rules](../../AGENTS.md) firs
 
 [git.go](git.go) documents limits and hardening; [types.go](types.go) is the public result
 contract. [git_test.go](git_test.go) exercises hostile repositories in temporary fixtures.
+[baseline_test.go](baseline_test.go) covers partial snapshots, exact budgets, and cleanup.
 
 ## Checks
 

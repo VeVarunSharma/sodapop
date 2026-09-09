@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -68,6 +69,12 @@ func newCopilot(cfg Config, deps dependencies) (*Copilot, error) {
 	if cfg.TokenSource == nil {
 		return nil, ErrNoToken
 	}
+	if err := validateMCPServers(cfg.MCPServers); err != nil {
+		return nil, err
+	}
+	if err := validateSkills(cfg.Skills, cfg.ActiveSkillDigests); err != nil {
+		return nil, err
+	}
 	project, err := canonicalDirectory(cfg.Project)
 	if err != nil {
 		return nil, fmt.Errorf("open Sodapop project: %w", err)
@@ -99,6 +106,13 @@ func newCopilot(cfg Config, deps dependencies) (*Copilot, error) {
 		return nil, errors.New("Sodapop data must not resolve inside ~/.copilot")
 	}
 	cfg.Project, cfg.Home = project, home
+	for index := range cfg.Skills {
+		directory, err := canonicalDirectory(cfg.Skills[index].Directory)
+		if err != nil {
+			return nil, fmt.Errorf("open Sodapop skill %q: %w", cfg.Skills[index].Name, err)
+		}
+		cfg.Skills[index].Directory = directory
+	}
 	if deps.healthEvery <= 0 {
 		deps.healthEvery = 5 * time.Second
 	}
@@ -107,6 +121,62 @@ func newCopilot(cfg Config, deps dependencies) (*Copilot, error) {
 		cfg: cfg, deps: deps, index: &sessionIndex{home: home, project: project, account: cfg.AccountID},
 		stream: newEventStream(), redact: &redactor{}, ctx: ctx, cancel: cancel,
 	}, nil
+}
+
+func validateSkills(skills []Skill, active []string) error {
+	names, digests := make(map[string]bool, len(skills)), make(map[string]bool, len(skills))
+	for _, skill := range skills {
+		if strings.TrimSpace(skill.Name) == "" || skill.Name != strings.TrimSpace(skill.Name) ||
+			strings.IndexFunc(skill.Name, unicode.IsControl) >= 0 {
+			return errors.New("skill requires a valid name")
+		}
+		if len(skill.Digest) != 64 || strings.ToLower(skill.Digest) != skill.Digest {
+			return fmt.Errorf("skill %q has an invalid digest", skill.Name)
+		}
+		if _, err := hex.DecodeString(skill.Digest); err != nil {
+			return fmt.Errorf("skill %q has an invalid digest", skill.Name)
+		}
+		if !filepath.IsAbs(skill.Directory) {
+			return fmt.Errorf("skill %q requires an absolute directory", skill.Name)
+		}
+		nameKey := strings.ToLower(skill.Name)
+		if names[nameKey] || digests[skill.Digest] {
+			return fmt.Errorf("skill %q is duplicated", skill.Name)
+		}
+		names[nameKey], digests[skill.Digest] = true, true
+	}
+	enabled := make(map[string]bool, len(active))
+	for _, digest := range active {
+		if !digests[digest] {
+			return fmt.Errorf("active skill digest %q is not installed", digest)
+		}
+		if enabled[digest] {
+			return fmt.Errorf("active skill digest %q is duplicated", digest)
+		}
+		enabled[digest] = true
+	}
+	return nil
+}
+
+func (c *Copilot) skillDirectories(digests []string) ([]string, error) {
+	byDigest := make(map[string]Skill, len(c.cfg.Skills))
+	for _, skill := range c.cfg.Skills {
+		byDigest[skill.Digest] = skill
+	}
+	directories := make([]string, 0, len(digests))
+	for _, digest := range digests {
+		skill, ok := byDigest[digest]
+		if !ok {
+			return nil, fmt.Errorf("session requires missing skill digest %s; reinstall that exact version before resuming", digest)
+		}
+		manifest := filepath.Join(skill.Directory, skill.Name, "SKILL.md")
+		info, err := os.Lstat(manifest)
+		if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return nil, fmt.Errorf("session skill %q is missing or invalid", skill.Name)
+		}
+		directories = append(directories, skill.Directory)
+	}
+	return directories, nil
 }
 
 // reserve serializes public mutations without holding mu across filesystem,
@@ -232,7 +302,7 @@ func (c *Copilot) models(ctx context.Context) ([]Model, error) {
 		result = append(result, mapModel(model, c.redact.text(name)))
 	}
 	if len(result) == 0 {
-		return nil, errors.New("no Copilot models are available for this Sodapop account; check entitlement and organization policy")
+		return nil, ErrNoModels
 	}
 	return result, nil
 }
@@ -388,7 +458,8 @@ func (c *Copilot) NewSession(ctx context.Context, selection ModelSelection) (Ses
 	meta := Session{
 		ID: id, Project: c.cfg.Project, Model: selection.ModelID,
 		ContextTier: selection.ContextTier, ReasoningEffort: selection.ReasoningEffort,
-		Title: "New conversation", UpdatedAt: c.deps.now().UTC(),
+		SkillDigests: append([]string(nil), c.cfg.ActiveSkillDigests...),
+		Title:        "New conversation", UpdatedAt: c.deps.now().UTC(),
 	}
 	return c.openSession(ctx, meta, token, false)
 }
@@ -459,7 +530,11 @@ func (c *Copilot) openSession(ctx context.Context, meta Session, token string, r
 	c.mu.Lock()
 	c.active = session
 	c.mu.Unlock()
-	config := sessionConfig(session, c.cfg.Home, token, instructions)
+	skillDirectories, err := c.skillDirectories(meta.SkillDigests)
+	if err != nil {
+		return Session{}, err
+	}
+	config := sessionConfig(session, c.cfg.Home, token, instructions, c.cfg.MCPServers, skillDirectories)
 	ctx, cancel := linkedContext(ctx, session.ctx)
 	defer cancel()
 	var runtime runtimeSession

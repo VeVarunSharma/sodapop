@@ -26,6 +26,9 @@ Shift+Tab
 Wait+Screen@3s /plan>/
 Sleep 1800ms
 Shift+Tab
+Wait+Screen@3s /auto>/
+Sleep 1400ms
+Shift+Tab
 Wait+Screen@3s /chat>/
 Sleep 600ms
 

@@ -13,13 +13,23 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 		"install-tests.yml": {
 			"go run ./scripts/installcheck",
 			"npm run test:install",
+			"portable-npm:",
+			"homebrew:",
 			"previous_version:",
 			"name: verified-install-inputs",
+			"name: verified-install-manifests",
+			"cache: false",
+			"Verify target-specific installation inputs",
+			"--platform \"$SODAPOP_TARGET\"",
 			"releasectl\" verify",
 		},
 		"native-candidates.yml": {
 			"fixture.public-client",
 			"for revision in 1 2",
+			"name: Bundle the pinned runtime once",
+			"SODAPOP_PREPARED_RUNTIME=1",
+			"targeted_artifacts: true",
+			"current_artifact_prefix: sodapop-current-",
 			"bash scripts/package.sh",
 			"uses: ./.github/workflows/install-tests.yml",
 		},
@@ -66,6 +76,58 @@ func TestCIAndReleaseExerciseTheSameWindowsPackages(t *testing.T) {
 		} {
 			if !strings.Contains(text, required) {
 				t.Errorf("%s is missing %q", workflow, required)
+			}
+		}
+	}
+}
+
+func TestCISeparatesPortableQualityAndNPMDistribution(t *testing.T) {
+	data, err := os.ReadFile("../.github/workflows/ci.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, required := range []string{
+		"quality:",
+		"- name: Vet\n        run: go vet ./...",
+		"- name: Check formatting\n        shell: bash",
+		"run: make npm-test",
+	} {
+		if !strings.Contains(text, required) {
+			t.Errorf("CI is missing %q", required)
+		}
+	}
+	index := strings.Index(text, "  distribution:")
+	if index < 0 {
+		t.Fatal("CI distribution job is missing")
+	}
+	if strings.Contains(text[index:], "actions/setup-go") {
+		t.Error("npm-only distribution job unnecessarily installs Go")
+	}
+}
+
+func TestPullRequestWorkflowsCancelSupersededRunsWithoutDuplicatingBranchCI(t *testing.T) {
+	for file, required := range map[string][]string{
+		"ci.yml": {
+			"push:\n    branches: [main]",
+			"pull_request:",
+			"group: ci-${{ github.event.pull_request.number || github.ref }}",
+			"cancel-in-progress: true",
+		},
+		"native-candidates.yml": {
+			"pull_request:",
+			"group: native-candidates-${{ github.event.pull_request.number || github.ref }}",
+			"cancel-in-progress: true",
+		},
+	} {
+		data, err := os.ReadFile("../.github/workflows/" + file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, value := range required {
+			if !strings.Contains(text, value) {
+				t.Errorf("%s is missing concurrency/trigger contract %q", file, value)
 			}
 		}
 	}

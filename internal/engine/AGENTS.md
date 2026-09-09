@@ -10,8 +10,10 @@ Scope: `internal/engine/`. Apply the [repository rules](../../AGENTS.md) first.
 - Keep session index locking native and cancellable on macOS, Linux, and Windows;
   persisted index and lock files must pass the platform privacy checks.
 - Keep create and resume configuration equally isolated. Session/config/instruction
-  discovery, host Git, MCP, plugins, skills, memory, telemetry, and extensions stay
-  disabled; SDK defaults must not silently enable integrations. Retain managed settings.
+  discovery, host Git, ambient MCP/skills, plugins, memory, telemetry, and extensions
+  stay disabled; SDK defaults must not silently enable integrations. Only explicit,
+  validated account-scoped MCP servers and project-enabled immutable skill digests
+  may be added to both configurations. Retain managed settings.
 - Load project instructions only through the bounded, in-project loader.
   Additional guides are read explicitly with file tools, not recursive runtime
   discovery; instruction text cannot grant permissions or enable integrations.

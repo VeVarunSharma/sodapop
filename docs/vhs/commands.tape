@@ -1,7 +1,7 @@
 Source common.tape
 Set Width 1040
 Set Height 650
-Set FontSize 20
+Set FontSize 18
 Output output/commands.gif
 Require sodapop-recording
 
@@ -15,19 +15,28 @@ Sleep 600ms
 Type "/"
 Wait+Screen@3s /Discover commands/
 Sleep 1200ms
-Type "pl"
+Type "vend"
 Sleep 1s
-Screenshot output/commands.png
-Sleep 300ms
 Tab
-Sleep 900ms
+Sleep 500ms
+Enter
+Wait+Screen@3s /VENDING MACHINE/
+Sleep 1300ms
+Down
+Wait+Screen@3s /Burst into ideas/
+Sleep 500ms
+Screenshot output/commands.png
+Sleep 800ms
 Escape
-Backspace@20ms 6
+Sleep 500ms
 
+Type "Outline a small Go CLI"
 Shift+Tab
 Wait+Screen@3s /plan>/
-Type "Outline a small Go CLI"
-Sleep 2s
+Sleep 1400ms
+Shift+Tab
+Wait+Screen@3s /auto>/
+Sleep 1400ms
 Shift+Tab
 Wait+Screen@3s /chat>/
 Sleep 1300ms

@@ -8,18 +8,18 @@ import { withBase } from '../lib/urls';
 const catalog = getCatalog();
 const prerelease = catalog.mode === 'pre-release';
 const docs = [
-  { title: 'First sip', text: 'Install, sign in, and settle into your first conversation.', href: 'docs/getting-started/', icon: Sparkles },
-  { title: 'Know your commands', text: 'The shortcuts and little helpers that keep things flowing.', href: 'docs/commands/', icon: Terminal },
-  { title: 'Make it yours', text: 'Find your theme, your colors, and your level of fizz.', href: 'docs/customization/', icon: Palette },
-  { title: 'Stay in control', text: 'Understand approvals, planning, and your project boundaries.', href: 'docs/permissions-and-privacy/', icon: ShieldCheck },
+  { title: 'First sip', text: 'Install, sign in, and try one small request in your project.', href: 'docs/getting-started/', icon: Sparkles },
+  { title: 'Pick a workflow', text: 'Fizz up options, taste-test changes, or browse the vending machine.', href: 'docs/commands/#built-in-workflows', icon: Terminal },
+  { title: 'Connect the extras', text: 'Add explicit MCP servers and trusted project skills. Nothing ambient sneaks in.', href: 'docs/commands/#connect-and-extend', icon: Braces },
+  { title: 'Approvals and privacy', text: 'Learn what needs approval, what stays saved, and what cancellation does.', href: 'docs/permissions-and-privacy/', icon: ShieldCheck },
 ];
 ---
 <MarketingLayout>
   <section class="hero wrap" aria-labelledby="hero-title">
     <div class="hero-copy">
-      <p class="eyebrow">A fresh take on your terminal</p>
-      <h1 id="hero-title">Your terminal.<br />With a little<br /><em>more pop.</em></h1>
-      <p class="hero-lede">A colorful coding companion powered by GitHub Copilot. Real tools, clear approvals, and a terminal that feels a little more you.</p>
+      <p class="eyebrow">Psst. Bring that half-built idea.</p>
+      <h1 id="hero-title">A little can of <br /><em>let's build that.</em></h1>
+      <p class="hero-lede">An independent terminal coding companion powered by the GitHub Copilot SDK. Explore your code, compare approaches, taste-test the changes, and inspect the diff. The smiling can is coming too.</p>
       <div class="hero-ctas">
         <a class="button button-pink" href={withBase('download/')}>
           {prerelease ? 'Get Sodapop' : 'Download Sodapop'} <ArrowUpRight size={18} aria-hidden="true" />
@@ -34,24 +34,24 @@ const docs = [
     <div class="hero-art">
       <div class="mascot-disc" aria-hidden="true"></div>
       <span class="bubble b1" aria-hidden="true"></span><span class="bubble b2" aria-hidden="true"></span><span class="bubble b3" aria-hidden="true"></span><span class="bubble b4" aria-hidden="true"></span><span class="bubble b5" aria-hidden="true"></span>
-      <span class="floating-tag tag-top"><Sparkles size={14} aria-hidden="true" /> Small delights, built in.</span>
+      <span class="floating-tag tag-top"><Sparkles size={14} aria-hidden="true" /> Pairs well with side projects.</span>
       <img class="hero-mascot" src={withBase('assets/brand/sodapop-mascot.webp')} width="1200" height="1200" alt="Sodapop's smiling soda-can mascot waves hello." fetchpriority="high" />
       <span class="floating-tag tag-bottom"><ShieldCheck size={16} aria-hidden="true" /> Your project. Your call.</span>
-      <span class="floating-tag tag-small">SERIOUS TOOLS.<br />LESS SERIOUS VIBES.</span>
+      <span class="floating-tag tag-small">BEST SERVED<br />IN A TERMINAL.</span>
     </div>
   </section>
 
   <div class="ingredient-strip wrap">
-    <p>A few good ingredients</p>
-    <span><Braces size={19} aria-hidden="true" /> Copilot SDK at the core</span>
+    <p>What's in the can?</p>
+    <span><Braces size={19} aria-hidden="true" /> GitHub Copilot SDK</span>
     <span><ShieldCheck size={19} aria-hidden="true" /> Explicit approvals</span>
-    <span><Palette size={19} aria-hidden="true" /> A splash of personality</span>
+    <span><Sparkles size={19} aria-hidden="true" /> Workflows, tools &amp; skills</span>
   </div>
 
   <section class="section wrap" id="in-action" aria-labelledby="action-title">
     <div class="section-heading">
-      <div><p class="eyebrow">Take a peek inside</p><h2 id="action-title">Comfortably familiar.<br />Refreshingly different.</h2></div>
-      <p>A conversation, your project, and the tools you need. All together in one happy little terminal.</p>
+      <div><p class="eyebrow">Pull up a terminal</p><h2 id="action-title">Let's poke around <br />your repo.</h2></div>
+      <p>Meet the command palette, cycle through Chat, Plan, and Autopilot, and inspect a prepared working-tree diff in this signed-out tour.</p>
     </div>
     <DemoFrame name="overview" title="A peek inside Sodapop" />
   </section>
@@ -59,42 +59,43 @@ const docs = [
   <section class="features-section wrap" id="features" aria-label="The good stuff">
     <article class="story">
       <div class="story-copy">
-        <p class="eyebrow"><Terminal size={14} aria-hidden="true" /> Keep your flow</p>
-        <h2>Less hunting.<br />More doing.</h2>
-        <p>Type <strong>/</strong> and find your way. Discover commands, pick a model, switch into advisory planning, or come back to a saved conversation.</p>
-        <div class="feature-notes"><span>/help</span><span>/plan</span><span>/resume</span></div>
-        <a class="text-link" href={withBase('docs/commands/')}>Meet the command palette <ArrowUpRight size={16} aria-hidden="true" /></a>
+        <p class="eyebrow"><Terminal size={14} aria-hidden="true" /> Pick a can</p>
+        <h2>Ideas, checks, settings. <br />One vending machine.</h2>
+        <p>Open <strong>/vending-machine</strong> for a curated menu. Use <strong>/fizz</strong> to compare approaches, <strong>/taste-test</strong> to validate conversation changes, or jump to models, themes, MCP servers, and project skills.</p>
+        <div class="feature-notes"><span>/vending-machine</span><span>/fizz</span><span>/taste-test</span></div>
+        <a class="text-link" href={withBase('docs/commands/#built-in-workflows')}>See the built-in workflows <ArrowUpRight size={16} aria-hidden="true" /></a>
       </div>
-      <DemoFrame name="commands" title="Commands and planning" caption="Command discovery and advisory planning, recorded in a local fixture project." />
+      <DemoFrame name="commands" title="Commands and workflows" />
     </article>
 
     <article class="story story-reverse story-tone">
       <div class="story-copy">
-        <p class="eyebrow"><Palette size={14} aria-hidden="true" /> Find your flavor</p>
-        <h2>Make yourself<br />at home.</h2>
-        <p>Neon or understated. Playful or quiet. Choose a theme, adjust the personality, and keep color, motion, and ASCII preferences on your terms.</p>
-        <div class="swatch-row" aria-hidden="true"><span style="background:#fb7185"></span><span style="background:#c084fc"></span><span style="background:#67e8f9"></span><span style="background:#30303d"></span><span style="background:#f4f4f5"></span></div>
-        <a class="text-link" href={withBase('docs/customization/')}>Find your kind of fizz <ArrowUpRight size={16} aria-hidden="true" /></a>
+        <p class="eyebrow"><ShieldCheck size={14} aria-hidden="true" /> A little less "probably works"</p>
+        <h2>Taste-test it. <br />Then take a look.</h2>
+        <p>Use <strong>/diff session</strong> for changes observed since the conversation baseline, or <strong>/diff</strong> for the whole working tree. Taste Test reports what passed, failed, and stayed unverified without automatically fixing anything.</p>
+        <div class="feature-notes"><span>/diff session</span><span>/taste-test</span><span>UNVERIFIED means unverified</span></div>
+        <a class="text-link" href={withBase('docs/commands/#conversation-model-and-change-controls')}>See how the evidence works <ArrowUpRight size={16} aria-hidden="true" /></a>
       </div>
-      <DemoFrame name="themes" title="A theme for your mood" caption="Neon Arcade, Graphite, and Daylight in the real Sodapop interface." />
+      <DemoFrame name="diff" title="A clearer view of changes" />
     </article>
 
     <article class="story">
       <div class="story-copy">
-        <p class="eyebrow"><ShieldCheck size={14} aria-hidden="true" /> You keep the wheel</p>
-        <h2>Your project.<br />Your call.</h2>
-        <p>See the working-tree diff without changing it. Approve edits and shell commands explicitly. Know what planning and cancellation do&mdash;and what they don't.</p>
-        <a class="text-link" href={withBase('docs/permissions-and-privacy/')}>Understand the boundaries <ArrowUpRight size={16} aria-hidden="true" /></a>
+        <p class="eyebrow"><Palette size={14} aria-hidden="true" /> Find your flavor</p>
+        <h2>How fizzy <br />are we feeling?</h2>
+        <p>Go neon with Neon Arcade, or keep it understated with Graphite. Set the personality to Quiet, Playful, or Extra; color, motion, and ASCII settings are independent.</p>
+        <div class="swatch-row" aria-hidden="true"><span style="background:#fb7185"></span><span style="background:#c084fc"></span><span style="background:#67e8f9"></span><span style="background:#30303d"></span><span style="background:#f4f4f5"></span></div>
+        <a class="text-link" href={withBase('docs/customization/')}>Explore themes and personality <ArrowUpRight size={16} aria-hidden="true" /></a>
       </div>
-      <DemoFrame name="diff" title="A clearer view of changes" caption="Read-only inspection of prepared staged and unstaged changes. No automatic rollback." />
+      <DemoFrame name="themes" title="A theme for your mood" />
     </article>
   </section>
 
   <section class="install-section wrap" aria-labelledby="install-title">
     <div class="install-copy">
-      <p class="eyebrow">Ready when you are</p>
+      <p class="eyebrow">Got a project in mind?</p>
       <h2 id="install-title">Pop it open.</h2>
-      <p>{prerelease ? "We're preparing the first public downloads. In the meantime, explore the source-build path and get to know the app." : 'Choose your installation method, open a project, and make yourself at home.'}</p>
+      <p>{prerelease ? "Public downloads aren't enabled here yet. You can build from source with the documented prerequisites." : 'Choose an installation method, open your project directory, and launch Sodapop.'}</p>
       <a class="text-link" style="margin-top:18px" href={withBase('download/')}>All installation details <ArrowUpRight size={16} aria-hidden="true" /></a>
     </div>
     <InstallPanel />
@@ -102,7 +103,7 @@ const docs = [
 
   <section class="section docs-doorway wrap" aria-labelledby="docs-title">
     <div class="section-heading">
-      <div><p class="eyebrow">A little guidance goes a long way</p><h2 id="docs-title">No mystery ingredients.</h2></div>
+      <div><p class="eyebrow">Start here, or skip to what you need</p><h2 id="docs-title">No mystery ingredients.</h2></div>
       <a class="text-link" href={withBase('docs/')}>Explore the docs <ArrowUpRight size={16} aria-hidden="true" /></a>
     </div>
     <div class="docs-links">
@@ -114,7 +115,7 @@ const docs = [
     </div>
   </section>
   <section class="closing wrap" aria-labelledby="closing-title">
-    <div><h2 id="closing-title">Good tools. A little joy.</h2><p>There's room for both in your terminal.</p></div>
+    <div><h2 id="closing-title">Got a "what if"?</h2><p>Sodapop's up for a little tinkering.</p></div>
     <a class="button" href={withBase('download/')}>Get Sodapop <ArrowUpRight size={18} aria-hidden="true" /></a>
   </section>
 </MarketingLayout>

@@ -1,0 +1,33 @@
+name: Documentation issue
+description: Flag incorrect, missing, or unclear documentation.
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search [existing issues](https://github.com/VeVarunSharma/sodapop/issues) first.
+
+        Redact tokens, device codes, personal paths, and confidential source or conversations.
+        Do not attach environment files, whole state directories, credential-store dumps, or raw OAuth responses.
+        Do not post security-sensitive vulnerability details in public issues.
+  - type: input
+    id: location
+    attributes:
+      label: Page, file, or help topic
+      description: A URL, repository file, README section, or in-app help topic. Say "missing" if no page exists.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What needs improving?
+      description: Explain what is incorrect, missing, or unclear, and what you were trying to understand.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: Optional wording, examples, screenshots, or supporting links.
+    validations:
+      required: false

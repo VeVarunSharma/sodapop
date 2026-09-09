@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement to Sodapop.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search [existing issues](https://github.com/VeVarunSharma/sodapop/issues) first.
+
+        Redact tokens, device codes, personal paths, and confidential source or conversations.
+        Do not attach environment files, whole state directories, credential-store dumps, or raw OAuth responses.
+        Do not post security-sensitive vulnerability details in public issues.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+      description: Describe the use case or workflow you want to improve.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Requested behavior
+      description: What would you like Sodapop to do? Describe the desired outcome; no technical design is needed.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and context
+      description: Optional workarounds, examples, related requests, or reasons existing options do not fit.
+    validations:
+      required: false

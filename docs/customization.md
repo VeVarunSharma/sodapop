@@ -1,10 +1,13 @@
 # Customization
 
-Open `/theme` to change appearance and accessibility settings. Changes apply
-immediately and are saved as Sodapop preferences. Color, motion, personality,
-and the character set are independent choices.
+How fizzy are we feeling? Open `/theme` to choose a theme and set the UI
+personality to Quiet, Playful, or Extra. Appearance and accessibility changes
+apply immediately and are saved as Sodapop preferences. Color, motion,
+personality, and the character set are independent choices.
 
 ## Themes
+
+Pick the backdrop for your next session:
 
 | Theme | Command | Character |
 | --- | --- | --- |
@@ -33,6 +36,8 @@ The active-work indicator sits beside the composer. A still indicator with
 reduced motion enabled does not mean the application has stopped working.
 
 ## Terminal options
+
+You can also set display options when launching Sodapop:
 
 ```sh
 sodapop --reduced-motion

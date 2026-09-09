@@ -14,9 +14,17 @@ func TestParse(t *testing.T) {
 		{"/plan think first\nthen propose steps", "plan", "think first\nthen propose steps", ""},
 		{"/plan off", "plan", "off", ""},
 		{"/compact preserve decisions\nand failures", "compact", "preserve decisions\nand failures", ""},
-		{"/allow-all", "allow-all", "", ""},
-		{"/allow-all OFF", "allow-all", "off", ""},
+		{"/fizz compare storage options\nand failure modes", "fizz", "compare storage options\nand failure modes", ""},
+		{"/taste-test focus on cancellation\nand stale results", "taste-test", "focus on cancellation\nand stale results", ""},
+		{"/vending-machine", "vending-machine", "", ""},
+		{"/autopilot", "autopilot", "", ""},
+		{"/autopilot OFF", "autopilot", "off", ""},
+		{"/allow-all", "autopilot", "", ""},
+		{"/allow-all OFF", "autopilot", "off", ""},
+		{`/mcp add filesystem {"command":"npx","args":["-y","server"]}`, "mcp", `add filesystem {"command":"npx","args":["-y","server"]}`, ""},
+		{"/skill add /tmp/my skill", "skill", "add /tmp/my skill", ""},
 		{"/theme reduced-motion", "theme", "reduced-motion", ""},
+		{"/diff SESSION", "diff", "session", ""},
 		{"/login", "login", "", ""},
 		{"/logout", "logout", "", ""},
 		{"/clear", "clear", "", ""},
@@ -36,7 +44,7 @@ func TestParse(t *testing.T) {
 }
 
 func TestInvalidCommandsAreLocalErrors(t *testing.T) {
-	for _, text := range []string{"", " \n", "/", "/unknown", "/mo", "/new", "/clear now", "/login now", "/logout now", "/exit now", "/model two ids", "/allow-all on", "/diff other", "/help missing"} {
+	for _, text := range []string{"", " \n", "/", "/unknown", "/mo", "/new", "/skills", "/clear now", "/login now", "/logout now", "/vending-machine now", "/exit now", "/model two ids", "/autopilot on", "/allow-all on", "/diff other", "/help missing"} {
 		if _, err := Parse(text); err == nil {
 			t.Errorf("accepted invalid input %q", text)
 		}
@@ -45,32 +53,68 @@ func TestInvalidCommandsAreLocalErrors(t *testing.T) {
 
 func TestRegistryIsSharedButNotMutable(t *testing.T) {
 	all := All()
-	if len(all) != 13 {
-		t.Fatal("expected thirteen commands")
+	if len(all) != 18 {
+		t.Fatal("expected eighteen commands")
 	}
 	if _, ok := Lookup("new"); ok {
 		t.Fatal("legacy /new command is still registered")
+	}
+	if _, ok := Lookup("skills"); ok {
+		t.Fatal("plural /skills command is still registered")
 	}
 	all[0].Name = "changed"
 	if _, ok := Lookup("help"); !ok {
 		t.Fatal("caller mutated registry")
 	}
-	for _, name := range []string{"help", "logout", "theme", "allow-all", "diff", "context", "exit"} {
+	for _, name := range []string{"help", "logout", "theme", "autopilot", "diff", "context", "vending-machine", "exit"} {
 		command, ok := Lookup(name)
 		if !ok || !command.AllowedWhileBusy {
 			t.Errorf("expected local command %s to work while busy", name)
 		}
 	}
-	for _, name := range []string{"login", "model", "clear", "resume", "compact", "plan"} {
+	for _, name := range []string{"login", "model", "clear", "resume", "compact", "plan", "fizz", "taste-test", "mcp", "skill"} {
 		command, ok := Lookup(name)
 		if !ok || command.AllowedWhileBusy {
 			t.Errorf("unsafe busy command %s", name)
 		}
 	}
+	if command, ok := Lookup("allow-all"); !ok || command.Name != "autopilot" {
+		t.Fatal("legacy /allow-all alias is unavailable")
+	}
+}
+
+func TestVendingCatalogIsCuratedAndGrouped(t *testing.T) {
+	got := Vending()
+	want := []struct {
+		name, category string
+	}{
+		{"plan", "Create"},
+		{"fizz", "Create"},
+		{"context", "Inspect & Validate"},
+		{"taste-test", "Inspect & Validate"},
+		{"diff", "Inspect & Validate"},
+		{"theme", "Customize"},
+		{"login", "Connect & Extend"},
+		{"model", "Connect & Extend"},
+		{"mcp", "Connect & Extend"},
+		{"skill", "Connect & Extend"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("Vending() returned %d commands, want %d: %#v", len(got), len(want), got)
+	}
+	for i, expected := range want {
+		if got[i].Name != expected.name || got[i].VendingCategory != expected.category {
+			t.Errorf("Vending()[%d] = %s/%s, want %s/%s", i, got[i].Name, got[i].VendingCategory, expected.name, expected.category)
+		}
+	}
+	got[0].Name = "changed"
+	if command, _ := Lookup("plan"); command.Name != "plan" {
+		t.Fatal("caller mutated vending catalog")
+	}
 }
 
 func TestCompletionAndHelp(t *testing.T) {
-	for query, want := range map[string]string{"/CL": "clear", "/COM": "compact", "/MO": "model", "mdl": "model", "rs": "resume", "model chosen": "model"} {
+	for query, want := range map[string]string{"/AU": "autopilot", "/CL": "clear", "/COM": "compact", "/MO": "model", "mdl": "model", "rs": "resume", "model chosen": "model"} {
 		matches := Match(query)
 		if len(matches) == 0 || matches[0].Name != want {
 			t.Errorf("match %q: %#v", query, matches)
@@ -113,6 +157,24 @@ func TestCompactPreservesFreeformSpacing(t *testing.T) {
 	}
 }
 
+func TestWorkflowCommandsPreserveFreeformSpacing(t *testing.T) {
+	for _, command := range []string{"fizz", "taste-test"} {
+		for _, tc := range []struct {
+			suffix string
+			args   string
+		}{
+			{"   keep  spaces \n  and indentation\n\n", "  keep  spaces \n  and indentation\n\n"},
+			{"\n\n  pasted focus\n", "\n  pasted focus\n"},
+			{" \t\n", ""},
+		} {
+			input, err := Parse("/" + command + tc.suffix)
+			if err != nil || input.Command != command || input.Args != tc.args {
+				t.Errorf("Parse(%q) = %#v, %v; want args %q", "/"+command+tc.suffix, input, err, tc.args)
+			}
+		}
+	}
+}
+
 func TestPromptsAndNamesStayExact(t *testing.T) {
 	for _, text := range []string{
 		"  leading and trailing  \r\n\n",
@@ -146,6 +208,7 @@ func TestPromptsAndNamesStayExact(t *testing.T) {
 		{"/theme no-color", "no-color"},
 		{"/theme unicode", "unicode"},
 		{"/diff STAGED", "staged"},
+		{"/diff SESSION", "session"},
 	} {
 		input, err := Parse(tc.text)
 		if err != nil || input.Args != tc.args {
@@ -182,7 +245,12 @@ func TestHelpIncludesLocalGuidance(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, required := range []string{"Enter", "Ctrl+J", "Esc", "Ctrl+C", "Ctrl+P", "advisory", "not read-only", "safety boundary", "approvals", "//path", "later"} {
+		for _, required := range []string{
+			"Enter", "Ctrl+J", "Shift+Enter", "Alt+Enter", "Esc", "Ctrl+C", "Ctrl+Q",
+			"Ctrl+P", "F1", "F2", "F3", "F4", "PgUp", "Ctrl+Home", "Ctrl+End",
+			"Shift+drag", "advisory", "not read-only", "safety boundary", "approvals",
+			"//path", "later",
+		} {
 			if !strings.Contains(text, required) {
 				t.Errorf("Help(%q) missing %q", name, required)
 			}
@@ -190,8 +258,44 @@ func TestHelpIncludesLocalGuidance(t *testing.T) {
 	}
 }
 
+func TestGeneralHelpSeparatesLongUsageFromSummary(t *testing.T) {
+	help, err := Help("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(help, "\n")
+	for _, command := range All() {
+		found := false
+		for _, line := range lines {
+			if !strings.HasPrefix(line, command.Usage) {
+				continue
+			}
+			found = true
+			rest := strings.TrimPrefix(line, command.Usage)
+			if !strings.HasPrefix(rest, "  ") || !strings.Contains(rest, command.Summary) {
+				t.Errorf("help line does not separate %q from its summary: %q", command.Usage, line)
+			}
+		}
+		if !found {
+			t.Errorf("help omitted %s", command.Usage)
+		}
+	}
+}
+
+func TestDiffHelpExplainsSessionAttribution(t *testing.T) {
+	help, err := Help("diff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"/diff [all|staged|unstaged|session]", "does not infer", "another process"} {
+		if !strings.Contains(help, want) {
+			t.Errorf("diff help missing %q: %s", want, help)
+		}
+	}
+}
+
 func TestHelpAndPaletteFallback(t *testing.T) {
-	if len(Match("")) != 13 || len(Match("xyz")) != 0 {
+	if len(Match("")) != 18 || len(Match("xyz")) != 0 {
 		t.Fatal("unexpected palette fallback")
 	}
 	help, err := Help("")
@@ -210,5 +314,22 @@ func TestHelpAndPaletteFallback(t *testing.T) {
 	compact, err := Help("compact")
 	if err != nil || !strings.Contains(compact, "visible transcript") || !strings.Contains(compact, "model tokens") {
 		t.Fatal("compaction help omits behavior or cost")
+	}
+	autopilot, err := Help("allow-all")
+	if err != nil || !strings.Contains(autopilot, "/autopilot") || !strings.Contains(autopilot, "legacy /allow-all") {
+		t.Fatal("autopilot help omits the compatibility alias")
+	}
+	for name, want := range map[string]string{
+		"login":   "without replaying",
+		"logout":  "completed working-tree changes are kept",
+		"clear":   "starts only when you send",
+		"resume":  "canonical project",
+		"context": "fixed context window",
+		"theme":   "do not change model capability",
+	} {
+		text, err := Help(name)
+		if err != nil || !strings.Contains(text, want) {
+			t.Errorf("%s help missing %q: %s, %v", name, want, text, err)
+		}
 	}
 }

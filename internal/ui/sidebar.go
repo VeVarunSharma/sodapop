@@ -58,6 +58,9 @@ func (m *Model) sidebarContent() string {
 	for i := range modelRows {
 		modelRows[i] = c.paint(c.cyan, modelRows[i])
 	}
+	if issue, blocked := m.currentAccessIssue(); blocked {
+		modelRows = []string{c.paint(c.amber, accessTitle(issue)), c.paint(c.muted, "/login for access recovery")}
+	}
 	lines = append(lines, m.sidebarSection("MODEL", modelRows)...)
 	lines = append(lines, "")
 	lines = append(lines, m.sidebarSection("MCP SERVERS", m.capabilityRows(m.mcpServers))...)

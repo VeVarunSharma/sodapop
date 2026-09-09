@@ -43,8 +43,8 @@ application theme, not the terminal palette.
 
 | Tape | Content | PNG still |
 |---|---|---|
-| `overview.tape` | Mascot, command completion, chat/plan toggle, and a scrolling diff | Resting mascot and sidebar |
-| `commands.tape` | Filtering, Tab completion, and an unsent draft preserved across modes | Filtered command palette |
+| `overview.tape` | Mascot, command completion, Chat/Plan/Autopilot cycle, and a scrolling diff | Resting mascot and sidebar |
+| `commands.tape` | Vending-machine discovery and an unsent draft preserved across all composer modes | Curated vending-machine launcher |
 | `themes.tape` | Neon Arcade, Graphite, and Daylight | Daylight |
 | `diff.tape` | Staged, unstaged, and combined changes | Unstaged diff |
 
@@ -73,6 +73,8 @@ project, settings, keychain, Git index, and sign-in are not modified.
 The three `fixtures/main.go.*` files define the initial commit, staged change,
 and additional unstaged change. These are prepared example edits, **not AI output**.
 Planning is advisory; the recording does not claim it makes tools read-only.
+The overview and commands clips briefly show the Autopilot composer state but do
+not connect an engine, approve a tool, or claim that approved commands are sandboxed.
 
 ## Editing and publishing
 

@@ -445,10 +445,10 @@ func TestSlashPaletteIsElevatedSearchableAndShowsEightRows(t *testing.T) {
 			t.Fatalf("palette omitted %q:\n%s", expected, panel)
 		}
 	}
-	if strings.Contains(panel, "/allow-all") {
+	if strings.Contains(panel, "/autopilot") {
 		t.Fatalf("palette displayed more than eight command rows:\n%s", panel)
 	}
-	if !strings.Contains(panel, "1/13") || (!strings.Contains(panel, "↓ 5") && !strings.Contains(panel, "v 5")) {
+	if !strings.Contains(panel, "1/18") || (!strings.Contains(panel, "↓ 10") && !strings.Contains(panel, "v 10")) {
 		t.Fatalf("palette omitted result position or overflow cue:\n%s", panel)
 	}
 
@@ -458,11 +458,11 @@ func TestSlashPaletteIsElevatedSearchableAndShowsEightRows(t *testing.T) {
 		t.Fatalf("palette did not keep the selected command in its scrolling window:\n%s", panel)
 	}
 
-	m.composer.SetValue("/zzzz")
+	m.composer.SetValue("/qqqqqq")
 	m.paletteIndex = 0
 	m.updatePalette()
 	panel, _, _ = m.commandPaletteView()
-	if !strings.Contains(panel, "/zzzz") || !strings.Contains(panel, "No matching commands") {
+	if !strings.Contains(panel, "/qqqqqq") || !strings.Contains(panel, "No matching commands") {
 		t.Fatalf("palette did not expose its search query and empty state:\n%s", panel)
 	}
 }
@@ -650,6 +650,7 @@ func TestDiffIsReadOnlyAsyncAndErrorsVisible(t *testing.T) {
 	if w.diffCalls.Load() != 0 {
 		t.Fatal("Git diff ran in UI loop")
 	}
+
 	runFinite(t, m, cmd)
 	if w.mode != "staged" || !strings.Contains(m.overlay.body, "includes changes not made by Sodapop") || !strings.Contains(m.overlay.body, "truncated") {
 		t.Fatal("diff mode / ownership / truncation labels missing")
@@ -667,6 +668,48 @@ func TestDiffIsReadOnlyAsyncAndErrorsVisible(t *testing.T) {
 	runFinite(t, m, cmd)
 	if m.overlay != nil {
 		t.Fatal("late diff reopened a dismissed overlay")
+	}
+}
+
+func TestSessionDiffUsesConversationBaseline(t *testing.T) {
+	m, _ := readyModel(t)
+	baseline := &fakeBaseline{diff: workspace.Diff{
+		IsRepository: true,
+		Text:         "OBSERVED SINCE THIS CONVERSATION'S BASELINE\n+changed",
+	}}
+	w := &fakeWorkspace{baseline: baseline}
+	m.opts.Workspace = w
+	m.baseline = baseline
+	cmd := m.openDiff("session")
+	if w.diffCalls.Load() != 0 {
+		t.Fatal("session diff used the whole-working-tree API")
+	}
+	runFinite(t, m, cmd)
+	if !strings.Contains(m.overlay.title, "CONVERSATION CHANGES") ||
+		!strings.Contains(m.overlay.body, "OBSERVED SINCE") {
+		t.Fatalf("session diff was not presented distinctly: %#v", m.overlay)
+	}
+}
+
+func TestSessionDiffShowsPartialBaselineCoverage(t *testing.T) {
+	m, _ := readyModel(t)
+	partial := &fakeBaseline{diff: workspace.Diff{
+		IsRepository: true,
+		Truncated:    true,
+		Text:         "PARTIAL BASELINE\n\"large.gif\": file exceeds the 64 KiB snapshot limit\n+source change",
+	}}
+	w := &fakeWorkspace{baseline: partial}
+	m.opts.Workspace = w
+	m.baseline = partial
+	m.composer.SetValue("draft stays here")
+	runFinite(t, m, m.openDiff("session"))
+	for _, want := range []string{"PARTIAL BASELINE", "large.gif", "64 KiB", "+source change", "additional content is not shown"} {
+		if !strings.Contains(m.overlay.body, want) {
+			t.Errorf("partial diff omitted %q: %s", want, m.overlay.body)
+		}
+	}
+	if w.diffCalls.Load() != 0 || m.notice.error || m.composer.Value() != "draft stays here" {
+		t.Fatal("partial session diff used the wrong service, reported failure, or lost the draft")
 	}
 }
 

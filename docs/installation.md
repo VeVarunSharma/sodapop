@@ -1,9 +1,10 @@
 # Installation
 
-The [download page](/download/) is the authority for current public availability,
-exact release versions, and enabled installation methods. Sodapop's website can
-launch before native archives, npm packages, or the Homebrew tap are published.
-An unavailable method is not a working installation command.
+Let's get Sodapop onto your machine. The [download page](/download/) is the
+authority for current public availability, exact release versions, and enabled
+installation methods. Sodapop's website can launch before native archives,
+npm packages, or the Homebrew tap are published. An unavailable method is not
+a working installation command.
 
 If public downloads are not enabled, use the
 [source-build guide](development.md). Local builds need the existing Sodapop

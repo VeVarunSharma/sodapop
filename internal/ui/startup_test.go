@@ -53,7 +53,7 @@ func TestStartupWaitsForWindowSizeWithoutBlockingDiscovery(t *testing.T) {
 	}
 	cmd := m.Init()
 	batch, ok := cmd().(tea.BatchMsg)
-	if !ok || len(batch) != 2 {
+	if !ok || len(batch) != 3 {
 		t.Fatal("startup did not independently schedule identity and workspace discovery")
 	}
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})

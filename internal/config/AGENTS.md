@@ -14,12 +14,15 @@ Scope: `internal/config/`. Apply the [repository rules](../../AGENTS.md) first.
   good preferences.
 - Derive runtime homes from explicit account IDs and keep credentials out of
   preferences/state paths so account data cannot leak through shared defaults.
+- Keep the MCP registry account-scoped, strict, and value-secret-free. Persist
+  environment-variable names only; resolve their values in memory when creating
+  an engine.
 - Preference serialization belongs to the UI's writer, not independent goroutines:
   atomic replacement alone does not stop an older snapshot from winning a race.
 
 ## Start here
 
-[store.go](store.go), [types.go](types.go), and [store_test.go](store_test.go).
+[store.go](store.go), [types.go](types.go), [mcp.go](mcp.go), and their tests.
 The cross-package write ordering lives in [UI lifecycle](../ui/lifecycle.go).
 
 ## Checks

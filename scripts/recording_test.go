@@ -329,9 +329,21 @@ func TestDemoTapesUseBoundedWaitsAndProduceGIFsAndStills(t *testing.T) {
 			if strings.HasPrefix(line, "Wait") && !strings.HasPrefix(line, "Wait+Screen@") {
 				t.Errorf("%s uses a wait without explicit screen scope/timeout: %s", clip, line)
 			}
-			if strings.Contains(line, "/login") || strings.Contains(line, "/allow-all") || strings.Contains(line, "Publish") {
+			if strings.Contains(line, "/login") || strings.Contains(line, "/autopilot") || strings.Contains(line, "/allow-all") || strings.Contains(line, "Publish") {
 				t.Errorf("%s added authentication, unrestricted tools, or publishing", clip)
 			}
+		}
+		if clip == "overview" || clip == "commands" {
+			tape := string(data)
+			if strings.Count(tape, "Shift+Tab") < 3 ||
+				!strings.Contains(tape, "Wait+Screen@3s /plan>/") ||
+				!strings.Contains(tape, "Wait+Screen@3s /auto>/") ||
+				!strings.Contains(tape, "Wait+Screen@3s /chat>/") {
+				t.Errorf("%s does not show the complete Chat/Plan/Autopilot cycle", clip)
+			}
+		}
+		if clip == "commands" && !strings.Contains(string(data), `Type "vend"`) {
+			t.Error("commands demo does not discover the vending machine")
 		}
 	}
 }

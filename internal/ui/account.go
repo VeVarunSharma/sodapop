@@ -12,6 +12,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/VeVarunSharma/sodapop/internal/auth"
+	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
 )
 
@@ -35,21 +36,7 @@ func (m *Model) showAccount() {
 		m.showLogin()
 		return
 	}
-	body := authExplanation(m.authError)
-	if m.account.ID != "" {
-		storage := "secure credential storage"
-		if m.account.SessionOnly {
-			storage = "session-only; not saved to disk"
-		}
-		body = fmt.Sprintf("GitHub: %s\nCredentials: %s\n\nSigning out removes Sodapop credentials, not conversation history or completed edits.", singleLine(m.account.Login), storage)
-		if m.connectionError != nil {
-			body += "\n\nGitHub is signed in, but Copilot is unavailable:\n" + safeText(m.connectionError.Error())
-		}
-	}
-	if m.signOutWarning != "" {
-		body = m.signOutWarning + "\n\n" + body
-	}
-	d := m.newDialog(dialogAccount, "ACCOUNT / GitHub", body)
+	d := m.newDialog(dialogAccount, "ACCOUNT / GitHub and Copilot", m.accountBody())
 	if m.account.ID == "" {
 		d.items = []menuItem{
 			{id: "login", label: "Sign in securely", detail: "Keep credentials in the OS keychain"},
@@ -63,11 +50,7 @@ func (m *Model) showAccount() {
 			d.items = append(d.items, menuItem{id: "signout", label: "Retry removing saved credentials", detail: "Only Sodapop's keyring entry"})
 		}
 	} else {
-		d.items = []menuItem{
-			{id: "reconnect", label: "Reconnect to Copilot", detail: "Restore context; never replay a prompt"},
-			{id: "signout", label: "Sign out", detail: "Keep history and working-tree changes"},
-			{id: "close", label: "Back to conversation"},
-		}
+		d.items = m.accountAccessItems()
 	}
 }
 
@@ -81,6 +64,9 @@ func (m *Model) startLogin(sessionOnly bool) tea.Cmd {
 		m.report("Finish or cancel the current operation before signing in. Your draft is kept.", true)
 		return nil
 	}
+	m.cancelAccountAction()
+	m.clearAccessFailure()
+	m.accessRecovery.pending = false
 	if m.identityCancel != nil {
 		m.identityCancel()
 		m.identityCancel = nil
@@ -208,12 +194,17 @@ func (m *Model) identityResult(msg identityMsg) tea.Cmd {
 		m.signOutWarning = ""
 	}
 	if m.overlay != nil && (m.overlay.kind == dialogLogin || m.overlay.kind == dialogAccount) {
+		m.cancelAccountAction()
 		m.overlay = nil
 	}
-	return m.connect()
+	return tea.Batch(m.loadMCP(), m.connectWithRecovery(msg.login))
 }
 
 func (m *Model) connect() tea.Cmd {
+	return m.connectWithRecovery(m.overlay != nil && m.overlay.kind == dialogAccount)
+}
+
+func (m *Model) connectWithRecovery(showRecovery bool) tea.Cmd {
 	if m.opts.NewEngine == nil {
 		m.connectionError = errors.New("the Copilot engine is unavailable in this build")
 		m.report(m.connectionError.Error(), true)
@@ -230,13 +221,20 @@ func (m *Model) connect() tea.Cmd {
 	if m.session.ID != "" {
 		m.reconnectID = m.session.ID
 	}
+	showRecovery = showRecovery && (m.overlay == nil || m.overlay.kind == dialogAccount || m.overlay.kind == dialogLogin)
+	m.cancelAccountAction()
+	_ = m.finishConnectionProbe(nil)
 	m.cancelContextRequest()
 	m.engineGeneration++
 	generation := m.engineGeneration
-	ctx, cancel := context.WithCancel(m.life.ctx)
+	ctx, cancel, probe := newConnectionProbe(m.life.ctx, m.connectTimeout)
+	m.connectProbe = probe
 	m.connectCancel = cancel
 	m.connecting = true
-	m.connectionError = nil
+	m.clearAccessFailure()
+	m.accessRecovery = accessRecovery{generation: generation, dialog: m.dialogSequence, pending: showRecovery}
+	m.report("Checking Copilot access. Your draft is kept; nothing is sent.", false)
+	previous := m.lease
 	m.lease = nil
 	if m.overlay != nil && (m.overlay.kind == dialogAccount || m.overlay.kind == dialogLogin) {
 		m.overlay = nil
@@ -245,6 +243,12 @@ func (m *Model) connect() tea.Cmd {
 	work := life.registerFactory(cancel)
 	return func() tea.Msg {
 		defer life.finishFactory(work)
+		if previous != nil {
+			if err := previous.close(); err != nil {
+				cancel()
+				return connectedMsg{generation: generation, err: fmt.Errorf("close previous connection: %w", err)}
+			}
+		}
 		lease, err := accountRead(life, ctx, func() (*engineLease, error) {
 			if err := life.closeEngines(); err != nil {
 				return nil, fmt.Errorf("close previous connection: %w", err)
@@ -273,8 +277,9 @@ func (m *Model) connect() tea.Cmd {
 }
 
 func (m *Model) connectedResult(msg connectedMsg) tea.Cmd {
-	if msg.generation != m.engineGeneration || m.quitting {
-		if msg.lease != nil {
+	if msg.generation != m.engineGeneration || m.quitting || m.life.ctx.Err() != nil ||
+		!m.connecting || m.lease != nil {
+		if msg.lease != nil && msg.lease != m.lease {
 			l := msg.lease
 			return func() tea.Msg { return decisionMsg{err: l.close()} }
 		}
@@ -282,8 +287,30 @@ func (m *Model) connectedResult(msg connectedMsg) tea.Cmd {
 	}
 	if msg.err != nil {
 		m.connecting = false
-		m.connectionError = msg.err
-		m.report("GitHub is signed in, but Copilot could not connect: "+msg.err.Error()+". Use /login to reconnect.", true)
+		err := m.finishConnectionProbe(msg.err)
+		if !m.recordAccessFailure(err, nil, true) {
+			m.connectionError = err
+		}
+		m.notifyAccessFailure()
+		m.presentAccessRecovery()
+		return nil
+	}
+	if msg.lease == nil || msg.lease.ctx.Err() != nil {
+		err := errors.New("Copilot returned no usable connection")
+		if msg.lease != nil {
+			err = msg.lease.ctx.Err()
+		}
+		m.connecting = false
+		err = m.finishConnectionProbe(err)
+		if !m.recordAccessFailure(err, nil, true) {
+			m.connectionError = err
+		}
+		m.notifyAccessFailure()
+		m.presentAccessRecovery()
+		if msg.lease != nil {
+			l := msg.lease
+			return func() tea.Msg { return decisionMsg{err: l.close()} }
+		}
 		return nil
 	}
 	m.lease = msg.lease
@@ -301,26 +328,35 @@ func (m *Model) loadModels() tea.Cmd {
 }
 
 func (m *Model) modelsResult(msg modelsMsg) tea.Cmd {
-	if msg.generation != m.engineGeneration {
+	if msg.generation != m.engineGeneration || m.quitting || m.life.ctx.Err() != nil || m.lease == nil {
 		return nil
 	}
 	m.connecting = false
-	m.connectCancel = nil
-	if msg.err != nil || len(msg.models) == 0 {
-		err := msg.err
+	err := m.finishConnectionProbe(msg.err)
+	if err == nil && m.lease.ctx.Err() != nil {
+		err = m.lease.ctx.Err()
+	}
+	if err != nil || len(msg.models) == 0 {
 		if err == nil {
-			err = errors.New("Copilot returned no models for this account")
+			err = engine.ErrNoModels
 		}
-		m.connectionError = err
+		if !m.recordAccessFailure(err, nil, true) {
+			m.connectionError = err
+		}
 		m.models = nil
 		m.model = ""
-		m.report("GitHub is signed in, but model access failed: "+err.Error()+". Check Copilot entitlement / organization policy; /login reconnects.", true)
+		m.contextTier, m.reasoningEffort = "", ""
+		m.notifyAccessFailure()
 		if m.overlay != nil && m.overlay.kind == dialogModels {
-			m.overlay.body = safeText(err.Error())
+			m.overlay.body = "Copilot access is unavailable. Close this picker and use /login for recovery."
+			m.overlay.items = nil
 		}
-		return nil
+		m.presentAccessRecovery()
+		return m.retireConnection()
 	}
-	m.connectionError = nil
+	m.accessRecovery.pending = false
+	m.clearAccessFailure()
+	m.report("Copilot connected. Your draft is kept; no prompt was sent.", false)
 	m.models = msg.models
 	m.model = ""
 	for _, model := range m.models {
@@ -354,6 +390,8 @@ func (m *Model) signOut() tea.Cmd {
 		m.report("GitHub authentication is unavailable in this build.", true)
 		return nil
 	}
+	m.cancelAccountAction()
+	m.accessRecovery.pending = false
 	if m.identityCancel != nil {
 		m.identityCancel()
 		m.identityCancel = nil
@@ -381,7 +419,7 @@ func (m *Model) signOut() tea.Cmd {
 	life, service, ctx := m.life, m.opts.Auth, m.life.ctx
 	m.lease = nil
 	m.connecting, m.turn, m.sendPending, m.canceling = false, false, false, false
-	m.setAllowAll(false)
+	m.setAutopilot(false)
 	m.needsAbort = false
 	m.abortAcknowledged, m.abortBarrierSeen = false, false
 	m.needsResume = m.session.ID != ""
@@ -414,7 +452,11 @@ func (m *Model) signOutResult(msg signedOutMsg) tea.Cmd {
 		m.connectionError = msg.err
 		m.report("Account was not changed because the previous connection could not be drained: "+fmt.Sprint(msg.err), true)
 	} else {
+		m.clearAccessFailure()
 		m.account = auth.Account{}
+		m.mcpGeneration++
+		m.mcpSaving = false
+		m.setMCPRegistry(config.DefaultMCPRegistry())
 		m.models = nil
 		m.model = ""
 		m.contextTier = ""

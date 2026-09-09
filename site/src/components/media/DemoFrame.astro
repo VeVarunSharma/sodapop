@@ -5,10 +5,9 @@ import { withBase } from '../../lib/urls';
 interface Props {
   name: 'overview' | 'commands' | 'themes' | 'diff';
   title: string;
-  caption?: string;
   eager?: boolean;
 }
-const { name, title, caption = 'A real, local UI recording. Signed out; no AI responses are simulated.', eager = false } = Astro.props;
+const { name, title, eager = false } = Astro.props;
 const width = name === 'overview' ? 1440 : 1040;
 const height = name === 'overview' ? 810 : 650;
 const poster = withBase(`assets/demos/${name}.webp`);
@@ -27,7 +26,6 @@ const poster = withBase(`assets/demos/${name}.webp`);
     <img src={poster} alt={`${title}: the Sodapop terminal interface`} width={width} height={height} loading={eager ? 'eager' : 'lazy'} decoding="async" />
     <span class="sr-only" data-demo-status role="status"></span>
   </sodapop-demo>
-  <figcaption>{caption}</figcaption>
 </figure>
 <script>
   class SodapopDemo extends HTMLElement {
@@ -37,9 +35,16 @@ const poster = withBase(`assets/demos/${name}.webp`);
     private animation = '';
     private demoTitle = '';
     private playing = false;
+    private visible = false;
     private observer?: IntersectionObserver;
     private onVisibility = () => { if (document.hidden) this.stop(); };
-    private onMotion = () => { if (document.documentElement.dataset.motion === 'off') this.stop(); };
+    private onMotion = () => {
+      if (document.documentElement.dataset.motion === 'off') {
+        this.stop();
+      } else if (this.visible && !document.hidden) {
+        this.play();
+      }
+    };
 
     connectedCallback() {
       const image = this.querySelector('img');
@@ -57,7 +62,12 @@ const poster = withBase(`assets/demos/${name}.webp`);
       document.addEventListener('visibilitychange', this.onVisibility);
       window.addEventListener('sodapop:motionchange', this.onMotion);
       this.observer = new IntersectionObserver((entries) => {
-        if (!entries[0].isIntersecting) this.stop();
+        this.visible = entries[0].isIntersecting;
+        if (this.visible && !document.hidden && document.documentElement.dataset.motion !== 'off') {
+          this.play();
+        } else {
+          this.stop();
+        }
       });
       this.observer.observe(this);
     }
@@ -69,8 +79,12 @@ const poster = withBase(`assets/demos/${name}.webp`);
     }
 
     private play() {
+      if (document.documentElement.dataset.motion === 'off') {
+        this.stop('Motion is off. Showing the still image.');
+        return;
+      }
       this.playing = true;
-      this.image.src = this.animation;
+      if (this.image.getAttribute('src') !== this.animation) this.image.src = this.animation;
       this.update('Playing the recorded demonstration.');
     }
 

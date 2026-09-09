@@ -170,13 +170,168 @@ func TestSessionConfigsPropagateContextTierAndReasoningEffort(t *testing.T) {
 		ID: "sodapop-00000000000000000000000000000000", Project: t.TempDir(), Model: "model-a",
 		ContextTier: "long_context", ReasoningEffort: "high",
 	}}
-	created := sessionConfig(live, t.TempDir(), "token", "instructions")
+	created := sessionConfig(live, t.TempDir(), "token", "instructions", nil, nil)
 	if created.ContextTier != copilot.ContextTier(rpc.ContextTierLongContext) || created.ReasoningEffort != "high" {
 		t.Fatalf("create selection = %q, %q", created.ContextTier, created.ReasoningEffort)
 	}
 	resumed := resumeConfig(created)
 	if resumed.ContextTier != created.ContextTier || resumed.ReasoningEffort != created.ReasoningEffort {
 		t.Fatalf("resume selection = %q, %q", resumed.ContextTier, resumed.ReasoningEffort)
+	}
+}
+
+func TestSessionConfigsIncludeExplicitMCPServers(t *testing.T) {
+	project := t.TempDir()
+	live := &liveSession{meta: Session{
+		ID: "sodapop-00000000000000000000000000000000", Project: project, Model: "model-a",
+	}}
+	created := sessionConfig(live, t.TempDir(), "token", "instructions", []MCPServer{{
+		Name: "filesystem", Command: "server", Args: []string{"."},
+		Env: map[string]string{"TOKEN": "value"}, Tools: []string{"read_file"}, TimeoutSeconds: 20,
+	}}, nil)
+	raw, ok := created.MCPServers["filesystem"]
+	if !ok {
+		t.Fatal("configured MCP server was omitted")
+	}
+
+	server, ok := raw.(copilot.MCPStdioServerConfig)
+	if !ok || server.Command != "server" || server.WorkingDirectory != project ||
+		len(server.Tools) != 1 || server.Tools[0] != "read_file" || server.Env["TOKEN"] != "value" {
+		t.Fatalf("MCP server config = %#v", raw)
+	}
+	resumed := resumeConfig(created)
+	if len(resumed.MCPServers) != 1 {
+		t.Fatal("resume configuration omitted MCP servers")
+	}
+	defaults := sessionConfig(live, t.TempDir(), "token", "instructions", []MCPServer{{
+		Name: "all-tools", Command: "server",
+	}}, nil)
+	raw = defaults.MCPServers["all-tools"]
+	server, ok = raw.(copilot.MCPStdioServerConfig)
+	if !ok || len(server.Tools) != 1 || server.Tools[0] != "*" || server.Env != nil {
+		t.Fatalf("default MCP exposure = %#v", raw)
+	}
+	withSkills := sessionConfig(live, t.TempDir(), "token", "instructions", nil, []string{"/skills"})
+	if !boolValue(withSkills.EnableSkills) || len(withSkills.SkillDirectories) != 1 {
+		t.Fatalf("explicit skills were not preserved alongside MCP configuration: %#v", withSkills.SkillDirectories)
+	}
+}
+
+func TestSessionConfigsIncludeOnlyExplicitSkills(t *testing.T) {
+	parent := t.TempDir()
+	skill := filepath.Join(parent, "review")
+	if err := os.Mkdir(skill, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(skill, "SKILL.md"), []byte("---\nname: review\ndescription: Review code\n---\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	live := &liveSession{meta: Session{
+		ID: "sodapop-00000000000000000000000000000000", Project: t.TempDir(), Model: "model-a",
+	}}
+	created := sessionConfig(live, t.TempDir(), "token", "instructions", nil, []string{parent})
+	if !boolValue(created.EnableSkills) || len(created.SkillDirectories) != 1 ||
+		len(created.IncludedBuiltinSkills) != 0 || len(created.PluginDirectories) != 0 {
+		t.Fatalf("skill config = %#v", created)
+	}
+	resumed := resumeConfig(created)
+	if !boolValue(resumed.EnableSkills) || len(resumed.SkillDirectories) != 1 ||
+		len(resumed.DisabledSkills) != 0 {
+		t.Fatalf("resume skill config = %#v", resumed)
+	}
+}
+
+func TestEngineRejectsMalformedMCPServers(t *testing.T) {
+	base := Config{
+		Project: t.TempDir(), Home: t.TempDir(), AccountID: "account",
+		TokenSource: func(context.Context) (string, error) { return "token", nil },
+	}
+	for _, server := range []MCPServer{
+		{Name: "", Command: "server"},
+		{Name: " server", Command: "server"},
+		{Name: "server\n", Command: "server"},
+		{Name: "server", Command: ""},
+		{Name: "server", Command: "bad\ncommand"},
+		{Name: "server", Command: "server", TimeoutSeconds: 301},
+		{Name: "server", Command: "server", Env: map[string]string{"": "value"}},
+	} {
+		cfg := base
+		cfg.MCPServers = []MCPServer{server}
+		if _, err := newCopilot(cfg, dependencies{}); err == nil {
+			t.Fatalf("accepted malformed MCP server: %#v", server)
+		}
+		if err := validateMCPServers([]MCPServer{
+			{Name: "Server", Command: "one"},
+			{Name: "server", Command: "two"},
+		}); err == nil {
+			t.Fatal("duplicate MCP server names were accepted")
+		}
+		if err := validateMCPServers([]MCPServer{{
+			Name: "server", Command: "mcp-server", Args: []string{"."},
+			Env: map[string]string{"TOKEN": "value"}, TimeoutSeconds: 300,
+		}}); err != nil {
+			t.Fatalf("valid MCP server rejected: %v", err)
+		}
+	}
+}
+
+func TestSkillConfigurationValidationAndResolution(t *testing.T) {
+	parent := t.TempDir()
+	name := "review"
+	digest := strings.Repeat("a", 64)
+	directory := filepath.Join(parent, name)
+	if err := os.Mkdir(directory, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "SKILL.md"), []byte("skill"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	skill := Skill{Name: name, Digest: digest, Directory: parent}
+	if err := validateSkills([]Skill{skill}, []string{digest}); err != nil {
+		t.Fatal(err)
+	}
+	c := &Copilot{cfg: Config{Skills: []Skill{skill}}}
+	directories, err := c.skillDirectories([]string{digest})
+	if err != nil || len(directories) != 1 || directories[0] != parent {
+		t.Fatalf("skill directories = %#v, %v", directories, err)
+	}
+	if _, err := c.skillDirectories([]string{strings.Repeat("b", 64)}); err == nil {
+		t.Fatal("resolved an uninstalled skill digest")
+	}
+	if err := os.Remove(filepath.Join(directory, "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.skillDirectories([]string{digest}); err == nil {
+		t.Fatal("resolved a skill without a regular manifest")
+	}
+}
+
+func TestSkillConfigurationRejectsMalformedEntries(t *testing.T) {
+	parent := t.TempDir()
+	digestA, digestB := strings.Repeat("a", 64), strings.Repeat("b", 64)
+	valid := Skill{Name: "review", Digest: digestA, Directory: parent}
+	tests := []struct {
+		name   string
+		skills []Skill
+		active []string
+	}{
+		{name: "blank name", skills: []Skill{{Name: "", Digest: digestA, Directory: parent}}},
+		{name: "padded name", skills: []Skill{{Name: " review", Digest: digestA, Directory: parent}}},
+		{name: "short digest", skills: []Skill{{Name: "review", Digest: "abc", Directory: parent}}},
+		{name: "uppercase digest", skills: []Skill{{Name: "review", Digest: strings.Repeat("A", 64), Directory: parent}}},
+		{name: "non hex digest", skills: []Skill{{Name: "review", Digest: strings.Repeat("z", 64), Directory: parent}}},
+		{name: "relative directory", skills: []Skill{{Name: "review", Digest: digestA, Directory: "skills"}}},
+		{name: "duplicate name", skills: []Skill{valid, {Name: "REVIEW", Digest: digestB, Directory: parent}}},
+		{name: "duplicate digest", skills: []Skill{valid, {Name: "other", Digest: digestA, Directory: parent}}},
+		{name: "missing active", skills: []Skill{valid}, active: []string{digestB}},
+		{name: "duplicate active", skills: []Skill{valid}, active: []string{digestA, digestA}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateSkills(test.skills, test.active); err == nil {
+				t.Fatal("accepted malformed skill configuration")
+			}
+		})
 	}
 }
 
