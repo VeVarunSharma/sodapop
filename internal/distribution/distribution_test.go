@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -82,6 +83,9 @@ func read(t *testing.T, name string) []byte {
 }
 
 func TestReleaseRoundTrip(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix executable-mode archive fixtures are covered on Unix; Windows uses the native ZIP path")
+	}
 	dir, generated := releaseFixture(t, DefaultPlatforms()...)
 	m, err := ReadManifest(filepath.Join(dir, "sodapop-"+testVersion+"-manifest.json"))
 	if err != nil {
@@ -120,6 +124,9 @@ func TestReleaseRoundTrip(t *testing.T) {
 }
 
 func TestSubsetPhasesRequireExplicitCompleteness(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix archive fixture coverage is covered on Unix runners")
+	}
 	dir, m := releaseFixture(t, "linux/amd64")
 	if err := Verify(dir, m, "", DefaultPlatforms()); err == nil {
 		t.Fatal("incomplete full release was accepted")
@@ -141,6 +148,9 @@ func TestSubsetPhasesRequireExplicitCompleteness(t *testing.T) {
 }
 
 func TestManifestRejectsAmbiguousOrInvalidMetadata(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix archive fixture coverage is covered on Unix runners")
+	}
 	_, original := releaseFixture(t, "linux/amd64")
 	encoded, err := json.Marshal(original)
 	if err != nil {
@@ -369,7 +379,11 @@ func TestVerifierRejectsUnsafeArchivePayloadsInBothFormats(t *testing.T) {
 }
 
 func TestVerifierRejectsChecksumsCorruptionAndBinaryMismatch(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "windows/amd64"} {
+	platforms := []string{"linux/amd64", "windows/amd64"}
+	if runtime.GOOS == "windows" {
+		platforms = []string{"windows/amd64"}
+	}
+	for _, platform := range platforms {
 		for _, mutation := range []string{"archive bytes", "archive hash", "binary hash", "checksum basename", "multiline", "uppercase", "no newline", "empty", "short", "checksum symlink", "archive symlink", "manifest symlink"} {
 			t.Run(platform+"/"+mutation, func(t *testing.T) {
 				dir, m := releaseFixture(t, platform)
@@ -418,6 +432,9 @@ func TestVerifierRejectsChecksumsCorruptionAndBinaryMismatch(t *testing.T) {
 				assertRejectedUnchanged(t, dir, m)
 			})
 		}
+		if runtime.GOOS == "windows" {
+			return
+		}
 		for _, transform := range []func([]byte) []byte{
 			func(data []byte) []byte { return data[:len(data)-10] },
 			func(data []byte) []byte { data[0] ^= 0xff; return data },
@@ -438,6 +455,9 @@ func TestVerifierRejectsChecksumsCorruptionAndBinaryMismatch(t *testing.T) {
 }
 
 func TestExtractionRefusesOutputClobberAndMissingParent(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix archive fixture coverage is covered on Unix runners")
+	}
 	dir, m := releaseFixture(t, "linux/amd64")
 	parent := t.TempDir()
 	output := filepath.Join(parent, "output")
@@ -544,7 +564,11 @@ func TestVersionPlatformAndPinValidation(t *testing.T) {
 }
 
 func TestArchiveRejectsBadStagingAndExistingOutputs(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "windows/amd64"} {
+	platforms := []string{"linux/amd64", "windows/amd64"}
+	if runtime.GOOS == "windows" {
+		platforms = []string{"windows/amd64"}
+	}
+	for _, platform := range platforms {
 		stage := stageFixture(t, platform)
 		dir := t.TempDir()
 		artifact, err := Archive(stage, dir, testVersion, platform)
