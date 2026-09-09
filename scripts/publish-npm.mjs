@@ -72,6 +72,18 @@ function resultJSON(result, operation) {
   }
 }
 
+export function expectedNativeModeDifference(output) {
+  const lines = output.trim().split(/\r?\n/);
+  if (lines.length !== 6) return false;
+  const match = lines[0].match(/^diff --git a\/(bin\/sodapop(?:\.exe)?) b\/\1$/);
+  if (!match || lines[1] !== "old mode 100644" || lines[2] !== "new mode 100755" ||
+      !/^index \S+\.\.\S+(?: \d+)?$/.test(lines[3]) ||
+      lines[4] !== `--- a/${match[1]}` || lines[5] !== `+++ b/${match[1]}`) {
+    return false;
+  }
+  return true;
+}
+
 export function publishPackages({ directory, version, tag }, runner = npm, log = console.log) {
   if (!directory || !validVersion(version) || !["preview", "latest"].includes(tag)) {
     throw new Error("Provide a generated package directory, exact SemVer, and preview or latest tag");
@@ -92,14 +104,18 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
         }
         const comparison = runner([
           "diff", `--diff=${specification}`,
-          "--diff-name-only", "--registry=https://registry.npmjs.org"
+          "--registry=https://registry.npmjs.org"
         ], { cwd: packageDirectory });
         if (comparison.error || comparison.status !== 0) {
           throw new Error(`Could not compare published contents for ${specification}`);
         }
-        if (comparison.stdout.trim() !== "") {
-          const detail = comparison.stdout.trim().slice(0, 4096);
+        const difference = comparison.stdout.trim();
+        if (difference !== "" && !expectedNativeModeDifference(difference)) {
+          const detail = difference.slice(0, 4096);
           throw new Error(`Refusing to replace different published package contents for ${specification}: ${detail}`);
+        }
+        if (difference !== "") {
+          log(`Published payload differs only by npm's native executable mode normalization: ${specification}`);
         }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
