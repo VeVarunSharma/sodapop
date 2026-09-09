@@ -201,6 +201,9 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 			t.Errorf("publication workflow unexpectedly contains %q", excluded)
 		}
 	}
+	if count := strings.Count(text, "ref: ${{ github.event.repository.default_branch }}"); count != 2 {
+		t.Errorf("publisher and public-install verifier default-branch checkouts = %d, want 2", count)
+	}
 }
 
 func TestChannelPublicationResolvesAutomaticAndManualSelections(t *testing.T) {
