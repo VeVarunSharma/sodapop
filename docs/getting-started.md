@@ -1,8 +1,8 @@
 # Getting started
 
-Sodapop is an independent terminal coding companion powered by the Copilot SDK.
-It brings a conversation, tool activity, approvals, and local project views into
-one terminal interface.
+Pick a project. We'll start there. Sodapop is an independent terminal coding
+companion powered by the GitHub Copilot SDK, with conversation, tool activity,
+approvals, and local project views in one interface.
 
 ## Before you start
 
@@ -19,7 +19,7 @@ Contributors building from source should follow [development](development.md).
 
 ## Open your project
 
-Change to the directory you want Sodapop to work in, then launch it:
+Got a project in mind? Change to its directory, then launch Sodapop:
 
 ```sh
 cd /path/to/your/project
@@ -31,7 +31,7 @@ Sodapop takes the current directory as its project; do not pass a project path
 as a positional argument. Starting at the project root makes the intended
 file-access boundary clear.
 
-Type `/help` or just `/` to explore the interface. Local help, appearance, and
+Start with `/help` or just `/` to find your way around. Local help, appearance, and
 read-only Git diff views are useful even while signed out.
 
 ## Sign in inside Sodapop
@@ -55,8 +55,8 @@ Copilot access fails, use [troubleshooting](troubleshooting.md#sign-in-and-copil
 
 ## Try one focused request
 
-For a first interaction, describe a small task and the boundary you want. For
-example, send this prompt:
+Start with something small: a question about the code or one focused task.
+Say what Sodapop should do and where it should stop. For example:
 
 ```text
 Explain how this project starts. Read the relevant files and suggest one
@@ -68,9 +68,16 @@ and tool details, and review any permission request before deciding.
 Only eligible structured reads inside the project are approved automatically
 by default. Edits and shell commands still need your approval.
 
-Use `/plan` or Shift+Tab for an advisory planning focus. Planning is **not a
-read-only mode** and does not replace the [permission policy](permissions-and-privacy.md).
-Enter sends a message; Ctrl+J inserts a newline.
+Not sure which direction to take? Run `/fizz` for a one-shot comparison of
+approaches, risks, and trade-offs, or open `/vending-machine` to browse the
+curated workflows. After a change, `/taste-test` asks for focused checks and
+reports what passed, failed, and remains unverified. These workflows still use
+the ordinary permission rules and do not guarantee that a change is correct.
+
+Use `/plan` for an advisory planning focus, or press Shift+Tab to cycle Chat,
+Plan, and Autopilot. Planning is **not a read-only mode** and does not replace
+the [permission policy](permissions-and-privacy.md).
+Enter sends a message; Ctrl+J, Shift+Enter, or Alt+Enter inserts a newline.
 
 ## Review and continue
 
@@ -87,5 +94,5 @@ Sodapop starts fresh; history is never resumed automatically.
 This still comes from a real, local, signed-out UI recording with prepared Git
 changes. It does not show or simulate an AI response.
 
-Continue with [commands and shortcuts](commands.md),
+Next, explore [commands and shortcuts](commands.md),
 [customization](customization.md), or [permissions and privacy](permissions-and-privacy.md).

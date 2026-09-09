@@ -176,7 +176,7 @@ Usage: sodapop [options]
 
 Run sodapop from your project directory. Type / for commands or /login for your account.
 
-Commands: /help /login /logout /model /clear /resume /compact /plan /diff /theme /exit
+Commands: /help /login /logout /model /clear /resume /context /compact /plan /fizz /taste-test /vending-machine /autopilot /mcp /skill /diff /theme /exit
 
 Sign-in uses Sodapop's own GitHub OAuth device flow. Development builds need
 SODAPOP_GITHUB_CLIENT_ID set to a registered, device-flow-enabled public client ID.
@@ -529,7 +529,7 @@ func TestGenerateHomebrewFormulaUsesTaggedReleaseAssets(t *testing.T) {
 		`Copilot SDK 1.0.13 / runtime 1.0.83`,
 		`help = shell_output("#{bin}/sodapop --help")`,
 		`assert_includes help, "Usage: sodapop [options]"`,
-		`Commands: /help /login /logout /model /clear /resume /compact /plan /diff /theme /exit`,
+		`Commands: /help /login /logout /model /clear /resume /context /compact /plan /fizz /taste-test /vending-machine /autopilot /mcp /skill /diff /theme /exit`,
 		`assert_includes help, "-check-runtime"`,
 	} {
 		if !strings.Contains(text, snippet) {

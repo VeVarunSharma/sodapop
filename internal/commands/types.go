@@ -5,6 +5,7 @@ type Command struct {
 	Summary          string
 	Usage            string
 	AllowedWhileBusy bool
+	VendingCategory  string
 }
 
 type Input struct {

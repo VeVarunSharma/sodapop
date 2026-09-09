@@ -31,9 +31,10 @@ func TestMissingAuthKeepsHelpThemeAndAccountAccessible(t *testing.T) {
 		t.Fatal("local onboarding actions attempted credentials or failed")
 	}
 	m.handleKey(keyPress("f2"))
-	if m.overlay != nil {
-		t.Fatal("F2 still opened the account menu")
+	if m.overlay != nil || !m.autopilotEnabled {
+		t.Fatal("F2 did not toggle Autopilot without opening the account menu")
 	}
+	m.handleKey(keyPress("f2"))
 	m.runLocal("login")
 	if m.overlay == nil || m.overlay.kind != dialogAccount || len(m.overlay.items) != 3 {
 		t.Fatal("native account menu is unreachable without auth")
@@ -228,6 +229,9 @@ func TestBackgroundIdentityDoesNotDismissLocalHelp(t *testing.T) {
 	m := testModel(t, options)
 	m.runLocal("help")
 	id := m.overlay.id
+	if count := strings.Count(m.overlay.body, "KEYBOARD AND MOUSE"); count != 1 {
+		t.Fatalf("help contains %d keyboard references, want one", count)
+	}
 	identity := m.loadIdentity()().(identityMsg)
 	cmd := m.identityResult(identity)
 	if cmd == nil || m.overlay == nil || m.overlay.id != id || m.overlay.kind != dialogHelp {

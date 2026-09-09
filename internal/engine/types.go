@@ -33,6 +33,7 @@ type Session struct {
 	Model           string
 	ContextTier     string
 	ReasoningEffort string
+	SkillDigests    []string
 	UpdatedAt       time.Time
 }
 
@@ -125,6 +126,26 @@ type Question struct {
 	Cancel        func() error
 }
 
+type AccessReason string
+
+const (
+	AccessUnknown        AccessReason = "unknown"
+	AccessAuthentication AccessReason = "authentication"
+	AccessAuthorization  AccessReason = "authorization"
+	AccessPolicy         AccessReason = "policy"
+	AccessQuota          AccessReason = "quota"
+	AccessBilling        AccessReason = "billing"
+	AccessRateLimit      AccessReason = "rate_limit"
+	AccessNetwork        AccessReason = "network"
+)
+
+type AccessIssue struct {
+	Reason      AccessReason
+	Code        string
+	Remediation string
+	StatusCode  int
+}
+
 type Event struct {
 	Kind       EventKind
 	ID         string
@@ -139,7 +160,23 @@ type Event struct {
 	Role       string
 	Permission *Permission
 	Question   *Question
+	Access     *AccessIssue
 	Err        error
+}
+
+type MCPServer struct {
+	Name           string
+	Command        string
+	Args           []string
+	Env            map[string]string
+	Tools          []string
+	TimeoutSeconds int
+}
+
+type Skill struct {
+	Name      string
+	Digest    string
+	Directory string
 }
 
 type Engine interface {
@@ -158,8 +195,11 @@ type Engine interface {
 }
 
 type Config struct {
-	Project     string
-	Home        string
-	AccountID   string
-	TokenSource func(context.Context) (string, error)
+	Project            string
+	Home               string
+	AccountID          string
+	TokenSource        func(context.Context) (string, error)
+	MCPServers         []MCPServer
+	Skills             []Skill
+	ActiveSkillDigests []string
 }

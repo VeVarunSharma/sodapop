@@ -87,10 +87,17 @@ func (m *Model) resize(width, height int) {
 // composerAccent keeps the composer border, prompt and cursor color tied to the
 // active mode so the current mode is obvious at a glance.
 func (m *Model) composerAccent() string {
+	if m.autopilotEnabled {
+		return m.autopilotAccent()
+	}
 	if m.planning {
 		return m.color.amber
 	}
 	return m.color.cyan
+}
+
+func (m *Model) autopilotAccent() string {
+	return m.color.magenta
 }
 
 // composerBubble pulses while Sodapop is working and rests as a dim bubble otherwise.
@@ -110,7 +117,9 @@ func (m *Model) composerBubble() string {
 
 func (m *Model) composerPrompt() string {
 	label := "chat> "
-	if m.planning {
+	if m.autopilotEnabled {
+		label = "auto> "
+	} else if m.planning {
 		label = "plan> "
 	}
 	switch {
@@ -207,12 +216,15 @@ func (m *Model) View() tea.View {
 	if g.compact {
 		parts = append(parts, fitBlock(input, m.width, g.input))
 	} else {
-		title := "CHAT / Shift+Tab mode / Enter send / Ctrl+J newline"
+		title := "CHAT / Shift+Tab next: plan / Enter send / Ctrl+J newline"
 		if m.busy() {
 			title = "DRAFT / work active; nothing is queued"
 		}
 		if m.planning {
-			title = "ADVISORY PLAN / Shift+Tab mode / normal approvals"
+			title = "ADVISORY PLAN / Shift+Tab next: Autopilot / normal approvals"
+		}
+		if m.autopilotEnabled {
+			title = "AUTOPILOT / Shift+Tab next: chat / approvals bypassed"
 		}
 		parts = append(parts, c.frame(title, fitBlock(input, g.innerWidth, g.input), g.mainWidth, m.composerAccent()))
 	}
@@ -314,8 +326,8 @@ func (m *Model) headerView() string {
 	if m.planning {
 		mode = c.badge("ADVISORY PLAN / not read-only", c.amber)
 	}
-	if m.allowAll {
-		mode = c.badge("ALLOW ALL / approvals bypassed", c.red)
+	if m.autopilotEnabled {
+		mode = c.badge("AUTOPILOT / approvals bypassed", m.autopilotAccent())
 	}
 	second := c.paint(c.muted, " model: ") + c.paint(c.cyan, m.modelName())
 	second = fitLine(second, max(0, width-lipgloss.Width(mode)-1)) + mode + " "
@@ -323,6 +335,9 @@ func (m *Model) headerView() string {
 }
 
 func (m *Model) welcomeView() string {
+	if issue, blocked := m.currentAccessIssue(); blocked && !m.connecting {
+		return m.accessWelcomeView(issue)
+	}
 	if content, ok := m.mascotWelcome(); ok {
 		return content
 	}
@@ -379,6 +394,9 @@ func (m *Model) footerView() string {
 	}
 	if !m.follow {
 		text = " Scrollback / PgUp PgDn / Ctrl+End follows live output"
+	}
+	if issue, blocked := m.currentAccessIssue(); blocked {
+		text, accent = " "+m.accessHint(issue), c.amber
 	}
 	if m.notice.text != "" {
 		text = " " + singleLine(m.notice.text)
@@ -558,9 +576,7 @@ func (m *Model) dialogView() (string, int, int, *tea.Cursor) {
 	outerHeight := min(available, max(5, m.height-7))
 	innerHeight := max(1, outerHeight-frameHeight)
 	body := d.body
-	if d.kind == dialogModels && len(d.items) > 0 {
-		body = m.modelPickerBody(d)
-	} else if len(d.items) > 0 && (d.kind == dialogSessions || d.kind == dialogQuestion) {
+	if len(d.items) > 0 && (d.kind == dialogSessions || d.kind == dialogQuestion) {
 		item := d.items[d.selected]
 		body += "\n\nSelected: " + item.label
 		if item.detail != "" {
@@ -574,9 +590,14 @@ func (m *Model) dialogView() (string, int, int, *tea.Cursor) {
 	if len(d.items) > 0 && !d.freeform {
 		rows := len(d.items)
 		if d.kind == dialogModels {
-			rows += modelGroupCount(d.items)
+			rows = m.modelMenuRowCount(d, innerWidth)
+			menuHeight = min(rows, max(1, innerHeight-3))
+		} else if d.kind == dialogVending {
+			rows = m.groupedMenuRowCount(d)
+			menuHeight = min(rows, max(1, innerHeight/2))
+		} else {
+			menuHeight = min(rows, max(1, innerHeight/2))
 		}
-		menuHeight = min(rows, max(1, innerHeight/2))
 	}
 	answerHeight := 0
 	if d.freeform {
@@ -615,6 +636,8 @@ func (m *Model) dialogView() (string, int, int, *tea.Cursor) {
 	} else if menuHeight > 0 {
 		if d.kind == dialogModels {
 			lines = append(lines, m.modelMenuLines(d, innerWidth, menuHeight)...)
+		} else if d.kind == dialogVending {
+			lines = append(lines, m.groupedMenuLines(d, innerWidth, menuHeight)...)
 		} else {
 			start := max(0, d.selected-menuHeight+1)
 			for i := start; i < min(len(d.items), start+menuHeight); i++ {
@@ -670,39 +693,39 @@ func (m *Model) dialogView() (string, int, int, *tea.Cursor) {
 	return content, x, y, cursor
 }
 
-func (m *Model) modelPickerBody(d *dialog) string {
-	item := d.items[d.selected]
-	model, ok := m.modelByID(item.id)
-	if !ok {
-		return d.body
-	}
-	selection := d.modelDrafts[item.id]
-	contexts := make([]string, 0, len(model.ContextOptions))
-	for _, option := range model.ContextOptions {
-		label := contextOptionLabel(option)
-		if option.Tier == selection.ContextTier {
-			label = "[" + label + "]"
+func (m *Model) groupedMenuRowCount(d *dialog) int {
+	rows := len(d.items)
+	previous := ""
+	for _, item := range d.items {
+		if item.group != previous {
+			rows++
+			previous = item.group
 		}
-		contexts = append(contexts, label)
 	}
-	if len(contexts) == 1 {
-		contexts[0] += " (fixed)"
-	}
-	efforts := make([]string, 0, len(model.ReasoningEfforts))
-	for _, effort := range model.ReasoningEfforts {
-		label := effortLabel(effort)
-		if effort == selection.ReasoningEffort {
-			label = "[" + label + "]"
+	return rows
+}
+
+func (m *Model) groupedMenuLines(d *dialog, width, height int) []string {
+	rows := make([]string, 0, m.groupedMenuRowCount(d))
+	selectedRow := 0
+	previous := ""
+	for i, item := range d.items {
+		if item.group != previous {
+			group := item.group
+			if group == "" {
+				group = "Other"
+			}
+			rows = append(rows, m.color.paint(m.color.magenta, fitLine(strings.ToUpper(group), width)))
+			previous = item.group
 		}
-		efforts = append(efforts, label)
+		if i == d.selected {
+			selectedRow = len(rows)
+		}
+		rows = append(rows, m.menuLine(item, i == d.selected, width))
 	}
-	if len(efforts) == 0 {
-		efforts = []string{"Model default (fixed)"}
-	} else if len(efforts) == 1 {
-		efforts[0] += " (fixed)"
-	}
-	return d.body + "\n\nContext    " + strings.Join(contexts, "  ") +
-		"\nReasoning  " + strings.Join(efforts, "  ")
+	start := max(0, selectedRow-height+1)
+	end := min(len(rows), start+height)
+	return rows[start:end]
 }
 
 func contextOptionLabel(option engine.ContextOption) string {
@@ -724,36 +747,143 @@ func compactTokenCount(tokens int64) string {
 	}
 }
 
-func modelGroupCount(items []menuItem) int {
-	count, previous := 0, ""
-	for _, item := range items {
-		if item.group != previous {
-			count++
-			previous = item.group
-		}
+func (m *Model) modelMenuLines(d *dialog, width, height int) []string {
+	header, rows, selectedStart, selectedEnd := m.modelMenuRows(d, width)
+	if height <= 1 {
+		return []string{header}
 	}
-	return count
+	bodyHeight := height - 1
+	start := max(0, selectedEnd-bodyHeight+1)
+	if selectedEnd-selectedStart+1 > bodyHeight {
+		start = selectedStart
+	}
+	end := min(len(rows), start+bodyHeight)
+	return append([]string{header}, rows[start:end]...)
 }
 
-func (m *Model) modelMenuLines(d *dialog, width, height int) []string {
-	var rows []string
-	selectedRow, previous := 0, ""
+func (m *Model) modelMenuRowCount(d *dialog, width int) int {
+	_, rows, _, _ := m.modelMenuRows(d, width)
+	return 1 + len(rows)
+}
+
+func (m *Model) modelMenuRows(d *dialog, width int) (string, []string, int, int) {
+	wide := width >= 56
+	header := m.modelTableHeader(width, wide)
+	rows := make([]string, 0, len(d.items)*2+2)
+	selectedStart, selectedEnd, previous := 0, 0, ""
 	for i, item := range d.items {
 		if item.group != previous {
 			group := item.group
 			if group == "" {
 				group = "Other"
 			}
-			rows = append(rows, m.color.paint(m.color.magenta, strings.ToUpper(group)))
+			rows = append(rows, m.color.paint(m.color.magenta, fitLine(strings.ToUpper(group), width)))
 			previous = item.group
 		}
-		if i == d.selected {
-			selectedRow = len(rows)
+		model, ok := m.modelByID(item.id)
+		if !ok {
+			continue
 		}
-		rows = append(rows, m.menuLine(item, i == d.selected, width))
+		selection := d.modelDrafts[item.id]
+		selected := i == d.selected
+		if i == d.selected {
+			selectedStart = len(rows)
+		}
+		if wide {
+			rows = append(rows, m.modelTableRow(item, model, selection, selected, width))
+		} else {
+			rows = append(rows, m.modelTableLine(modelRowName(item, item.id == m.model), selected, width))
+			if selected {
+				context := modelContextValue(model, selection, true)
+				effort := modelEffortValue(model, selection, true)
+				rows = append(rows,
+					m.modelTableLine("  Context   "+context, true, width),
+					m.modelTableLine("  Thinking  "+effort, true, width),
+				)
+			}
+		}
+		if selected {
+			selectedEnd = len(rows) - 1
+		}
 	}
-	start := max(0, min(selectedRow, len(rows)-height))
-	return rows[start:min(len(rows), start+height)]
+	return header, rows, selectedStart, selectedEnd
+}
+
+func (m *Model) modelTableHeader(width int, wide bool) string {
+	if !wide {
+		return m.color.paint(m.color.muted, fitLine("  MODEL / CONTEXT / THINKING", width))
+	}
+	modelWidth, contextWidth, effortWidth := modelColumnWidths(width)
+	line := "  " + fitLine("MODEL", modelWidth) + "  " +
+		fitLine("CONTEXT", contextWidth) + "  " + fitLine("THINKING", effortWidth)
+	return m.color.paint(m.color.muted, fitLine(line, width))
+}
+
+func (m *Model) modelTableRow(item menuItem, model engine.Model, selection engine.ModelSelection, selected bool, width int) string {
+	modelWidth, contextWidth, effortWidth := modelColumnWidths(width)
+	marker := "  "
+	if selected {
+		marker = "> "
+	}
+	line := marker + fitLine(modelRowName(item, item.id == m.model), modelWidth) + "  " +
+		fitLine(modelContextValue(model, selection, selected), contextWidth) + "  " +
+		fitLine(modelEffortValue(model, selection, selected), effortWidth)
+	return m.modelTableLine(line, selected, width)
+}
+
+func modelColumnWidths(width int) (int, int, int) {
+	contextWidth := min(22, max(16, width/4))
+	effortWidth := min(18, max(12, width/5))
+	modelWidth := max(12, width-6-contextWidth-effortWidth)
+	return modelWidth, contextWidth, effortWidth
+}
+
+func modelRowName(item menuItem, current bool) string {
+	name := singleLine(item.label)
+	if current {
+		name += " [current]"
+	}
+	return name
+}
+
+func modelContextValue(model engine.Model, selection engine.ModelSelection, selected bool) string {
+	label := contextTierLabel(selection.ContextTier)
+	for _, option := range model.ContextOptions {
+		if option.Tier == selection.ContextTier {
+			label = contextOptionLabel(option)
+			break
+		}
+	}
+	return adjustableModelValue(label, len(model.ContextOptions), selected)
+}
+
+func modelEffortValue(model engine.Model, selection engine.ModelSelection, selected bool) string {
+	if len(model.ReasoningEfforts) == 0 {
+		return "Default (fixed)"
+	}
+	return adjustableModelValue(effortLabel(selection.ReasoningEffort), len(model.ReasoningEfforts), selected)
+}
+
+func adjustableModelValue(label string, options int, selected bool) string {
+	if options <= 1 {
+		return label + " fixed"
+	}
+	if selected {
+		return "< " + label + " >"
+	}
+	return label
+}
+
+func (m *Model) modelTableLine(text string, selected bool, width int) string {
+	text = fitLine(text, width)
+	if selected {
+		style := m.color.background(m.color.raised)
+		if !m.color.noColor {
+			style = style.Foreground(lipgloss.Color(m.color.cyan)).Bold(true)
+		}
+		return style.Render(text)
+	}
+	return m.color.paint(m.color.text, text)
 }
 
 func (m *Model) dialogBody(body string, width int, kind dialogKind) string {

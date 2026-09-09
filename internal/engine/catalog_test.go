@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -82,5 +84,46 @@ func TestEffectiveToolsAreValidatedNotAssumed(t *testing.T) {
 		if err := validateTools(tools); err == nil {
 			t.Fatalf("accepted missing or implicitly imported tools: %+v", tools)
 		}
+	}
+	if err := validateToolsForSkills(append(valid, rpc.CurrentToolMetadata{Name: "skill"}), true); err != nil {
+		t.Fatalf("rejected explicit skill tool: %v", err)
+	}
+}
+
+func TestLoadedSkillsMustMatchExplicitPaths(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "review", "SKILL.md")
+	expected := map[string]string{"review": path}
+	valid := &rpc.SkillList{Skills: []rpc.Skill{{
+		Name: "review", Enabled: true, Path: copilot.String(path), Source: rpc.SkillSourceCustom,
+	}}}
+	if err := validateLoadedSkills(valid, expected); err != nil {
+		t.Fatal(err)
+	}
+	for _, list := range []*rpc.SkillList{
+		nil,
+		{},
+		{Skills: []rpc.Skill{{Name: "review", Enabled: false, Path: copilot.String(path), Source: rpc.SkillSourceCustom}}},
+		{Skills: []rpc.Skill{{Name: "other", Enabled: true, Path: copilot.String(path), Source: rpc.SkillSourceCustom}}},
+		{Skills: []rpc.Skill{{Name: "review", Enabled: true, Path: copilot.String("/other/SKILL.md"), Source: rpc.SkillSourceCustom}}},
+		{Skills: []rpc.Skill{{Name: "review", Enabled: true, Path: copilot.String(path), Source: rpc.SkillSourcePlugin}}},
+	} {
+		if err := validateLoadedSkills(list, expected); err == nil {
+			t.Fatalf("accepted unexpected loaded skills: %#v", list)
+		}
+	}
+}
+
+func TestExpectedSkillPathsIncludesOnlySkillDirectories(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "review"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "README.md"), []byte("ignored"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	expected := expectedSkillPaths([]string{root, filepath.Join(root, "missing")})
+	path, ok := expected["review"]
+	if !ok || path != filepath.Join(root, "review", "SKILL.md") || len(expected) != 1 {
+		t.Fatalf("expected skill paths = %#v", expected)
 	}
 }

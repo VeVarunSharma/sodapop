@@ -1,7 +1,8 @@
 # Troubleshooting
 
-Start with the exact error and the command you installed. Avoid deleting state
-or changing credentials just to make an error disappear.
+Let's find what got stuck. Start with the exact error and the command you
+installed. Avoid deleting state or changing credentials just to make an error
+disappear.
 
 ## Installation or command not found
 
@@ -62,7 +63,9 @@ your browser, and then wait for the terminal's connection result.
 | Device code expired or authorization was canceled | Start a new `/login` attempt; do not reuse or share the old code. |
 | Authorization was denied | Review the application and account you intend to authorize before trying again. |
 | Network failure | Restore access to the required GitHub services, then retry the account connection explicitly. |
-| GitHub sign-in succeeded but models are unavailable | Confirm Copilot access and organization policy for that account. GitHub identity alone is insufficient. |
+| GitHub sign-in succeeded but Copilot access is unavailable | Open `/login`. Use **Get Copilot** if access has not been activated, or ask your organization administrator about your seat and CLI policy; then select **Check access again**. |
+| All returned models are disabled by policy | Ask the organization administrator to review enabled models and CLI policy. Buying another plan may not resolve a policy restriction. |
+| Copilot reports quota, rate-limit, or billing configuration errors | Use **Open Copilot settings** to review usage/billing, or contact the organization administrator. These errors do not establish that your subscription is missing. |
 | Missing Sodapop public client ID | Use a properly configured distribution or follow the source-build configuration below. |
 | Expired or revoked credential | Reauthorize through `/login`; do not paste tokens into a preferences file. |
 
@@ -70,6 +73,23 @@ Normal users do not need to create an OAuth app. Local source builds use the
 project's existing public-client configuration as described in
 [development](development.md#configure-source-build-sign-in).
 Never borrow GitHub CLI or Copilot CLI credentials as a workaround.
+
+Sodapop keeps your GitHub account, draft, and local commands available while
+Copilot access is unavailable. The account dialog shows the GitHub login to use
+on the plans/settings page; your browser might be signed in to another account.
+An eligible Copilot Free account is not required to buy a paid plan just to pass
+Sodapop's access handling.
+
+**Check access again** refreshes the same account's connection and model
+discovery instead of reusing the SDK's cached catalog. It runs only when selected,
+not automatically after opening GitHub. If browser opening fails or is unsupported,
+use the visible link or the explicit copy-link action. If a turn is unresolved,
+stop it with Ctrl+C and wait for cancellation before rechecking.
+
+An empty catalog or generic 403 can have multiple causes. Sodapop uses conditional
+activation guidance rather than claiming an inactive subscription without
+reliable evidence. A runtime, network, or credential failure should be resolved
+as that failure, not by assuming a purchase is necessary.
 
 Failed coding actions are not replayed automatically after account changes.
 Inspect any completed work, then decide whether to send a new request.
@@ -108,12 +128,35 @@ Ctrl+C cancels active work, but does not undo completed file changes. `/diff`
 includes changes from before the conversation, and reports when its bounded
 output is truncated. Review the actual worktree before retrying a request.
 
+`/diff session` may show **PARTIAL BASELINE** when tracked files exceed the
+64 KiB per-file, 16 MiB total, or 1,024-file snapshot limits, or when paths cannot
+be represented as regular-file snapshots. Excluded paths are listed with reasons;
+they do not invalidate the remaining baseline or cause a startup error. Changes
+to excluded files are not tracked by that baseline. Use `/diff all` for the
+current working-tree view, which also includes pre-existing changes.
+
+If startup reports that the conversation baseline is unavailable, retain the
+exact Git or file-read error. Genuine access and inspection failures still need
+attention; deleting project assets or changing credentials is not a fix for
+snapshot limits.
+
+Taste Test uses that same bounded conversation evidence. If its report starts
+with an evidence limitation, read the UNVERIFIED section and inspect the named
+exclusions before treating the result as complete. Sodapop deliberately does
+not replace missing session evidence with an unannounced whole-tree check.
+
 ## Report a reproducible problem
 
-Use the [canonical repository](https://github.com/VeVarunSharma/sodapop) to report
-the operating system, architecture, installation channel, version output, exact
-error, and minimal steps. Say whether the problem happens while signed out or
-only after connecting.
+Use the [issue chooser](https://github.com/VeVarunSharma/sodapop/issues/new/choose)
+for bug reports, feature requests, and documentation issues. A blank issue is
+available if none of those categories fits.
+
+For bugs, include the operating system, architecture, terminal, installation
+channel, full `sodapop --version` output, exact error, and minimal steps or
+circumstances. If known, say whether it happens while signed out or only after
+connecting, and which model is involved. "Unavailable" or "unknown" is fine
+when diagnostics cannot run; do not change credentials or delete state just to
+complete a report.
 
 Remove tokens, private device codes, personal paths, and confidential source or
 conversation content. Do not attach a whole state directory or environment file.

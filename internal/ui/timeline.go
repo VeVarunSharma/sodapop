@@ -131,7 +131,10 @@ func (m *Model) receiveEvents(msg eventsMsg) tea.Cmd {
 			m.turnCancel = nil
 		}
 		m.finishOperation()
-		m.connectionError = errors.New("the Copilot event stream closed")
+		_ = m.finishConnectionProbe(nil)
+		if _, blocked := m.currentAccessIssue(); !blocked {
+			m.recordAccessFailure(errors.New("the Copilot event stream closed"), &engine.AccessIssue{Reason: engine.AccessNetwork}, true)
+		}
 		m.needsResume = m.session.ID != ""
 		m.reconnectID = m.session.ID
 		m.report(m.recoveryCopy("Copilot disconnected. /login reconnects without replaying a prompt."), true)
@@ -141,6 +144,7 @@ func (m *Model) receiveEvents(msg eventsMsg) tea.Cmd {
 		if l != nil {
 			cmds = append(cmds, func() tea.Msg { return decisionMsg{generation: msg.generation, err: l.close()} })
 		}
+		m.presentAccessRecovery()
 	} else {
 		cmds = append(cmds, m.waitEvents())
 	}
@@ -174,12 +178,27 @@ func (m *Model) acceptEvent(envelope eventEnvelope) tea.Cmd {
 			return m.resolveCommand(envelope.decision, answer{cancel: true})
 		}
 		if e.Kind == engine.EventError && e.SessionID == "" {
-			m.report("Copilot: "+eventError(e), true)
+			if !e.History && m.recordAccessFailure(e.Err, e.Access, false) {
+				m.notifyAccessFailure()
+				if m.connecting {
+					m.connecting = false
+					_ = m.finishConnectionProbe(nil)
+					cmd := m.retireConnection()
+					m.presentAccessRecovery()
+					return cmd
+				}
+			} else {
+				m.report("Copilot: "+eventError(e), true)
+			}
 		}
 		return nil
 	}
 	if e.Kind == engine.EventError && !m.turn {
-		m.report("Copilot: "+eventError(e), true)
+		if !e.History && m.recordAccessFailure(e.Err, e.Access, false) {
+			m.notifyAccessFailure()
+		} else {
+			m.report("Copilot: "+eventError(e), true)
+		}
 		return nil
 	}
 	if !e.History && !m.turn && e.Kind != engine.EventUsage {
@@ -225,7 +244,7 @@ func (m *Model) acceptEvent(envelope eventEnvelope) tea.Cmd {
 		if d.resolved.Load() {
 			return nil
 		}
-		if e.Kind == engine.EventPermission && m.allowAll {
+		if e.Kind == engine.EventPermission && m.autopilotEnabled {
 			return m.resolveCommand(d, answer{allow: true})
 		}
 		if !m.seenRequests[d.key] {
@@ -276,7 +295,12 @@ func (m *Model) acceptEvent(envelope eventEnvelope) tea.Cmd {
 		m.needsAbort = true
 		m.experience.errored = true
 		m.stopCards("failed")
-		m.report(m.recoveryCopy("Copilot: "+eventError(e)+". Ctrl+C stops the unresolved turn; /login then reconnects if needed. Nothing was retried."), true)
+		detail := eventError(e)
+		if m.recordAccessFailure(e.Err, e.Access, false) {
+			issue, _ := m.currentAccessIssue()
+			detail = accessTitle(issue) + ". " + m.accessHint(issue)
+		}
+		m.report(m.recoveryCopy("Copilot: "+detail+". Ctrl+C stops the unresolved turn; /login then reconnects if needed. Nothing was retried."), true)
 		m.flushTimeline()
 		return tea.Batch(m.cancelDecisions(), m.startMoment(reactionRecovery))
 	}
@@ -603,12 +627,12 @@ func (m *Model) showDecision() {
 		if p.Description != "" {
 			body += "\n" + safeText(p.Description) + "\n"
 		}
-		body += "\nAllow-once and allow-all are not sandboxes. Completed edits are not undone by cancellation."
+		body += "\nAllow-once and Autopilot are not sandboxes. Completed edits are not undone by cancellation."
 		d := m.newDialog(dialogPermission, "PERMISSION / your decision", body)
 		d.items = []menuItem{
 			{id: "deny", label: "Deny", detail: "D / Esc"},
 			{id: "allow", label: "Allow once", detail: "A / this request only"},
-			{id: "allow-all", label: "Allow all", detail: "Shift+A / this conversation"},
+			{id: "autopilot", label: "Enable Autopilot", detail: "Shift+A / this conversation"},
 		}
 	} else if q := request.question; q != nil {
 		d := m.newDialog(dialogQuestion, "QUESTION / the agent needs you", q.Prompt)
@@ -643,8 +667,8 @@ func (m *Model) answerDecision(a answer) tea.Cmd {
 	return m.resolveCommand(d, a)
 }
 
-func (m *Model) answerAllPermissions() tea.Cmd {
-	m.setAllowAll(true)
+func (m *Model) enableAutopilotForPermissions() tea.Cmd {
+	m.setAutopilot(true)
 	requests := m.requests
 	m.requests = nil
 	var remaining []*decision
@@ -659,7 +683,7 @@ func (m *Model) answerAllPermissions() tea.Cmd {
 	m.requests = remaining
 	m.overlay = nil
 	m.showDecision()
-	m.report(m.allowAllNotice(), false)
+	m.report(m.autopilotNotice(), false)
 	return tea.Batch(cmds...)
 }
 
@@ -734,6 +758,11 @@ func (m *Model) cancelWork() tea.Cmd {
 	}
 	if m.operation.kind == "signing out" {
 		m.report("Sign-out is in progress. Ctrl+Q offers exit.", false)
+		return nil
+	}
+	if m.operation.kind == "preparing taste test" {
+		m.finishOperation()
+		m.report("Taste test preparation cancelled. Your draft is kept; no prompt was sent.", false)
 		return nil
 	}
 	if m.turnCancel != nil {

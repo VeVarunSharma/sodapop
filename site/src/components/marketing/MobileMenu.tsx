@@ -15,8 +15,8 @@ export default function MobileMenu({ home, download, docs }: { home: string; dow
       </SheetTrigger>
       <SheetContent className="soda-sheet">
         <SheetHeader>
-          <SheetTitle>A little direction.</SheetTitle>
-          <SheetDescription>Find your next stop in Sodapop.</SheetDescription>
+          <SheetTitle>Where to?</SheetTitle>
+          <SheetDescription>Get Sodapop, browse the docs, or peek at the source.</SheetDescription>
         </SheetHeader>
         <nav aria-label="Mobile navigation" className="sheet-links">
           <SheetClose asChild><a href={`${home}#features`}>The good stuff</a></SheetClose>

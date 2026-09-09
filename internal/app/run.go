@@ -15,9 +15,11 @@ import (
 	"github.com/charmbracelet/x/term"
 
 	"github.com/VeVarunSharma/sodapop/internal/auth"
+	"github.com/VeVarunSharma/sodapop/internal/commands"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
 	"github.com/VeVarunSharma/sodapop/internal/runtimebundle"
+	"github.com/VeVarunSharma/sodapop/internal/skills"
 	"github.com/VeVarunSharma/sodapop/internal/ui"
 	"github.com/VeVarunSharma/sodapop/internal/workspace"
 )
@@ -43,6 +45,8 @@ type runDependencies struct {
 	resolvePaths    func() (config.Paths, error)
 	loadPreferences func(string) (config.Preferences, error)
 	savePreferences func(string, config.Preferences) error
+	loadMCP         func(string) (config.MCPRegistry, error)
+	saveMCP         func(string, config.MCPRegistry) error
 	getwd           func() (string, error)
 	evalSymlinks    func(string) (string, error)
 	newWorkspace    func(string) (ui.Workspace, error)
@@ -59,6 +63,8 @@ func defaultRunDependencies() runDependencies {
 		resolvePaths:    config.ResolvePaths,
 		loadPreferences: config.Load,
 		savePreferences: config.Save,
+		loadMCP:         config.LoadMCP,
+		saveMCP:         config.SaveMCP,
 		getwd:           os.Getwd,
 		evalSymlinks:    filepath.EvalSymlinks,
 		newWorkspace: func(project string) (ui.Workspace, error) {
@@ -98,10 +104,14 @@ func run(ctx context.Context, args []string, input *os.File, output io.Writer, d
 	flags.BoolVar(&noBanner, "no-banner", false, "skip the startup mascot banner")
 	flags.BoolVar(&checkRuntime, "check-runtime", false, "check the bundled runtime without signing in or calling a model")
 	flags.Usage = func() {
+		commandNames := make([]string, 0, len(commands.All()))
+		for _, command := range commands.All() {
+			commandNames = append(commandNames, "/"+command.Name)
+		}
 		fmt.Fprintln(output, "Sodapop - a neon terminal coding companion")
 		fmt.Fprintln(output, "\nUsage: sodapop [options]")
 		fmt.Fprintln(output, "\nRun sodapop from your project directory. Type / for commands or /login for your account.")
-		fmt.Fprintln(output, "\nCommands: /help /login /logout /model /clear /resume /compact /plan /diff /theme /exit")
+		fmt.Fprintln(output, "\nCommands: "+strings.Join(commandNames, " "))
 		fmt.Fprintln(output, "\nSign-in uses Sodapop's own GitHub OAuth device flow. Development builds need")
 		fmt.Fprintln(output, "SODAPOP_GITHUB_CLIENT_ID set to a registered, device-flow-enabled public client ID.")
 		fmt.Fprintln(output, "\nOptions:")
@@ -160,6 +170,10 @@ func run(ctx context.Context, args []string, input *os.File, output io.Writer, d
 	if err != nil {
 		return err
 	}
+	skillManager, err := skills.New(paths.StateDir, project)
+	if err != nil {
+		return err
+	}
 	clientID := strings.TrimSpace(OAuthClientID)
 	if value, present := os.LookupEnv("SODAPOP_GITHUB_CLIENT_ID"); present {
 		clientID = strings.TrimSpace(value)
@@ -185,15 +199,51 @@ func run(ctx context.Context, args []string, input *os.File, output io.Writer, d
 			}
 			return deps.savePreferences(paths.ConfigFile, next)
 		},
+		LoadMCP: func(_ context.Context, account auth.Account) (config.MCPRegistry, error) {
+			path, err := paths.AccountMCPFile(account.ID)
+			if err != nil {
+				return config.MCPRegistry{}, err
+			}
+			return deps.loadMCP(path)
+		},
+		SaveMCP: func(_ context.Context, account auth.Account, registry config.MCPRegistry) error {
+			path, err := paths.AccountMCPFile(account.ID)
+			if err != nil {
+				return err
+			}
+			return deps.saveMCP(path, registry)
+		},
+		ManageSkills: skillManager.Apply,
 		NewEngine: func(engineCtx context.Context, account auth.Account) (engine.Engine, error) {
 			home, err := paths.AccountHome(account.ID)
 			if err != nil {
 				return nil, err
 			}
+			mcpPath, err := paths.AccountMCPFile(account.ID)
+			if err != nil {
+				return nil, err
+			}
+			registry, err := deps.loadMCP(mcpPath)
+			if err != nil {
+				return nil, err
+			}
+			servers, err := resolveMCPServers(registry)
+			if err != nil {
+				return nil, err
+			}
+			installed, active, err := skillManager.Resolve()
+			if err != nil {
+				return nil, err
+			}
+			engineSkills := make([]engine.Skill, 0, len(installed))
+			for _, skill := range installed {
+				engineSkills = append(engineSkills, engine.Skill{
+					Name: skill.Name, Digest: skill.Digest, Directory: skill.Directory,
+				})
+			}
 			backend, err := deps.newEngine(engine.Config{
-				Project:   project,
-				Home:      home,
-				AccountID: account.ID,
+				Project: project, Home: home, AccountID: account.ID,
+				MCPServers: servers, Skills: engineSkills, ActiveSkillDigests: active,
 				TokenSource: func(tokenCtx context.Context) (string, error) {
 					return identity.TokenForAccount(tokenCtx, account.ID)
 				},
@@ -215,4 +265,28 @@ func run(ctx context.Context, args []string, input *os.File, output io.Writer, d
 		return nil
 	}
 	return err
+}
+
+func resolveMCPServers(registry config.MCPRegistry) ([]engine.MCPServer, error) {
+	servers := make([]engine.MCPServer, 0, len(registry.Servers))
+	for _, configured := range registry.Servers {
+		if !configured.Enabled {
+			continue
+		}
+		env := make(map[string]string, len(configured.Env))
+		for _, name := range configured.Env {
+			value, present := os.LookupEnv(name)
+			if !present {
+				return nil, fmt.Errorf("MCP server %q requires environment variable %s", configured.Name, name)
+			}
+			env[name] = value
+		}
+		servers = append(servers, engine.MCPServer{
+			Name: configured.Name, Command: configured.Command,
+			Args: append([]string(nil), configured.Args...), Env: env,
+			Tools:          append([]string(nil), configured.Tools...),
+			TimeoutSeconds: configured.TimeoutSeconds,
+		})
+	}
+	return servers, nil
 }

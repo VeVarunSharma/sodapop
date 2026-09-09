@@ -207,7 +207,7 @@ function hubContent(map, base) {
     children: [{
       type: 'paragraph',
       children: [
-        { type: 'text', value: 'A practical guide to your terminal coding companion. Check the ' },
+        { type: 'text', value: "First sip? Let's get Sodapop running in your project. Check the " },
         { type: 'link', url: `${base}download/`, children: [{ type: 'text', value: 'download page' }] },
         { type: 'text', value: ' for current release and installation availability, then choose a guide below.' },
       ],

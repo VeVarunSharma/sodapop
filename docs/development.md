@@ -82,6 +82,22 @@ A local bundled-runtime smoke check is separate from real sign-in and model
 qualification. Do not run live qualification as an incidental build or website
 test; it requires owner-authorized accounts and normal Copilot usage.
 
+### Issue forms
+
+Templates live in `.github/ISSUE_TEMPLATE/`. With the existing website Node
+toolchain and dependencies, run these checks from the repository root:
+
+```sh
+node --test site/test/unit/issue-forms.test.mjs site/test/unit/content.test.mjs
+```
+
+This reuses the existing YAML tooling without starting the application or
+calling GitHub. Run it explicitly for template-only edits: the Pages workflow's
+current path filters do not include issue templates. Before publishing, inspect
+each form in GitHub's available preview/editor, including empty required inputs
+and optional evidence, without creating public test issues. The live chooser
+updates only after the files reach the repository's default branch.
+
 ## Release and package metadata
 
 The [distribution contract](distribution.md#release-assets) defines schema

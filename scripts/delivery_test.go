@@ -402,6 +402,10 @@ func TestInstallRejectsMissingNonExecutableAndCrossTargetInputs(t *testing.T) {
 }
 
 func TestREADMETracksCurrentCommandCatalog(t *testing.T) {
+	var commandNames []string
+	for _, command := range commands.All() {
+		commandNames = append(commandNames, "/"+command.Name)
+	}
 	for _, document := range []struct{ name, path string }{
 		{"README", "../README.md"},
 		{"Website", "../docs/commands.md"},
@@ -428,5 +432,13 @@ func TestREADMETracksCurrentCommandCatalog(t *testing.T) {
 				t.Fatalf("%s command catalog = %q, want %q", document.name, got, want)
 			}
 		})
+	}
+	formula, err := os.ReadFile("../packaging/homebrew/Formula/sodapop.rb.tmpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commandLine := "Commands: " + strings.Join(commandNames, " ")
+	if !strings.Contains(string(formula), commandLine) {
+		t.Fatalf("Homebrew smoke help is missing %q", commandLine)
 	}
 }

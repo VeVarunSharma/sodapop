@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -60,6 +62,7 @@ type sdkSessionBackend interface {
 	InitializeTools(context.Context) error
 	CurrentTools(context.Context) (*rpc.ToolsGetCurrentMetadataResult, error)
 	MCPServers(context.Context) (*rpc.MCPServerList, error)
+	Skills(context.Context) (*rpc.SkillList, error)
 	Send(context.Context, copilot.MessageOptions) (string, error)
 	Compact(context.Context, *rpc.SessionHistoryCompactRequest) (*rpc.HistoryCompactResult, error)
 	ContextAttribution(context.Context) (*rpc.MetadataContextAttributionResult, error)
@@ -86,6 +89,7 @@ type sdkSession struct {
 	session   sdkSessionBackend
 	owner     *sdkClient
 	selection ModelSelection
+	skills    map[string]string
 }
 
 func makeSDKClient(options *copilot.ClientOptions) runtimeClient {
@@ -155,6 +159,12 @@ func (s *copilotSessionBackend) CurrentTools(ctx context.Context) (*rpc.ToolsGet
 }
 func (s *copilotSessionBackend) MCPServers(ctx context.Context) (*rpc.MCPServerList, error) {
 	return s.session.RPC.MCP.List(ctx)
+}
+func (s *copilotSessionBackend) Skills(ctx context.Context) (*rpc.SkillList, error) {
+	if _, err := s.session.RPC.Skills.EnsureLoaded(ctx); err != nil {
+		return nil, err
+	}
+	return s.session.RPC.Skills.List(ctx)
 }
 func (s *copilotSessionBackend) Send(ctx context.Context, options copilot.MessageOptions) (string, error) {
 	return s.session.Send(ctx, options)
@@ -249,7 +259,7 @@ func (c *sdkClient) CreateSession(ctx context.Context, config *copilot.SessionCo
 	}
 	return &sdkSession{session: session, owner: c, selection: ModelSelection{
 		ModelID: config.Model, ContextTier: string(config.ContextTier), ReasoningEffort: config.ReasoningEffort,
-	}}, nil
+	}, skills: expectedSkillPaths(config.SkillDirectories)}, nil
 }
 
 func (c *sdkClient) ResumeSession(ctx context.Context, id string, config *copilot.ResumeSessionConfig) (runtimeSession, error) {
@@ -259,7 +269,7 @@ func (c *sdkClient) ResumeSession(ctx context.Context, id string, config *copilo
 	}
 	return &sdkSession{session: session, owner: c, selection: ModelSelection{
 		ModelID: config.Model, ContextTier: string(config.ContextTier), ReasoningEffort: config.ReasoningEffort,
-	}}, nil
+	}, skills: expectedSkillPaths(config.SkillDirectories)}, nil
 }
 
 func (s *sdkSession) ID() string { return s.session.ID() }
@@ -333,8 +343,17 @@ func (s *sdkSession) Configure(ctx context.Context) error {
 	if tools == nil {
 		return errors.New("runtime returned no effective tool metadata")
 	}
-	if err := validateTools(tools.Tools); err != nil {
+	if err := validateToolsForSkills(tools.Tools, len(s.skills) > 0); err != nil {
 		return err
+	}
+	if len(s.skills) > 0 {
+		loaded, err := s.session.Skills(ctx)
+		if err != nil {
+			return fmt.Errorf("inspect explicit skills: %w", err)
+		}
+		if err := validateLoadedSkills(loaded, s.skills); err != nil {
+			return err
+		}
 	}
 	mcp, err := s.session.MCPServers(ctx)
 	if err != nil {
@@ -452,9 +471,16 @@ var codingTools = []string{
 }
 
 func validateTools(tools []rpc.CurrentToolMetadata) error {
+	return validateToolsForSkills(tools, false)
+}
+
+func validateToolsForSkills(tools []rpc.CurrentToolMetadata, skills bool) error {
 	allowed := make(map[string]bool, len(codingTools))
 	for _, tool := range codingTools {
 		allowed[tool] = true
+	}
+	if skills {
+		allowed["skill"] = true
 	}
 	found := make(map[string]bool)
 	for _, tool := range tools {
@@ -466,6 +492,50 @@ func validateTools(tools []rpc.CurrentToolMetadata) error {
 	if !found["view"] || !found["bash"] || !found["ask_user"] ||
 		!(found["edit"] || found["create"] || found["apply_patch"] || found["str_replace_editor"]) {
 		return errors.New("runtime does not expose the required read, write, shell, and question tools")
+	}
+	return nil
+}
+
+func expectedSkillPaths(directories []string) map[string]string {
+	expected := make(map[string]string)
+	for _, directory := range directories {
+		entries, err := os.ReadDir(directory)
+		if err != nil {
+			continue
+		}
+		for _, entry := range entries {
+			if entry.IsDir() {
+				expected[entry.Name()] = filepath.Join(directory, entry.Name(), "SKILL.md")
+			}
+		}
+	}
+	return expected
+}
+
+func validateLoadedSkills(list *rpc.SkillList, expected map[string]string) error {
+	if list == nil {
+		return errors.New("runtime returned no skill isolation metadata")
+	}
+	found := make(map[string]bool, len(expected))
+	for _, skill := range list.Skills {
+		if !skill.Enabled {
+			continue
+		}
+		path := ""
+		if skill.Path != nil {
+			path = filepath.Clean(*skill.Path)
+		}
+		expectedPath, ok := expected[skill.Name]
+		if !ok || path != filepath.Clean(expectedPath) ||
+			skill.Source != rpc.SkillSourceCustom && skill.Source != rpc.SkillSourceSDK {
+			return fmt.Errorf("runtime enabled unexpected skill %q; refusing to start a coding turn", skill.Name)
+		}
+		found[skill.Name] = true
+	}
+	for name := range expected {
+		if !found[name] {
+			return fmt.Errorf("runtime did not enable requested skill %q", name)
+		}
 	}
 	return nil
 }

@@ -242,6 +242,7 @@ func TestCleanAndStagedUnstagedSameFile(t *testing.T) {
 	if err != nil || !status.IsRepository || len(status.Entries) != 0 {
 		t.Fatalf("clean repository: %#v, %v", status, err)
 	}
+
 	clean, err := service.Diff(t.Context(), "")
 	if err != nil || clean.Truncated || strings.Count(clean.Text, "(none)") != 3 {
 		t.Fatalf("clean diff: %#v, %v", clean, err)
@@ -313,6 +314,87 @@ func TestCleanAndStagedUnstagedSameFile(t *testing.T) {
 	}
 	if _, err := service.Diff(t.Context(), "other"); err == nil {
 		t.Fatal("accepted an unsupported diff mode")
+	}
+}
+
+func TestConversationBaselineShowsOnlySubsequentTrackedAndUntrackedChanges(t *testing.T) {
+	dir, service := gitFixture(t)
+	tracked := filepath.Join(dir, "tracked.txt")
+	deleted := filepath.Join(dir, "deleted.txt")
+	writeFixture(t, tracked, "committed\n")
+	writeFixture(t, deleted, "remove me\n")
+	gitRun(t, dir, "add", "tracked.txt", "deleted.txt")
+	gitRun(t, dir, "commit", "-m", "fixture")
+
+	writeFixture(t, tracked, "pre-existing\n")
+	writeFixture(t, filepath.Join(dir, "already-untracked.txt"), "before baseline\n")
+	captured, err := service.CaptureBaseline(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer captured.Close()
+
+	writeFixture(t, tracked, "changed during conversation\n")
+	if err := os.Remove(deleted); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, filepath.Join(dir, "new-untracked.txt"), "after baseline\n")
+	diff, err := captured.Diff(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"OBSERVED SINCE THIS CONVERSATION'S BASELINE",
+		"-pre-existing",
+		"+changed during conversation",
+		`"new-untracked.txt"`,
+		"-remove me",
+		"authorship is not inferred",
+	} {
+		if !strings.Contains(diff.Text, want) {
+			t.Errorf("session diff missing %q:\n%s", want, diff.Text)
+		}
+	}
+	if strings.Contains(diff.Text, `"already-untracked.txt"`) {
+		t.Fatalf("baseline untracked path was attributed to the conversation:\n%s", diff.Text)
+	}
+	if err := captured.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captured.Diff(t.Context()); err == nil {
+		t.Fatal("closed baseline remained usable")
+	}
+}
+
+func TestConversationBaselineDoesNotModifyRepositoryIndex(t *testing.T) {
+	dir, service := gitFixture(t)
+	file := filepath.Join(dir, "tracked.txt")
+	writeFixture(t, file, "one\n")
+	gitRun(t, dir, "add", "tracked.txt")
+	gitRun(t, dir, "commit", "-m", "fixture")
+	writeFixture(t, file, "staged\n")
+	gitRun(t, dir, "add", "tracked.txt")
+	indexPath := filepath.Join(dir, ".git", "index")
+	before, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	captured, err := service.CaptureBaseline(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer captured.Close()
+	writeFixture(t, file, "later\n")
+	if _, err := captured.Diff(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	after, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Fatal("baseline capture or diff modified the repository index")
 	}
 }
 

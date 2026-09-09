@@ -447,7 +447,27 @@ test('the real curated prose generates all approved routes using isolated fixtur
   const result = await prepareContent({ ...f, base: '/sodapop/' });
   assert.equal(result.pages.length, 11);
   assert.equal(new Set(result.pages.map(({ file }) => file)).size, 11);
+  assert.equal(result.pages.some(({ source }) => source === 'docs/brand-voice.md'), false);
   const generated = await tree(f.output);
+  const hub = generated['index.md'].toString();
+  assert.match(hub, /^title: "Sodapop docs"$/m);
+  assert.match(hub, /First sip\? Let's get Sodapop running in your project\./);
+  assert.match(hub, /\[download page\]\(\/sodapop\/download\/\)/);
+  const customization = generated['customization.md'].toString();
+  assert.match(customization, /^title: "Customization"$/m);
+  assert.match(customization, /How fizzy are we feeling\? Open `\/theme`/);
+  assert.match(customization, /`\/theme arcade`/);
+  assert.match(customization.replace(/\s+/g, ' '),
+    /Personality changes UI copy and decoration, not the model's capabilities, Copilot access, or tool-approval policy/);
+  assert.match(customization.replace(/\s+/g, ' '),
+    /Color, motion, personality, and the character set are independent choices/);
+  const commands = generated['commands.md'].toString();
+  assert.match(commands, /The good stuff starts with `\/`\./);
+  assert.match(commands, /^## Built-in workflows$/m);
+  assert.match(commands, /^## Conversation, model, and change controls$/m);
+  assert.match(commands, /^## Connect and extend$/m);
+  assert.match(commands, /Ctrl\+J \/ Shift\+Enter \/ Alt\+Enter/);
+  assert.match(commands, /Too many ideas\? Excellent\./);
   assert.match(generated['installation.md'].toString(), /\[download page\]\(\/sodapop\/download\/\)/);
   assert.doesNotMatch(generated['installation.md'].toString(), /\b(?:npm install|brew install)\b/);
   const installation = generated['installation.md'].toString().replace(/\s+/g, ' ');

@@ -207,12 +207,29 @@ func (f *fakeEngine) Close() error {
 }
 
 type fakeWorkspace struct {
-	statusCalls atomic.Int32
-	diffCalls   atomic.Int32
-	status      workspace.Status
-	diff        workspace.Diff
-	err         error
-	mode        string
+	statusCalls   atomic.Int32
+	diffCalls     atomic.Int32
+	baselineCalls atomic.Int32
+	status        workspace.Status
+	diff          workspace.Diff
+	err           error
+	mode          string
+	baseline      workspace.Baseline
+}
+
+type fakeBaseline struct {
+	diff   workspace.Diff
+	err    error
+	closed atomic.Int32
+}
+
+func (f *fakeBaseline) Diff(context.Context) (workspace.Diff, error) {
+	return f.diff, f.err
+}
+
+func (f *fakeBaseline) Close() error {
+	f.closed.Add(1)
+	return nil
 }
 
 func (f *fakeWorkspace) Status(context.Context) (workspace.Status, error) {
@@ -224,6 +241,11 @@ func (f *fakeWorkspace) Diff(_ context.Context, mode string) (workspace.Diff, er
 	f.diffCalls.Add(1)
 	f.mode = mode
 	return f.diff, f.err
+}
+
+func (f *fakeWorkspace) CaptureBaseline(context.Context) (workspace.Baseline, error) {
+	f.baselineCalls.Add(1)
+	return f.baseline, f.err
 }
 
 func testOptions() Options {
@@ -331,6 +353,65 @@ func keyPress(name string) tea.KeyPressMsg {
 	}
 }
 
+func TestConversationBaselinePartialCaptureKeepsStartupUsable(t *testing.T) {
+	options := testOptions()
+	partial := &fakeBaseline{diff: workspace.Diff{
+		IsRepository: true,
+		Truncated:    true,
+		Text:         "PARTIAL BASELINE\n\"large.gif\": file exceeds the 64 KiB snapshot limit",
+	}}
+	w := &fakeWorkspace{baseline: partial}
+	options.Workspace = w
+	m := testModel(t, options)
+	m.composer.SetValue("keep my draft")
+	noticeBefore := m.notice
+	cmd := m.captureBaseline()
+	if w.baselineCalls.Load() != 0 {
+		t.Fatal("baseline capture blocked the UI loop")
+	}
+	runFinite(t, m, cmd)
+	if w.baselineCalls.Load() != 1 || m.baseline != partial || m.notice != noticeBefore ||
+		m.composer.Value() != "keep my draft" {
+		t.Fatal("partial baseline became a startup error or discarded the draft")
+	}
+}
+
+func TestConversationBaselineStaleResultsAreClosed(t *testing.T) {
+	options := testOptions()
+	old := &fakeBaseline{}
+	current := &fakeBaseline{}
+	w := &fakeWorkspace{baseline: old}
+	options.Workspace = w
+	m := testModel(t, options)
+	stale := m.captureBaseline()()
+	w.baseline = current
+	runFinite(t, m, m.captureBaseline())
+	runFinite(t, m, func() tea.Msg { return stale })
+	if m.baseline != current || old.closed.Load() != 1 || current.closed.Load() != 0 || m.notice.error {
+		t.Fatal("stale capture replaced the current baseline or leaked its handle")
+	}
+	replacement := &fakeBaseline{}
+	w.baseline = replacement
+	runFinite(t, m, m.captureBaseline())
+	if m.baseline != replacement || current.closed.Load() != 1 {
+		t.Fatal("replacing a baseline leaked the previous handle")
+	}
+}
+
+func TestConversationBaselineRealFailureRemainsVisible(t *testing.T) {
+	options := testOptions()
+	failed := &fakeBaseline{}
+	options.Workspace = &fakeWorkspace{baseline: failed, err: errors.New("read denied")}
+	m := testModel(t, options)
+	m.composer.SetValue("keep my draft")
+	runFinite(t, m, m.captureBaseline())
+	if m.baseline != nil || failed.closed.Load() != 1 || !m.notice.error ||
+		!strings.Contains(m.notice.text, "Conversation change baseline unavailable: read denied") ||
+		m.composer.Value() != "keep my draft" {
+		t.Fatalf("real failure was hidden or its handle leaked: %#v", m.notice)
+	}
+}
+
 func TestNewAndDiscoveryDoNotCreateSessionOrSend(t *testing.T) {
 	options := testOptions()
 	f := newFakeEngine()
@@ -352,8 +433,8 @@ func TestNewAndDiscoveryDoNotCreateSessionOrSend(t *testing.T) {
 	}
 	start := m.Init()
 	batch, ok := start().(tea.BatchMsg)
-	if !ok || len(batch) != 2 {
-		t.Fatalf("Init should independently discover identity and project, got %#v", batch)
+	if !ok || len(batch) != 3 {
+		t.Fatalf("Init should independently discover identity, project, and change baseline, got %#v", batch)
 	}
 	identity := batch[0]().(identityMsg)
 	connect := m.identityResult(identity)
@@ -399,7 +480,7 @@ func TestModelPickerGroupsAndAppliesContextAndReasoningAtomically(t *testing.T) 
 	view := m.View().Content
 	for _, expected := range []string{
 		"OPENAI", "ANTHROPIC", "GPT-5.6 Luna", "Claude Sonnet 5",
-		"Default · 128K", "Long · 1M", "Medium",
+		"MODEL", "CONTEXT", "THINKING", "Default · 128K", "Medium", "[current]",
 	} {
 		if !strings.Contains(view, expected) {
 			t.Fatalf("model picker omitted %q:\n%s", expected, view)
@@ -417,6 +498,10 @@ func TestModelPickerGroupsAndAppliesContextAndReasoningAtomically(t *testing.T) 
 	draft := m.overlay.modelDrafts["model-a"]
 	if draft.ContextTier != "long_context" || draft.ReasoningEffort != "high" {
 		t.Fatalf("picker did not edit both axes: %+v", draft)
+	}
+	view = m.View().Content
+	if !strings.Contains(view, "Long · 1M") || !strings.Contains(view, "High") {
+		t.Fatalf("picker did not update the selected row inline:\n%s", view)
 	}
 
 	m.handleKey(keyPress("down"))
@@ -444,6 +529,49 @@ func TestModelPickerGroupsAndAppliesContextAndReasoningAtomically(t *testing.T) 
 	m.handleKey(keyPress("esc"))
 	if m.contextTier != "long_context" || m.reasoningEffort != "high" || len(f.setModels) != 1 {
 		t.Fatal("Escape committed a picker draft")
+	}
+}
+
+func TestModelPickerUsesResponsiveColumnsAndPreservesDraftsAcrossResize(t *testing.T) {
+	m, _ := readyModel(t)
+	m.resize(100, 30)
+	m.showModels()
+	wide := m.View()
+	assertBounds(t, wide, 100, 30)
+	for _, want := range []string{"MODEL", "CONTEXT", "THINKING", "GPT-5.6 Luna", "< Default · 128K", "< Medium >"} {
+		if !strings.Contains(wide.Content, want) {
+			t.Fatalf("wide model table omitted %q:\n%s", want, wide.Content)
+		}
+	}
+
+	m.handleKey(keyPress("tab"))
+	m.handleKey(keyPress("right"))
+	draft := m.overlay.modelDrafts["model-a"]
+	m.resize(52, 24)
+	narrow := m.View()
+	assertBounds(t, narrow, 52, 24)
+	for _, want := range []string{"MODEL / CONTEXT / THINKING", "GPT-5.6 Luna", "Context", "Long · 1M", "Thinking", "High"} {
+		if !strings.Contains(narrow.Content, want) {
+			t.Fatalf("stacked model picker omitted %q:\n%s", want, narrow.Content)
+		}
+	}
+	if got := m.overlay.modelDrafts["model-a"]; got != draft {
+		t.Fatalf("resize changed the picker draft: got %+v want %+v", got, draft)
+	}
+}
+
+func TestModelPickerTruncatesLongNamesBeforeConfigurationColumns(t *testing.T) {
+	m, f := readyModel(t)
+	f.models[0].Name = strings.Repeat("Extremely Long Model Name ", 8)
+	m.models = f.models
+	m.resize(80, 24)
+	m.showModels()
+	view := m.View()
+	assertBounds(t, view, 80, 24)
+	for _, want := range []string{"CONTEXT", "THINKING", "Default · 128K", "Medium"} {
+		if !strings.Contains(view.Content, want) {
+			t.Fatalf("long model name displaced %q:\n%s", want, view.Content)
+		}
 	}
 }
 
@@ -507,7 +635,7 @@ func TestCommandParsingLiteralSlashUnknownAndBusyDraftProtection(t *testing.T) {
 func TestPaletteKeyboardCompletionAndComposerNewlines(t *testing.T) {
 	m, _ := readyModel(t)
 	m.handleKey(keyPress("/"))
-	if !m.paletteOpen || len(m.paletteItems) != 13 {
+	if !m.paletteOpen || len(m.paletteItems) != 18 {
 		t.Fatalf("slash palette not driven by all registry commands: %#v", m.paletteItems)
 	}
 	first := m.paletteIndex
@@ -608,14 +736,15 @@ func TestCompactReportsNoOpAndFailureWithoutChangingTranscript(t *testing.T) {
 	}
 }
 
-func TestCompactComposerGrowsAndShiftTabCyclesModes(t *testing.T) {
+func TestCompactComposerGrowsAndShiftTabCyclesChatPlanAutopilot(t *testing.T) {
 	m, f := readyModel(t)
 	m.resize(80, 24)
-	if m.layout.input != 1 || !strings.Contains(m.View().Content, "CHAT / Shift+Tab mode") {
+	if m.layout.input != 1 || !strings.Contains(m.View().Content, "CHAT / Shift+Tab next: plan") {
 		t.Fatalf("composer did not start compact: input=%d", m.layout.input)
 	}
 	m.handleKey(keyPress("shift+tab"))
-	if !m.planning || !strings.HasSuffix(m.composer.Prompt, "plan> ") || !strings.Contains(m.View().Content, "ADVISORY PLAN / Shift+Tab mode") {
+	if !m.planning || m.autopilotEnabled || !strings.HasSuffix(m.composer.Prompt, "plan> ") ||
+		!strings.Contains(m.View().Content, "ADVISORY PLAN / Shift+Tab next: Autopilot") {
 		t.Fatal("Shift+Tab did not switch to visible advisory planning mode")
 	}
 	m.handleKey(keyPress("first line"))
@@ -629,8 +758,13 @@ func TestCompactComposerGrowsAndShiftTabCyclesModes(t *testing.T) {
 		t.Fatalf("send did not preserve mode and collapse composer: input=%d sent=%#v", m.layout.input, f.sent)
 	}
 	m.handleKey(keyPress("shift+tab"))
-	if m.planning || !strings.HasSuffix(m.composer.Prompt, "chat> ") {
-		t.Fatal("second Shift+Tab did not return to chat mode")
+	if m.planning || !m.autopilotEnabled || !strings.HasSuffix(m.composer.Prompt, "auto> ") ||
+		!strings.Contains(m.View().Content, "AUTOPILOT / Shift+Tab next: chat") {
+		t.Fatal("second Shift+Tab did not switch to visible Autopilot mode")
+	}
+	m.handleKey(keyPress("shift+tab"))
+	if m.planning || m.autopilotEnabled || !strings.HasSuffix(m.composer.Prompt, "chat> ") {
+		t.Fatal("third Shift+Tab did not return to chat mode")
 	}
 }
 
@@ -644,6 +778,15 @@ func TestComposerAccentAndBubbleFollowModeAndActivity(t *testing.T) {
 	m.handleKey(keyPress("shift+tab"))
 	if m.composerAccent() != m.color.amber || m.composerAccentApplied != m.color.amber {
 		t.Fatal("plan mode should repaint the composer with the amber accent")
+	}
+	m.handleKey(keyPress("shift+tab"))
+	if m.autopilotAccent() != m.color.magenta || m.autopilotAccent() == m.color.red ||
+		m.composerAccent() != m.autopilotAccent() || m.composerAccentApplied != m.autopilotAccent() {
+		t.Fatal("Autopilot should use the magenta brand accent instead of a danger color")
+	}
+	m.handleKey(keyPress("shift+tab"))
+	if m.planning || m.autopilotEnabled || m.composerAccent() != m.color.cyan {
+		t.Fatal("mode cycle did not return to cyan chat mode")
 	}
 	m.turn = true
 	seen := map[string]bool{}
@@ -765,7 +908,7 @@ func TestAllowOnceAndQuestionChoicesAndFreeText(t *testing.T) {
 	}
 }
 
-func TestAllowAllCommandAndPermissionOption(t *testing.T) {
+func TestAutopilotCommandShortcutAliasAndPermissionOption(t *testing.T) {
 	m, _ := readyModel(t)
 	m.session = engine.Session{ID: "session"}
 	m.turn = true
@@ -781,35 +924,166 @@ func TestAllowAllCommandAndPermissionOption(t *testing.T) {
 		}}
 	}
 
-	m.composer.SetValue("/allow-all")
+	m.composer.SetValue("/autopilot")
 	runFinite(t, m, m.submit())
-	if !m.allowAll {
-		t.Fatal("/allow-all did not enable conversation-wide approval")
+	if !m.autopilotEnabled {
+		t.Fatal("/autopilot did not enable conversation-wide approval")
 	}
 	runFinite(t, m, event(m, permission("automatic")))
 	if allows.Load() != 1 || len(m.requests) != 0 || m.overlay != nil {
-		t.Fatal("allow-all did not approve a permission without a popup")
+		t.Fatal("autopilot did not approve a permission without a popup")
+	}
+	var questionCanceled atomic.Int32
+	runFinite(t, m, event(m, engine.Event{Kind: engine.EventQuestion, Question: &engine.Question{
+		ID: "question", Prompt: "Choose a direction", Cancel: func() error {
+			questionCanceled.Add(1)
+			return nil
+		},
+	}}))
+	if m.overlay == nil || m.overlay.kind != dialogQuestion {
+		t.Fatal("Autopilot answered or hid an agent question")
+	}
+	runFinite(t, m, m.handleKey(keyPress("esc")))
+	if questionCanceled.Load() != 1 {
+		t.Fatal("agent question was not cancelled exactly once")
 	}
 
-	m.composer.SetValue("/allow-all off")
-	runFinite(t, m, m.submit())
+	m.handleKey(keyPress("f2"))
 	runFinite(t, m, event(m, permission("prompted")))
-	if m.allowAll || m.overlay == nil || m.overlay.kind != dialogPermission || len(m.overlay.items) != 3 || m.overlay.items[2].id != "allow-all" {
-		t.Fatal("permission popup did not offer deny, allow once, and allow all")
+	if m.autopilotEnabled || m.overlay == nil || m.overlay.kind != dialogPermission || len(m.overlay.items) != 3 || m.overlay.items[2].id != "autopilot" {
+		t.Fatal("permission popup did not offer deny, allow once, and Autopilot")
 	}
 	runFinite(t, m, m.chooseItem(m.overlay, m.overlay.items[2]))
-	if !m.allowAll || allows.Load() != 2 || len(m.requests) != 0 {
-		t.Fatal("popup allow-all did not approve the request and enable automatic approval")
+	if !m.autopilotEnabled || allows.Load() != 2 || len(m.requests) != 0 {
+		t.Fatal("popup Autopilot did not approve the request and enable automatic approval")
 	}
 
 	runFinite(t, m, event(m, permission("following")))
 	if allows.Load() != 3 || m.overlay != nil {
-		t.Fatal("popup allow-all did not apply to later permissions")
+		t.Fatal("popup Autopilot did not apply to later permissions")
 	}
 	m.resetConversation()
-	if m.allowAll {
-		t.Fatal("allow-all survived a conversation reset")
+	if m.autopilotEnabled {
+		t.Fatal("Autopilot survived a conversation reset")
 	}
+
+	m.composer.SetValue("/allow-all")
+	runFinite(t, m, m.submit())
+	if !m.autopilotEnabled {
+		t.Fatal("legacy /allow-all alias did not enable Autopilot")
+	}
+}
+
+func TestAutopilotOffCommandImmediatelyRestoresPermissionPrompts(t *testing.T) {
+	m, _ := readyModel(t)
+	m.session = engine.Session{ID: "session"}
+	m.turn = true
+	m.setAutopilot(true)
+
+	m.composer.SetValue("/autopilot off")
+	runFinite(t, m, m.submit())
+	if m.autopilotEnabled || !strings.Contains(m.notice.text, "require individual approval") {
+		t.Fatalf("/autopilot off did not restore prompts: enabled=%t notice=%q", m.autopilotEnabled, m.notice.text)
+	}
+
+	var calls, allows atomic.Int32
+	runFinite(t, m, event(m, engine.Event{Kind: engine.EventPermission, Permission: &engine.Permission{
+		ID: "after-off", Kind: "write", Path: "main.go", Respond: func(allow bool) error {
+			calls.Add(1)
+			if allow {
+				allows.Add(1)
+			}
+			return nil
+		},
+	}}))
+	if calls.Load() != 0 || allows.Load() != 0 || m.overlay == nil || m.overlay.kind != dialogPermission {
+		t.Fatal("permission arriving after /autopilot off was not held for an explicit decision")
+	}
+	runFinite(t, m, m.handleKey(keyPress("esc")))
+	if calls.Load() != 1 || allows.Load() != 0 {
+		t.Fatal("denied permission after /autopilot off was not resolved exactly once")
+	}
+}
+
+func TestPlanAndAutopilotCommandsSelectMutuallyExclusiveModes(t *testing.T) {
+	m, _ := readyModel(t)
+	m.setAutopilot(true)
+
+	m.composer.SetValue("/plan")
+	runFinite(t, m, m.submit())
+	if !m.planning || m.autopilotEnabled || !strings.HasSuffix(m.composer.Prompt, "plan> ") {
+		t.Fatal("/plan did not leave Autopilot and select Plan mode")
+	}
+
+	m.composer.SetValue("/autopilot")
+	runFinite(t, m, m.submit())
+	if m.planning || !m.autopilotEnabled || !strings.HasSuffix(m.composer.Prompt, "auto> ") {
+		t.Fatal("/autopilot did not leave Plan and select Autopilot mode")
+	}
+}
+
+func TestF2EnablesAutopilotForQueuedPermissionsButPreservesQuestions(t *testing.T) {
+	m, _ := readyModel(t)
+	m.session = engine.Session{ID: "session"}
+	m.turn = true
+	var allowed, questionCanceled atomic.Int32
+
+	runFinite(t, m, event(m, engine.Event{Kind: engine.EventPermission, Permission: &engine.Permission{
+		ID: "queued-permission", Kind: "shell", Command: "go test ./...", Respond: func(allow bool) error {
+			if allow {
+				allowed.Add(1)
+			}
+			return nil
+		},
+	}}))
+	runFinite(t, m, event(m, engine.Event{Kind: engine.EventQuestion, Question: &engine.Question{
+		ID: "queued-question", Prompt: "Which option?", Cancel: func() error {
+			questionCanceled.Add(1)
+			return nil
+		},
+	}}))
+	if len(m.requests) != 2 || m.overlay == nil || m.overlay.kind != dialogPermission {
+		t.Fatal("permission and question were not queued in arrival order")
+	}
+
+	runFinite(t, m, m.handleKey(keyPress("f2")))
+	if !m.autopilotEnabled || allowed.Load() != 1 || questionCanceled.Load() != 0 ||
+		len(m.requests) != 1 || m.overlay == nil || m.overlay.kind != dialogQuestion {
+		t.Fatal("F2 did not approve queued permissions while preserving the queued question")
+	}
+	runFinite(t, m, m.handleKey(keyPress("esc")))
+	if questionCanceled.Load() != 1 {
+		t.Fatal("preserved question was not cancelled exactly once")
+	}
+}
+
+func TestF2DoesNotToggleAutopilotBehindNonPermissionDialogs(t *testing.T) {
+	m, _ := readyModel(t)
+	m.runLocal("help")
+	if m.overlay == nil || m.overlay.kind != dialogHelp {
+		t.Fatal("help dialog did not open")
+	}
+	dialogID := m.overlay.id
+	m.handleKey(keyPress("f2"))
+	if m.autopilotEnabled || m.overlay == nil || m.overlay.id != dialogID || m.overlay.kind != dialogHelp {
+		t.Fatal("F2 changed Autopilot or replaced a non-permission dialog")
+	}
+}
+
+func TestResumeTurnsOffConversationScopedAutopilot(t *testing.T) {
+	m, _ := readyModel(t)
+	m.setAutopilot(true)
+	m.operation = operation{id: 7, kind: "resuming conversation"}
+	cmd := m.sessionResult(sessionMsg{
+		generation: m.engineGeneration,
+		operation:  7,
+		kind:       "resume",
+		session:    engine.Session{ID: "resumed", Project: m.opts.Project},
+	})
+	if m.autopilotEnabled {
+		t.Fatal("Autopilot survived a successful conversation resume")
+	}
+	runFinite(t, m, cmd)
 }
 
 func TestShutdownOwnsPermissionBeforeUpdateReceivesIt(t *testing.T) {
@@ -869,7 +1143,7 @@ func TestClearIsLazyAndDraftIsExplicitlyProtected(t *testing.T) {
 	m.session = engine.Session{ID: "old"}
 	m.entries = append(m.entries, &entry{id: "old", role: "assistant", raw: "history", final: true})
 	m.planning = true
-	m.allowAll = true
+	m.autopilotEnabled = true
 	m.composer.SetValue("unfinished thought")
 	m.runLocal("clear")
 	if m.overlay == nil || m.overlay.kind != dialogConfirm || m.session.ID != "old" {
@@ -880,8 +1154,8 @@ func TestClearIsLazyAndDraftIsExplicitlyProtected(t *testing.T) {
 	if m.session.ID != "" || len(m.entries) != 0 || len(f.newModels) != 0 || m.composer.Value() != "unfinished thought" {
 		t.Fatal("clear deleted a draft or eagerly created a session")
 	}
-	if m.planning || m.allowAll {
-		t.Fatal("clear retained conversation-scoped planning or allow-all state")
+	if m.planning || m.autopilotEnabled {
+		t.Fatal("clear retained conversation-scoped planning or Autopilot state")
 	}
 
 	m.session = engine.Session{ID: "second"}

@@ -16,6 +16,7 @@ import (
 	"github.com/VeVarunSharma/sodapop/internal/auth"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
+	"github.com/VeVarunSharma/sodapop/internal/skills"
 	"github.com/VeVarunSharma/sodapop/internal/workspace"
 )
 
@@ -28,11 +29,14 @@ type dialogKind uint8
 const (
 	dialogHelp dialogKind = iota + 1
 	dialogActions
+	dialogVending
 	dialogAccount
 	dialogLogin
 	dialogModels
 	dialogSessions
 	dialogThemes
+	dialogMCP
+	dialogSkills
 	dialogDiff
 	dialogPermission
 	dialogQuestion
@@ -43,6 +47,33 @@ type menuItem struct {
 	id, label, detail string
 	group             string
 	disabled          bool
+}
+
+type baselineMsg struct {
+	generation uint64
+	baseline   workspace.Baseline
+	err        error
+}
+
+type mcpLoadedMsg struct {
+	generation uint64
+	accountID  string
+	registry   config.MCPRegistry
+	err        error
+}
+
+type mcpSavedMsg struct {
+	generation uint64
+	accountID  string
+	previous   config.MCPRegistry
+	err        error
+}
+
+type skillsMsg struct {
+	generation uint64
+	action     string
+	state      skills.State
+	err        error
 }
 
 type dialog struct {
@@ -61,6 +92,18 @@ type dialog struct {
 	cacheBody   string
 	cacheWidth  int
 	modelDrafts map[string]engine.ModelSelection
+}
+
+func (m *Model) captureBaseline() tea.Cmd {
+	if m.opts.Workspace == nil {
+		return nil
+	}
+	m.baselineGeneration++
+	service, ctx, generation := m.opts.Workspace, m.life.ctx, m.baselineGeneration
+	return func() tea.Msg {
+		baseline, err := service.CaptureBaseline(ctx)
+		return baselineMsg{generation: generation, baseline: baseline, err: err}
+	}
 }
 
 type notice struct {
@@ -91,82 +134,94 @@ type Model struct {
 	prefs config.Preferences
 	color palette
 
-	width, height int
-	layout        geometry
-	composer      textarea.Model
-	answerInput   textarea.Model
-	timeline      viewport.Model
-	sidebar       viewport.Model
-	follow        bool
-	sidebarFocus  bool
-	sidebarCache  string
-	sidebarWidth  int
-	mcpServers    []Capability
-	skills        []Capability
-	toolFocus     bool
-	selectedTool  int
-	entries       []*entry
-	messages      map[string]*entry
-	tools         map[string]*entry
-	seenEvents    map[string]bool
-	retired       map[string]bool
-	entrySequence uint64
-	renderer      *glamour.TermRenderer
-	renderWidth   int
-	appearance    uint64
-	renderPending bool
-	renderDirty   bool
-	renderCount   uint64
+	width, height   int
+	layout          geometry
+	composer        textarea.Model
+	answerInput     textarea.Model
+	timeline        viewport.Model
+	sidebar         viewport.Model
+	follow          bool
+	sidebarFocus    bool
+	sidebarCache    string
+	sidebarWidth    int
+	mcpServers      []Capability
+	mcpRegistry     config.MCPRegistry
+	mcpGeneration   uint64
+	mcpSaving       bool
+	skills          []Capability
+	skillState      skills.State
+	skillGeneration uint64
+	toolFocus       bool
+	selectedTool    int
+	entries         []*entry
+	messages        map[string]*entry
+	tools           map[string]*entry
+	seenEvents      map[string]bool
+	retired         map[string]bool
+	entrySequence   uint64
+	renderer        *glamour.TermRenderer
+	renderWidth     int
+	appearance      uint64
+	renderPending   bool
+	renderDirty     bool
+	renderCount     uint64
 
-	account           auth.Account
-	accountOwner      string
-	authGeneration    uint64
-	identityLoading   bool
-	identityCancel    context.CancelFunc
-	loggingIn         bool
-	loginCancel       context.CancelFunc
-	loginContext      context.Context
-	deviceCode        auth.DeviceCode
-	authError         error
-	signOutWarning    string
-	engineGeneration  uint64
-	lease             *engineLease
-	connecting        bool
-	connectCancel     context.CancelFunc
-	connectionError   error
-	models            []engine.Model
-	model             string
-	contextTier       string
-	reasoningEffort   string
-	session           engine.Session
-	sessionGeneration uint64
-	needsResume       bool
-	reconnectID       string
-	operation         operation
-	operationSequence uint64
-	sessionBuffer     []eventEnvelope
-	turn              bool
-	turnSequence      uint64
-	lastIdleTurn      uint64
-	turnCancel        context.CancelFunc
-	turnContext       context.Context
-	sendPending       bool
-	needsAbort        bool
-	canceling         bool
-	abortAcknowledged bool
-	abortBarrierSeen  bool
-	abortSessionID    string
-	submitted         string
-	pendingPrompt     *engine.Message
-	localUser         *entry
-	streamKey         string
-	planning          bool
-	allowAll          bool
-	usage             string
-	contextSequence   uint64
-	contextCancel     context.CancelFunc
-	status            workspace.Status
-	statusGeneration  uint64
+	account             auth.Account
+	accountOwner        string
+	authGeneration      uint64
+	identityLoading     bool
+	identityCancel      context.CancelFunc
+	loggingIn           bool
+	loginCancel         context.CancelFunc
+	loginContext        context.Context
+	deviceCode          auth.DeviceCode
+	authError           error
+	signOutWarning      string
+	engineGeneration    uint64
+	lease               *engineLease
+	connecting          bool
+	connectCancel       context.CancelFunc
+	connectProbe        *connectionProbe
+	connectTimeout      time.Duration
+	connectionError     error
+	access              accessFailure
+	accessRecovery      accessRecovery
+	accountLinkSequence uint64
+	models              []engine.Model
+	model               string
+	contextTier         string
+	reasoningEffort     string
+	session             engine.Session
+	sessionGeneration   uint64
+	needsResume         bool
+	reconnectID         string
+	operation           operation
+	operationSequence   uint64
+	sessionBuffer       []eventEnvelope
+	turn                bool
+	turnSequence        uint64
+	lastIdleTurn        uint64
+	turnCancel          context.CancelFunc
+	turnContext         context.Context
+	sendPending         bool
+	needsAbort          bool
+	canceling           bool
+	abortAcknowledged   bool
+	abortBarrierSeen    bool
+	abortSessionID      string
+	submitted           string
+	pendingPrompt       *engine.Message
+	localUser           *entry
+	streamKey           string
+	planning            bool
+	autopilotEnabled    bool
+	usage               string
+	contextSequence     uint64
+	contextCancel       context.CancelFunc
+	status              workspace.Status
+	statusGeneration    uint64
+	baseline            workspace.Baseline
+	baselineGeneration  uint64
 
 	overlay               *dialog
 	behindDecision        *dialog
@@ -224,9 +279,11 @@ func New(opts Options) *Model {
 		seenEvents: make(map[string]bool), retired: make(map[string]bool),
 		seenRequests:    make(map[string]bool),
 		identityLoading: true, authGeneration: 1,
-		openBrowser: openVerificationURL,
-		now:         time.Now,
+		openBrowser:    openVerificationURL,
+		now:            time.Now,
+		connectTimeout: accessCheckTimeout,
 	}
+	m.mcpRegistry = config.DefaultMCPRegistry()
 	m.mcpServers = append([]Capability(nil), opts.MCPServers...)
 	m.skills = append([]Capability(nil), opts.Skills...)
 	m.composer.Placeholder = "What are we building?  / for commands"
@@ -258,13 +315,20 @@ func newComposer() textarea.Model {
 }
 
 func (m *Model) Init() tea.Cmd {
-	return tea.Batch(m.loadIdentity(), m.refreshStatus(), m.ensureMotion())
+	return tea.Batch(m.loadIdentity(), m.loadSkills(), m.refreshStatus(), m.captureBaseline(), m.ensureMotion())
 }
 
 // Shutdown is safe to call more than once, including after a failed Run. It
 // cancels owned contexts, releases consent responders, and closes every engine
 // adopted by asynchronous startup, even when its result was never displayed.
-func (m *Model) Shutdown() error { return m.life.shutdown() }
+func (m *Model) Shutdown() error {
+	var err error
+	if m.baseline != nil {
+		err = m.baseline.Close()
+		m.baseline = nil
+	}
+	return errors.Join(err, m.life.shutdown())
+}
 
 type identityMsg struct {
 	generation uint64
@@ -368,6 +432,15 @@ type diffMsg struct {
 	dialog uint64
 	diff   workspace.Diff
 	err    error
+}
+
+type tasteTestPreparedMsg struct {
+	generation, session, operation uint64
+	draft, focus                   string
+	diff                           workspace.Diff
+	missingBaseline                bool
+	clearDraft                     bool
+	err                            error
 }
 
 type preferenceMsg struct {
@@ -520,7 +593,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.generation == m.engineGeneration && msg.operation == m.operation.id {
 			m.finishOperation()
 			if msg.err != nil {
-				m.report(m.recoveryCopy("Model switch failed: "+msg.err.Error()), true)
+				m.report(m.recoveryCopy("Model switch failed: "+m.accessErrorText(msg.err, nil)), true)
 				cmd = m.startMoment(reactionRecovery)
 			} else {
 				m.applySelection(msg.selection)
@@ -535,7 +608,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.generation == m.engineGeneration && msg.operation == m.operation.id {
 			m.finishOperation()
 			if msg.err != nil {
-				m.report(m.recoveryCopy("Compaction failed: "+msg.err.Error()+". The visible transcript was kept."), true)
+				m.report(m.recoveryCopy("Compaction failed: "+m.accessErrorText(msg.err, nil)+". The visible transcript was kept."), true)
 				cmd = m.startMoment(reactionRecovery)
 			} else {
 				m.report(compactionNotice(msg.result), false)
@@ -583,6 +656,32 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case diffMsg:
 		m.diffResult(msg)
+	case tasteTestPreparedMsg:
+		cmd = m.tasteTestPrepared(msg)
+	case baselineMsg:
+		if msg.generation != m.baselineGeneration {
+			if msg.baseline != nil {
+				_ = msg.baseline.Close()
+			}
+			break
+		}
+		if msg.err != nil {
+			if msg.baseline != nil {
+				_ = msg.baseline.Close()
+			}
+			m.report("Conversation change baseline unavailable: "+msg.err.Error(), true)
+			break
+		}
+		if m.baseline != nil {
+			_ = m.baseline.Close()
+		}
+		m.baseline = msg.baseline
+	case mcpLoadedMsg:
+		m.mcpLoadResult(msg)
+	case mcpSavedMsg:
+		cmd = m.mcpSaveResult(msg)
+	case skillsMsg:
+		cmd = m.skillsResult(msg)
 	case preferenceMsg:
 		m.savingPrefs = false
 		if msg.err != nil {
@@ -619,6 +718,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.report("Browser opened. Finish authorization there, then return to Sodapop.", false)
 		}
+	case accountLinkMsg:
+		m.accountLinkResult(msg)
 	case shutdownMsg:
 		if msg.err != nil {
 			m.notice = notice{text: "Shutdown: " + safeText(msg.err.Error()), error: true}
@@ -718,12 +819,21 @@ func (m *Model) ready() bool {
 		m.report("Sign in to GitHub first with /login. /help and /theme work without an account.", true)
 		return false
 	}
-	if m.lease == nil {
+	if m.connecting {
+		m.report("Still connecting to Copilot. Your draft is kept.", false)
+		return false
+	}
+	if _, blocked := m.currentAccessIssue(); blocked {
+		m.notifyAccessFailure()
+		return false
+	}
+	if m.lease == nil || m.lease.ctx.Err() != nil {
 		m.report("Copilot is not connected. Use /login to reconnect; signing in and Copilot access are separate.", true)
 		return false
 	}
-	if m.connecting {
-		m.report("Still connecting to Copilot. Your draft is kept.", false)
+	if len(m.models) == 0 {
+		m.recordAccessFailure(engine.ErrNoModels, nil, true)
+		m.notifyAccessFailure()
 		return false
 	}
 	return true
@@ -761,6 +871,9 @@ func (m *Model) operationLabel() string {
 		return "stopping"
 	case m.needsAbort:
 		return "unresolved turn / Ctrl+C"
+	case m.accessBlocked():
+		issue, _ := m.currentAccessIssue()
+		return accessTitle(issue)
 	case len(m.requests) > 0:
 		return "needs your answer"
 	case m.operation.kind != "":

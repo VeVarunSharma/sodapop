@@ -1,5 +1,7 @@
 package workspace
 
+import "context"
+
 type Entry struct {
 	Path         string
 	OriginalPath string
@@ -16,5 +18,11 @@ type Status struct {
 type Diff struct {
 	Text         string
 	IsRepository bool
-	Truncated    bool
+	// Truncated also marks incomplete coverage from a partial conversation baseline.
+	Truncated bool
+}
+
+type Baseline interface {
+	Diff(context.Context) (Diff, error)
+	Close() error
 }

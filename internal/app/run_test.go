@@ -14,8 +14,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/VeVarunSharma/sodapop/internal/auth"
+	"github.com/VeVarunSharma/sodapop/internal/commands"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
+	"github.com/VeVarunSharma/sodapop/internal/skills"
 	"github.com/VeVarunSharma/sodapop/internal/ui"
 	"github.com/VeVarunSharma/sodapop/internal/workspace"
 )
@@ -40,9 +42,15 @@ func TestInformationFlagsDoNotNeedTerminalOrIdentity(t *testing.T) {
 			} else if !strings.HasPrefix(output.String(), "sodapop "+Version+"\n") {
 				t.Fatalf("version did not identify the executable: %q", output.String())
 			}
-			if (arg == "--help" || arg == "-h") && (!strings.Contains(output.String(), "/clear") ||
-				!strings.Contains(output.String(), "/compact") || strings.Contains(output.String(), "/new")) {
-				t.Fatalf("help did not advertise the current commands: %q", output.String())
+			if arg == "--help" || arg == "-h" {
+				for _, command := range commands.All() {
+					if !strings.Contains(output.String(), "/"+command.Name) {
+						t.Fatalf("help omitted /%s: %q", command.Name, output.String())
+					}
+				}
+				if strings.Contains(output.String(), "/new") {
+					t.Fatalf("help advertised a retired command: %q", output.String())
+				}
 			}
 		})
 	}
@@ -134,7 +142,7 @@ func TestInteractiveRunWiresOptionsAndDoesNotPersistTemporaryOverrides(t *testin
 	if state.authClientID != "environment-client" {
 		t.Fatalf("client ID = %q", state.authClientID)
 	}
-	if state.options.Project != "/canonical/project" || state.options.Version != Version ||
+	if state.options.Project != state.project || state.options.Version != Version ||
 		!state.options.Preferences.NoColor || !state.options.Preferences.ReducedMotion || !state.options.Preferences.ASCII {
 		t.Fatalf("unexpected UI options: %+v", state.options)
 	}
@@ -153,6 +161,11 @@ func TestInteractiveRunWiresOptionsAndDoesNotPersistTemporaryOverrides(t *testin
 
 func TestInteractiveRunBuildsAccountBoundEngine(t *testing.T) {
 	deps, state := testRunDependencies(t)
+	t.Setenv("MCP_TOKEN", "secret-value")
+	state.mcpRegistry = config.MCPRegistry{Version: 1, Servers: []config.MCPServer{
+		{Name: "filesystem", Command: "mcp-server", Args: []string{"."}, Env: []string{"MCP_TOKEN"}, Enabled: true},
+		{Name: "disabled", Command: "disabled-server", Enabled: false},
+	}}
 	backend := newTestEngine()
 	deps.newEngine = func(cfg engine.Config) (engine.Engine, error) {
 		state.engineConfig = cfg
@@ -161,18 +174,64 @@ func TestInteractiveRunBuildsAccountBoundEngine(t *testing.T) {
 	if err := run(context.Background(), nil, state.input, state.output, deps); err != nil {
 		t.Fatal(err)
 	}
+	skillRoot := t.TempDir()
+	manifest := "---\nname: app-skill\ndescription: App wiring fixture\n---\n"
+	if err := os.WriteFile(filepath.Join(skillRoot, "SKILL.md"), []byte(manifest), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, action := range []skills.Action{
+		{Operation: "trust", Value: skillRoot},
+		{Operation: "install", Value: skillRoot},
+		{Operation: "enable", Value: "app-skill"},
+	} {
+		if _, err := state.options.ManageSkills(context.Background(), action); err != nil {
+			t.Fatal(err)
+		}
+	}
 	got, err := state.options.NewEngine(context.Background(), auth.Account{ID: "account-a"})
 	if err != nil || got != backend || backend.starts != 1 {
 		t.Fatalf("engine result = %#v, starts=%d, err=%v", got, backend.starts, err)
 	}
-	if state.engineConfig.AccountID != "account-a" || state.engineConfig.Project != "/canonical/project" ||
+	if state.engineConfig.AccountID != "account-a" || state.engineConfig.Project != state.project ||
 		filepath.Dir(state.engineConfig.Home) != filepath.Join(state.paths.StateDir, "copilot") ||
 		strings.Contains(state.engineConfig.Home, "account-a") {
 		t.Fatalf("engine config = %+v", state.engineConfig)
 	}
+	if len(state.engineConfig.MCPServers) != 1 || state.engineConfig.MCPServers[0].Name != "filesystem" ||
+		state.engineConfig.MCPServers[0].Env["MCP_TOKEN"] != "secret-value" {
+		t.Fatalf("MCP engine config = %+v", state.engineConfig.MCPServers)
+	}
+	if len(state.engineConfig.ActiveSkillDigests) != 1 {
+		t.Fatalf("active skills = %+v", state.engineConfig.ActiveSkillDigests)
+	}
+	foundSkill := false
+	for _, configured := range state.engineConfig.Skills {
+		if configured.Name == "app-skill" && configured.Digest == state.engineConfig.ActiveSkillDigests[0] {
+			foundSkill = true
+		}
+	}
+	if !foundSkill {
+		t.Fatalf("skill engine config = %+v", state.engineConfig.Skills)
+	}
 	token, err := state.engineConfig.TokenSource(context.Background())
 	if err != nil || token != "token-for-account-a" || state.authTokenAccount != "account-a" {
 		t.Fatalf("bound token = %q, account=%q, err=%v", token, state.authTokenAccount, err)
+	}
+}
+
+func TestResolveMCPServersRequiresReferencedEnvironment(t *testing.T) {
+	registry := config.MCPRegistry{Version: 1, Servers: []config.MCPServer{{
+		Name: "server", Command: "mcp-server", Env: []string{"SODAPOP_TEST_MISSING_MCP_ENV"}, Enabled: true,
+	}}}
+	t.Setenv("SODAPOP_TEST_MISSING_MCP_ENV", "")
+	if _, err := resolveMCPServers(registry); err != nil {
+		t.Fatalf("present empty environment value was rejected: %v", err)
+	}
+	if err := os.Unsetenv("SODAPOP_TEST_MISSING_MCP_ENV"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := resolveMCPServers(registry); err == nil {
+		t.Fatal("missing referenced environment variable was accepted")
 	}
 }
 
@@ -252,8 +311,10 @@ type runTestState struct {
 	authClientID     string
 	authTokenAccount string
 	saved            config.Preferences
+	mcpRegistry      config.MCPRegistry
 	engineConfig     engine.Config
 	paths            config.Paths
+	project          string
 }
 
 func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
@@ -273,6 +334,8 @@ func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
 	state := &runTestState{input: input, output: output, model: &testApplicationModel{}}
 	paths := config.Paths{ConfigFile: filepath.Join(t.TempDir(), "config.json"), StateDir: filepath.Join(t.TempDir(), "state")}
 	state.paths = paths
+	project, canonicalProject := t.TempDir(), t.TempDir()
+	state.project = canonicalProject
 	deps := defaultRunDependencies()
 	deps.isTerminal = func(uintptr) bool { return true }
 	deps.resolvePaths = func() (config.Paths, error) { return paths, nil }
@@ -281,8 +344,14 @@ func testRunDependencies(t *testing.T) (runDependencies, *runTestState) {
 		state.saved = prefs
 		return nil
 	}
-	deps.getwd = func() (string, error) { return "/project", nil }
-	deps.evalSymlinks = func(string) (string, error) { return "/canonical/project", nil }
+	state.mcpRegistry = config.DefaultMCPRegistry()
+	deps.loadMCP = func(string) (config.MCPRegistry, error) { return state.mcpRegistry, nil }
+	deps.saveMCP = func(_ string, registry config.MCPRegistry) error {
+		state.mcpRegistry = registry
+		return nil
+	}
+	deps.getwd = func() (string, error) { return project, nil }
+	deps.evalSymlinks = func(string) (string, error) { return canonicalProject, nil }
 	deps.newWorkspace = func(string) (ui.Workspace, error) { return testWorkspace{}, nil }
 	deps.newAuth = func(clientID string) applicationAuth {
 		state.authClientID = clientID
@@ -329,6 +398,10 @@ func (testWorkspace) Status(context.Context) (workspace.Status, error) {
 }
 func (testWorkspace) Diff(context.Context, string) (workspace.Diff, error) {
 	return workspace.Diff{}, nil
+}
+
+func (testWorkspace) CaptureBaseline(context.Context) (workspace.Baseline, error) {
+	return nil, nil
 }
 
 type testEngine struct {

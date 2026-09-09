@@ -49,7 +49,7 @@ class Sodapop < Formula
 
     help = shell_output("#{bin}/sodapop --help")
     assert_includes help, "Usage: sodapop [options]"
-    assert_includes help, "Commands: /help /login /logout /model /clear /resume /compact /plan /diff /theme /exit"
+    assert_includes help, "Commands: /help /login /logout /model /clear /resume /context /compact /plan /fizz /taste-test /vending-machine /autopilot /mcp /skill /diff /theme /exit"
     assert_includes help, "-check-runtime"
     assert_includes help, "-version"
     assert_includes help, "-help"

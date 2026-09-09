@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: native-candidates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   SODAPOP_LIVE_QUALIFY: '0'
   SODAPOP_RUNTIME_SMOKE: '0'
@@ -55,13 +59,16 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - name: Bundle the pinned runtime once
+        shell: bash
+        run: bash scripts/bundle.sh
       - name: Build two real candidate versions for upgrade tests
         shell: bash
         run: |
           mkdir -p candidates/previous candidates/current
           for revision in 1 2; do
             version="0.0.${revision}"
-            SODAPOP_VERSION="$version" bash scripts/package.sh
+            SODAPOP_VERSION="$version" SODAPOP_PREPARED_RUNTIME=1 bash scripts/package.sh
             channel=previous
             if [[ "$revision" == 2 ]]; then channel=current; fi
             name="sodapop-${version}-${SODAPOP_TARGET%/*}-${SODAPOP_TARGET#*/}"
@@ -91,3 +98,6 @@ jobs:
       previous_artifact_pattern: sodapop-previous-*
       previous_version: 0.0.1
       commit: ${{ github.sha }}
+      targeted_artifacts: true
+      current_artifact_prefix: sodapop-current-
+      previous_artifact_prefix: sodapop-previous-

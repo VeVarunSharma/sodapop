@@ -15,7 +15,7 @@
       "source": null,
       "route": "/docs/",
       "title": "Sodapop docs",
-      "description": "Get started, make the terminal your own, and understand how Sodapop works.",
+      "description": "First sip? Find your setup steps, learn the commands, and choose your level of fizz.",
       "section": "Start here",
       "sidebar": { "label": "Welcome", "order": 1 }
     },
@@ -23,7 +23,7 @@
       "source": "docs/getting-started.md",
       "route": "/docs/getting-started/",
       "title": "Getting started",
-      "description": "Open a project, sign in inside Sodapop, and try one focused request.",
+      "description": "Open your project, sign in, and give Sodapop one small task to start with.",
       "section": "Start here",
       "sidebar": { "label": "Getting started", "order": 2 }
     },
@@ -31,7 +31,7 @@
       "source": "docs/installation.md",
       "route": "/docs/installation/",
       "title": "Installation",
-      "description": "Find current installation availability and choose the right native platform.",
+      "description": "Get Sodapop onto your machine, starting with current downloads and platform support.",
       "section": "Start here",
       "sidebar": { "label": "Installation", "order": 3 }
     },
@@ -39,7 +39,7 @@
       "source": "docs/commands.md",
       "route": "/docs/commands/",
       "title": "Commands and shortcuts",
-      "description": "Discover slash commands, conversation controls, and keyboard navigation.",
+      "description": "Start with / to find commands, browse built-in workflows, connect extensions, and navigate your terminal.",
       "section": "Make it yours",
       "sidebar": { "label": "Commands and shortcuts", "order": 4 }
     },
@@ -47,7 +47,7 @@
       "source": "docs/customization.md",
       "route": "/docs/customization/",
       "title": "Customization",
-      "description": "Choose themes, personality, motion, and accessible terminal options.",
+      "description": "How fizzy are we feeling? Choose themes, personality, motion, and terminal options.",
       "section": "Make it yours",
       "sidebar": { "label": "Customization", "order": 5 }
     },
@@ -63,7 +63,7 @@
       "source": "docs/troubleshooting.md",
       "route": "/docs/troubleshooting/",
       "title": "Troubleshooting",
-      "description": "Resolve installation, sign-in, secure-store, runtime, and display problems.",
+      "description": "Find what got stuck and work through installation, sign-in, runtime, or display problems.",
       "section": "Make it yours",
       "sidebar": { "label": "Troubleshooting", "order": 7 }
     },

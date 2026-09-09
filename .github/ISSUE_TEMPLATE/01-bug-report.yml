@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a problem with Sodapop.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please search [existing issues](https://github.com/VeVarunSharma/sodapop/issues) first.
+
+        Redact tokens, device codes, personal paths, and confidential source or conversations.
+        Do not attach environment files, whole state directories, credential-store dumps, or raw OAuth responses.
+        Do not post security-sensitive vulnerability details in public issues.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the exact error, if there is one.
+      placeholder: |
+        Actual behavior:
+
+        Expected behavior:
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps or circumstances
+      description: Share a minimal example or commands. If it is intermittent, describe when it happens.
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Use `sodapop --version` for the Sodapop, SDK, and runtime versions.
+        "Unavailable" or "unknown" is fine if startup or installation fails.
+        Do not sign in, sign out, or delete state just to fill out this form.
+      placeholder: |
+        Sodapop / SDK / runtime versions:
+        OS and architecture:
+        Terminal:
+        Installation method:
+        Signed out or connected (if known):
+        Model (if relevant):
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Supporting context
+      description: Optional screenshots, short redacted logs, or related issues. You can attach files here.
+    validations:
+      required: false

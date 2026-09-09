@@ -1,0 +1,7 @@
+---
+import DefaultMarkdownContent from '@astrojs/starlight/components/MarkdownContent.astro';
+import { focusableTables } from '../../lib/docs-tables.mjs';
+
+const content = focusableTables(await Astro.slots.render('default'));
+---
+<DefaultMarkdownContent><Fragment set:html={content} /></DefaultMarkdownContent>

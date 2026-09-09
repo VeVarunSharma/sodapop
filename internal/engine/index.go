@@ -32,13 +32,15 @@ type sessionRecord struct {
 	Model            string    `json:"model"`
 	ContextTier      string    `json:"contextTier"`
 	ReasoningEffort  string    `json:"reasoningEffort,omitempty"`
+	SkillDigests     []string  `json:"skillDigests,omitempty"`
 	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
 func (r sessionRecord) session() Session {
 	return Session{
 		ID: r.ID, Title: r.Title, Project: r.CanonicalProject, Model: r.Model,
-		ContextTier: r.ContextTier, ReasoningEffort: r.ReasoningEffort, UpdatedAt: r.UpdatedAt,
+		ContextTier: r.ContextTier, ReasoningEffort: r.ReasoningEffort,
+		SkillDigests: append([]string(nil), r.SkillDigests...), UpdatedAt: r.UpdatedAt,
 	}
 }
 
@@ -87,7 +89,7 @@ func (s *sessionIndex) transaction(ctx context.Context, change func(*indexDocume
 		return err
 	}
 	defer func() { err = errors.Join(err, lock.Close()) }()
-	document := indexDocument{Version: 2, Sessions: []sessionRecord{}}
+	document := indexDocument{Version: 3, Sessions: []sessionRecord{}}
 	file, err := root.Open(indexFilename)
 	if err == nil {
 		private, statErr := securefs.IsPrivateRegularFile(file)
@@ -113,8 +115,10 @@ func (s *sessionIndex) transaction(ctx context.Context, change func(*indexDocume
 		for i := range document.Sessions {
 			document.Sessions[i].ContextTier = "default"
 		}
-		document.Version = 2
-	} else if document.Version != 2 {
+		document.Version = 3
+	} else if document.Version == 2 {
+		document.Version = 3
+	} else if document.Version != 3 {
 		return errors.New("unsupported Sodapop session index version")
 	}
 	seen := make(map[string]bool)
@@ -125,6 +129,9 @@ func (s *sessionIndex) transaction(ctx context.Context, change func(*indexDocume
 			record.ContextTier != "default" && record.ContextTier != "long_context" ||
 			!validReasoningEffort(record.ReasoningEffort) {
 			return errors.New("invalid or duplicate record in Sodapop session index")
+		}
+		if !validSkillDigests(record.SkillDigests) {
+			return errors.New("invalid skill digest in Sodapop session index")
 		}
 		seen[record.ID] = true
 	}
@@ -219,13 +226,14 @@ func (s *sessionIndex) save(ctx context.Context, session Session) error {
 	if !validSessionID(session.ID) || session.Project != s.project ||
 		strings.TrimSpace(session.Title) == "" || session.UpdatedAt.IsZero() || validateModelID(session.Model) != nil ||
 		session.ContextTier != "default" && session.ContextTier != "long_context" ||
-		!validReasoningEffort(session.ReasoningEffort) {
+		!validReasoningEffort(session.ReasoningEffort) || !validSkillDigests(session.SkillDigests) {
 		return errors.New("refusing to store invalid or out-of-scope Sodapop session metadata")
 	}
 	record := sessionRecord{
 		ID: session.ID, Title: session.Title, CanonicalProject: s.project,
 		Account: s.account, Model: session.Model, ContextTier: session.ContextTier,
-		ReasoningEffort: session.ReasoningEffort, UpdatedAt: session.UpdatedAt,
+		ReasoningEffort: session.ReasoningEffort,
+		SkillDigests:    append([]string(nil), session.SkillDigests...), UpdatedAt: session.UpdatedAt,
 	}
 	return s.transaction(ctx, func(document *indexDocument) error {
 		for i, previous := range document.Sessions {
@@ -240,4 +248,18 @@ func (s *sessionIndex) save(ctx context.Context, session Session) error {
 		document.Sessions = append(document.Sessions, record)
 		return nil
 	}, true)
+}
+
+func validSkillDigests(digests []string) bool {
+	seen := make(map[string]bool, len(digests))
+	for _, digest := range digests {
+		if len(digest) != 64 || strings.ToLower(digest) != digest || seen[digest] {
+			return false
+		}
+		if _, err := hex.DecodeString(digest); err != nil {
+			return false
+		}
+		seen[digest] = true
+	}
+	return true
 }

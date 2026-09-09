@@ -23,8 +23,11 @@ export default defineConfig({
 		starlight({
 			title: 'Sodapop',
 			disable404Route: true,
-			description: 'Get comfortable with your terminal coding companion.',
-			components: { Banner: './src/components/docs/PreviewBanner.astro' },
+			description: 'Get Sodapop running in your project, learn the commands, and choose your level of fizz.',
+			components: {
+				Banner: './src/components/docs/PreviewBanner.astro',
+				MarkdownContent: './src/components/docs/MarkdownContent.astro',
+			},
 			logo: {
 				light: '../images/sodapop-lockup-on-light.svg',
 				dark: '../images/sodapop-lockup-on-dark.svg',

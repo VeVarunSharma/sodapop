@@ -45,6 +45,82 @@ func TestBuildInputsAreRejectedBeforeBundling(t *testing.T) {
 	}
 }
 
+func TestBuildReusesOnlyCompleteMatchingPreparedRuntime(t *testing.T) {
+	writePreparedRuntime := func(t *testing.T, root string, complete bool) {
+		t.Helper()
+		source := `//go:build linux && amd64
+
+package runtimebundle
+
+import _ "embed"
+
+//go:embed zcopilot_1.0.83_linux_amd64.zst
+var cli []byte
+
+//go:embed zcopilot_1.0.83_linux_amd64.license
+var license []byte
+
+func init() { _ = "fixture"; _ = struct{ Version string }{Version: "1.0.83"} }
+`
+		for _, name := range []string{"zcopilot_linux_amd64.go", "zcopilot_inprocess_linux_amd64.go"} {
+			writeFixtureFile(t, root, "internal/runtimebundle/"+name, source, 0600)
+		}
+		writeFixtureFile(t, root, "internal/runtimebundle/zcopilot_1.0.83_linux_amd64.zst", "runtime", 0600)
+		if complete {
+			writeFixtureFile(t, root, "internal/runtimebundle/zcopilot_1.0.83_linux_amd64.license", "terms", 0600)
+		}
+	}
+
+	t.Run("complete", func(t *testing.T) {
+		root := scriptFixture(t)
+		writePreparedRuntime(t, root, true)
+		output, err := runScriptFixture(t, root, []string{"bash", "scripts/build.sh"},
+			"SODAPOP_TARGET=linux/amd64", "SODAPOP_PREPARED_RUNTIME=1")
+		if err != nil {
+			t.Fatalf("prepared build failed: %s: %v", output, err)
+		}
+		if _, err := os.Stat(filepath.Join(root, "go-tool.log")); !os.IsNotExist(err) {
+			t.Fatalf("prepared build invoked the bundler: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(root, "go-build.log")); err != nil {
+			t.Fatalf("prepared build did not compile: %v", err)
+		}
+	})
+
+	t.Run("missing asset", func(t *testing.T) {
+		root := scriptFixture(t)
+		writePreparedRuntime(t, root, false)
+		output, err := runScriptFixture(t, root, []string{"bash", "scripts/build.sh"},
+			"SODAPOP_TARGET=linux/amd64", "SODAPOP_PREPARED_RUNTIME=1")
+		if err == nil || !strings.Contains(output, "Prepared runtime asset is missing") {
+			t.Fatalf("incomplete prepared runtime was accepted: %s: %v", output, err)
+		}
+		if _, err := os.Stat(filepath.Join(root, "go-build.log")); !os.IsNotExist(err) {
+			t.Fatalf("invalid prepared runtime reached compilation: %v", err)
+		}
+	})
+
+	t.Run("wrong version", func(t *testing.T) {
+		root := scriptFixture(t)
+		writePreparedRuntime(t, root, true)
+		for _, name := range []string{"zcopilot_linux_amd64.go", "zcopilot_inprocess_linux_amd64.go"} {
+			path := filepath.Join(root, "internal/runtimebundle", name)
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(strings.ReplaceAll(string(data), `Version: "1.0.83"`, `Version: "1.0.82"`)), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		output, err := runScriptFixture(t, root, []string{"bash", "scripts/build.sh"},
+			"SODAPOP_TARGET=linux/amd64", "SODAPOP_PREPARED_RUNTIME=1")
+		if err == nil || !strings.Contains(output, "does not match 1.0.83") {
+			t.Fatalf("wrong prepared runtime version was accepted: %s: %v", output, err)
+		}
+	})
+}
+
 func TestCoverageRatchet(t *testing.T) {
 	cases := []struct {
 		name     string

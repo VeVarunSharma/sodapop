@@ -14,12 +14,12 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
   throw new Error('The Windows download catalog must contain a qualified ZIP archive');
 }
 ---
-<MarketingLayout title="Get Sodapop - Downloads and installation" description="Find the right installation path for Sodapop, with clear platform support, release availability, and first-launch guidance.">
+<MarketingLayout title="Get Sodapop - Downloads and installation" description="Start here to install Sodapop, check platform and release availability, and open your first project.">
   <div class="wrap">
     <section class="download-intro">
-      <p class="eyebrow">Your next favorite terminal companion</p>
-      <h1>Let's get you<br />a little more pop.</h1>
-      <p>A native app for your project, not another tab to keep open. Here's what is available, what you'll need, and where to start.</p>
+      <p class="eyebrow">Bring a project. We'll meet you there.</p>
+      <h1>Let's get Sodapop <br />into your terminal.</h1>
+      <p>Pick the install that fits your machine, then launch Sodapop from your project directory. The commands and prerequisites are below.</p>
     </section>
 
     <section class="release-notice" aria-labelledby="release-status">
@@ -56,19 +56,19 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
         <p class="integrity-note">Source builds use the existing Sodapop public OAuth client configuration. Do not borrow another application's credentials or put tokens in project files.</p>
       </div>
       <div class="download-guide">
-        <h2>Your first few steps</h2>
+        <h2>From download to first prompt</h2>
         <ol>
           <li><strong>Get the app</strong>{prerelease ? 'Read the build prerequisites and create a local build from a source checkout.' : 'Install a verified package or put the extracted executable in a directory on your PATH.'}</li>
           <li><strong>Open a project</strong>Launch <code>sodapop</code> from the directory you want to work in.</li>
           <li><strong>Bring your account</strong>Run <code>/login</code> and authorize in your browser. You need an eligible GitHub account with Copilot access.</li>
-          <li><strong>Choose a model and settle in</strong>Pick an available model, start a conversation, and approve tool actions as needed.</li>
+          <li><strong>Choose a model and try a request</strong>Pick an available model, describe a small task, and review tool requests before approving them.</li>
         </ol>
         <a class="text-link" style="margin-top:25px" href={withBase('docs/getting-started/')}>The getting-started guide <ArrowUpRight size={16} aria-hidden="true" /></a>
       </div>
     </section>
 
     <section class="compatibility" aria-labelledby="platform-title">
-      <h2 id="platform-title">The platform picture</h2>
+      <h2 id="platform-title">Supported platforms</h2>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Supported platforms">
         <table>
           <thead><tr><th scope="col">Platform</th><th scope="col">Processors</th><th scope="col">Distribution design</th></tr></thead>
@@ -82,7 +82,7 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
       <p>This table describes supported build targets, not a claim that every channel is published. npm installs only the native platforms declared by that published package version; Windows requires its qualified ZIP payload. Node.js is required for the npm launcher. Native downloads and Homebrew do not require Go or a separate Copilot installation. Windows ARM64 and musl-based Linux are not supported targets.</p>
     </section>
     <section class="faq-section" aria-labelledby="questions-title">
-      <h2 id="questions-title">A few things worth knowing</h2>
+      <h2 id="questions-title">Before your first prompt</h2>
       <div class="js-enhanced-only"><Questions client:visible /></div>
       <div class="no-js-only"><p>Read the <a class="text-link" href={withBase('docs/permissions-and-privacy/')}>permissions and privacy guide</a> for account requirements, approvals, and the limits of cancellation.</p></div>
     </section>

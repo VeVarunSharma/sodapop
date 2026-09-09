@@ -10,7 +10,7 @@ be approved automatically by default. File writes, shell commands, reads outside
 that directory, URLs, external tools, unknown requests, and sandbox-bypass or
 enterprise-managed requests need an explicit decision.
 
-An approval dialog offers Deny, Allow once, and Allow all. Deny is appropriate
+An approval dialog offers Deny, Allow once, and Enable Autopilot. Deny is appropriate
 when the requested operation is unclear or exceeds the task. Allow once approves
 that request without broadly trusting later actions.
 
@@ -18,18 +18,36 @@ that request without broadly trusting later actions.
 or network effects as running it yourself. A safe-looking command label is not
 a substitute for inspecting its arguments and scope.
 
-## Planning and allow-all
+## Planning and Autopilot
 
-`/plan` and Shift+Tab provide an advisory planning focus. They are not read-only
-modes and do not prevent writes after approval. Normal permission rules still
-apply.
+`/plan` provides an advisory planning focus. Shift+Tab cycles Chat, Plan, and
+Autopilot; these modes are mutually exclusive. Planning is not read-only and
+does not prevent writes after approval. Normal permission rules still apply.
 
-`/allow-all` approves every tool request in the current conversation without
-another per-action prompt. Use it only when you understand and trust the scope
-of the requested work. It does not answer the agent's questions.
+`/autopilot` approves every tool request in the current conversation without
+another per-action prompt. F2 provides the same toggle, and `/allow-all` remains
+a compatibility alias. Use Autopilot only when you understand and trust the
+scope of the requested work. It does not answer the agent's questions.
 
-Use `/allow-all off` to restore prompts. Starting or resuming a conversation
-also turns allow-all off; it is not a saved global preference.
+Use `/autopilot off`, F2, or Shift+Tab from Autopilot to return to Chat and
+restore prompts. Starting or resuming a conversation also turns Autopilot off;
+it is not a saved global preference.
+
+## Workflow guidance and evidence
+
+`/fizz` asks the model to compare ideas without beginning implementation.
+`/taste-test` asks it to run focused checks and return a report without applying
+fixes. Those instructions shape the request; they do not grant or remove tool
+permissions. Any tool request still follows normal approvals or the current
+Autopilot setting.
+
+Taste Test uses the bounded conversation baseline behind `/diff session`.
+Missing, partial, unreadable, or additionally truncated evidence is reported
+instead of silently falling back to the whole working tree. Its PASSED, FAILED,
+and UNVERIFIED sections should be read as evidence from the checks that actually
+ran, not a guarantee that every path or requirement was covered. A Perfect Pour
+celebration requires recognized successful validation commands, but remains
+presentation rather than proof.
 
 ## Cancellation and file changes
 
@@ -62,7 +80,20 @@ separately from tokens.
 
 The application does not fall back to ambient GitHub credentials, a separately
 installed Copilot executable, or ordinary Copilot session state. It does not
-import your existing MCP servers, plugins, or skills by default.
+import existing MCP servers, plugins, or skills. Explicit stdio MCP definitions
+are stored in the signed-in account's private Sodapop state; environment entries
+store variable names rather than values. Servers start only after enablement and
+reconnection, and every MCP tool invocation requires the same explicit decision
+as other external tools unless Autopilot is enabled for that conversation.
+
+Explicit skills are stored separately in private, content-addressed Sodapop
+state. Bundled skills are trusted by default but remain disabled until selected
+for a project. Local directories and public Git repositories must be trusted
+explicitly before import; Git URLs containing credentials are rejected and
+interactive credential prompts are disabled. Project activation stores exact
+content digests, and saved conversations retain their digest set. A skill can
+shape model instructions, but it cannot authorize edits, shell commands, URLs,
+MCP calls, or any other tool request.
 
 ## Connected-service boundaries
 

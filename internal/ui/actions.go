@@ -12,24 +12,8 @@ import (
 	"github.com/VeVarunSharma/sodapop/internal/commands"
 	"github.com/VeVarunSharma/sodapop/internal/config"
 	"github.com/VeVarunSharma/sodapop/internal/engine"
+	"github.com/VeVarunSharma/sodapop/internal/workspace"
 )
-
-const keyboardHelp = `
-Keyboard
-Enter sends; Ctrl+J / Shift+Enter inserts a newline.
-Shift+Tab switches between CHAT and ADVISORY PLAN modes.
-/ opens commands; Tab completes; arrows select; Esc closes.
-Ctrl+P opens all actions. /login opens your GitHub account.
-Mouse wheel or PgUp / PgDown scroll; Ctrl+Home / Ctrl+End jump.
-F4 focuses tool cards; arrows select; Enter expands.
-F3 focuses the sidebar when the terminal is wide enough.
-Ctrl+C cancels a turn or sign-in; completed edits are kept.
-Ctrl+Q requests exit. A nonempty draft is protected.
-
-Planning is ADVISORY, not read-only. Normal tool approvals still apply.
-Use /allow-all only when you intend to approve every tool request in this conversation.
-Opening /diff only reads working-tree state, including changes not made by Sodapop.
-`
 
 func (m *Model) submit() tea.Cmd {
 	raw := m.composer.Value()
@@ -84,7 +68,7 @@ func (m *Model) execute(input commands.Input, fromComposer bool) (tea.Cmd, bool)
 			m.report(err.Error(), true)
 			return nil, false
 		}
-		m.newDialog(dialogHelp, "FIELD GUIDE / Sodapop", help+"\n"+keyboardHelp)
+		m.newDialog(dialogHelp, "FIELD GUIDE / Sodapop", help)
 		return nil, true
 	case "login":
 		m.showAccount()
@@ -105,9 +89,6 @@ func (m *Model) execute(input commands.Input, fromComposer bool) (tea.Cmd, bool)
 		}
 		if input.Args == "" {
 			m.showModels()
-			if len(m.models) == 0 {
-				return m.loadModels(), true
-			}
 			return nil, true
 		}
 		return m.selectModel(input.Args)
@@ -118,6 +99,7 @@ func (m *Model) execute(input commands.Input, fromComposer bool) (tea.Cmd, bool)
 			m.resetConversation()
 			m.overlay = nil
 			m.report("Fresh conversation. History is kept; a session starts only when you send.", false)
+			return m.captureBaseline(), true
 		}
 		return nil, true
 	case "resume":
@@ -143,16 +125,31 @@ func (m *Model) execute(input commands.Input, fromComposer bool) (tea.Cmd, bool)
 			return nil, true
 		}
 		if input.Args == "off" {
-			m.setPlanning(false)
+			m.setChat()
 			m.report(m.planningNotice(), false)
 			return nil, true
 		}
 		m.setPlanning(true)
 		return m.sendPrompt(input.Args, m.composer.Value())
-	case "allow-all":
-		m.setAllowAll(input.Args != "off")
-		m.report(m.allowAllNotice(), false)
+	case "fizz":
+		return m.runFizz(input.Args, m.composer.Value())
+	case "taste-test":
+		return m.prepareTasteTest(input.Args, m.composer.Value(), fromComposer)
+	case "vending-machine":
+		m.showVendingMachine()
 		return nil, true
+	case "autopilot":
+		if input.Args == "off" {
+			m.setChat()
+		} else {
+			m.setAutopilot(true)
+		}
+		m.report(m.autopilotNotice(), false)
+		return nil, true
+	case "mcp":
+		return m.manageMCP(input.Args)
+	case "skill":
+		return m.manageSkills(input.Args)
 	case "diff":
 		mode := input.Args
 		if mode == "" {
@@ -213,7 +210,7 @@ func (m *Model) contextResult(msg contextMsg) {
 		case errors.Is(msg.err, engine.ErrVariableContext):
 			m.appendContextText("Context usage is unavailable for HydraFusion because its context window depends on the model selected for each turn.")
 		default:
-			m.report(m.recoveryCopy("Context usage could not be loaded: "+msg.err.Error()), true)
+			m.report(m.recoveryCopy("Context usage could not be loaded: "+m.accessErrorText(msg.err, nil)), true)
 		}
 		return
 	}
@@ -282,23 +279,62 @@ func (m *Model) planningNotice() string {
 
 func (m *Model) setPlanning(enabled bool) {
 	m.planning = enabled
+	if enabled {
+		m.autopilotEnabled = false
+	}
 	m.updateComposerPrompt()
 }
 
-func (m *Model) allowAllNotice() string {
-	if m.allowAll {
-		return "ALLOW ALL enabled for this conversation. Tool requests will be approved without prompting; commands are not sandboxed. Use /allow-all off to restore prompts."
+func (m *Model) autopilotNotice() string {
+	if m.autopilotEnabled {
+		return "AUTOPILOT enabled for this conversation. Tool requests will be approved without prompting; commands are not sandboxed. Agent questions still require your answer. Use /autopilot off, F2, or Shift+Tab to return to chat and restore prompts."
 	}
-	return "Allow-all is off. Tool requests will require individual approval."
+	return "Autopilot is off. Tool requests will require individual approval."
 }
 
-func (m *Model) setAllowAll(enabled bool) {
-	m.allowAll = enabled
+func (m *Model) setAutopilot(enabled bool) {
+	m.autopilotEnabled = enabled
+	if enabled {
+		m.planning = false
+	}
+	m.updateComposerPrompt()
 	m.renderDirty = true
 }
 
+func (m *Model) setChat() {
+	m.planning = false
+	m.autopilotEnabled = false
+	m.updateComposerPrompt()
+	m.renderDirty = true
+}
+
+func (m *Model) cycleComposerMode() {
+	switch {
+	case m.autopilotEnabled:
+		m.setChat()
+	case m.planning:
+		m.setAutopilot(true)
+	default:
+		m.setPlanning(true)
+	}
+}
+
+func (m *Model) toggleAutopilot() tea.Cmd {
+	if m.autopilotEnabled {
+		m.setAutopilot(false)
+		m.report(m.autopilotNotice(), false)
+		return nil
+	}
+	if len(m.requests) > 0 {
+		return m.enableAutopilotForPermissions()
+	}
+	m.setAutopilot(true)
+	m.report(m.autopilotNotice(), false)
+	return nil
+}
+
 func (m *Model) showModels() {
-	d := m.newDialog(dialogModels, "MODEL / Copilot", "Choose model, context, and reasoning. Changes apply together only when you press Enter.")
+	d := m.newDialog(dialogModels, "MODEL / Copilot", "Choose a model and adjust its Context and Thinking columns. Changes apply together only when you press Enter.")
 	d.modelDrafts = make(map[string]engine.ModelSelection)
 	if len(m.models) == 0 {
 		d.body = "Loading models from Copilot..."
@@ -623,14 +659,22 @@ func (m *Model) sessionResult(msg sessionMsg) tea.Cmd {
 		if msg.kind == "resume" {
 			m.needsResume = m.session.ID != ""
 		}
-		m.report(m.recoveryCopy("Could not "+msg.kind+" conversation: "+msg.err.Error()+". Your draft and previous history are kept."), true)
+		detail := m.accessErrorText(msg.err, nil)
+		for _, envelope := range m.sessionBuffer {
+			e := envelope.event
+			if e.Kind == engine.EventError && e.SessionID == "" && !e.History && e.Access != nil {
+				detail = m.accessErrorText(e.Err, e.Access)
+				break
+			}
+		}
+		m.report(m.recoveryCopy("Could not "+msg.kind+" conversation: "+detail+". Your draft and previous history are kept."), true)
 		return m.discardBufferedEvents()
 	}
 	if msg.kind == "resume" {
 		m.cancelContextRequest()
 		m.clearTimeline()
 		m.setPlanning(false)
-		m.setAllowAll(false)
+		m.setAutopilot(false)
 	}
 	m.session = msg.session
 	m.sessionGeneration++
@@ -656,6 +700,7 @@ func (m *Model) sessionResult(msg sessionMsg) tea.Cmd {
 	} else {
 		m.report("Conversation restored. Your draft is kept; nothing was sent.", false)
 	}
+	cmds = append(cmds, m.captureBaseline())
 	if m.model == "" && m.overlay == nil {
 		m.showModels()
 	}
@@ -683,18 +728,23 @@ func (m *Model) clearTimeline() {
 func (m *Model) resetConversation() {
 	m.cancelContextRequest()
 	m.sessionGeneration++
+	m.baselineGeneration++
 	m.session = engine.Session{}
 	m.needsResume = false
 	m.needsAbort = false
 	m.reconnectID = ""
 	m.setPlanning(false)
-	m.setAllowAll(false)
+	m.setAutopilot(false)
 	m.usage = ""
 	m.clearTimeline()
 }
 
 func (m *Model) openDiff(mode string) tea.Cmd {
-	d := m.newDialog(dialogDiff, "WORKING TREE / "+mode+" / read-only", "Loading Git diff...\n\nThis includes your existing changes, not only changes made by Sodapop.")
+	scope := "WORKING TREE"
+	if mode == "session" {
+		scope = "CONVERSATION CHANGES"
+	}
+	d := m.newDialog(dialogDiff, scope+" / "+mode+" / read-only", "Loading Git diff...\n\nChange attribution is observational and does not prove authorship.")
 	if m.opts.Workspace == nil {
 		d.body = "Working-tree inspection is unavailable in this build."
 		m.report(d.body, true)
@@ -703,8 +753,19 @@ func (m *Model) openDiff(mode string) tea.Cmd {
 	ctx, cancel := context.WithCancel(m.life.ctx)
 	d.cancel = cancel
 	service, id := m.opts.Workspace, d.id
+	baseline := m.baseline
 	return func() tea.Msg {
-		diff, err := service.Diff(ctx, mode)
+		var diff workspace.Diff
+		var err error
+		if mode == "session" {
+			if baseline == nil {
+				err = errors.New("conversation baseline is not ready")
+			} else {
+				diff, err = baseline.Diff(ctx)
+			}
+		} else {
+			diff, err = service.Diff(ctx, mode)
+		}
 		return diffMsg{dialog: id, diff: diff, err: err}
 	}
 }
@@ -820,6 +881,7 @@ func (m *Model) confirmAction(d *dialog) tea.Cmd {
 		m.resetConversation()
 		m.overlay = nil
 		m.report("Fresh conversation. Your draft and prior history are kept.", false)
+		return m.captureBaseline()
 	case "resume":
 		return m.resumeSession(d.value)
 	case "signout":

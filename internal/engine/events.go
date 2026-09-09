@@ -152,6 +152,10 @@ func (m *eventMapper) mapEvent(raw copilot.SessionEvent, history bool) []Event {
 			e.Name += "/" + *data.ErrorCode
 		}
 		e.Err = errors.New(m.redact.text(strings.TrimSpace(e.Name + ": " + data.Message)))
+		if issue, ok := sessionAccessIssue(data); ok {
+			e.Access = &issue
+			e.Err = withAccessIssue(e.Err, issue)
+		}
 	case *copilot.AssistantUsageData:
 		if history {
 			return nil

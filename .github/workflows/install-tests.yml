@@ -19,6 +19,18 @@ on:
       previous_version:
         type: string
         default: ''
+      targeted_artifacts:
+        description: Consume separately named native artifacts plus the verified manifests
+        type: boolean
+        default: false
+      current_artifact_prefix:
+        description: Exact artifact-name prefix used when targeted_artifacts is enabled
+        type: string
+        default: ''
+      previous_artifact_prefix:
+        description: Previous-version artifact-name prefix used when targeted_artifacts is enabled
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -37,7 +49,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: actions/download-artifact@v4
         with:
           pattern: ${{ inputs.artifact_pattern }}
@@ -69,13 +81,23 @@ jobs:
             "$RUNNER_TEMP/releasectl" verify --dir install-inputs/previous --manifest "install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json"
           fi
       - uses: actions/upload-artifact@v4
+        if: inputs.targeted_artifacts
+        with:
+          name: verified-install-manifests
+          path: |
+            install-inputs/current/sodapop-${{ inputs.version }}-manifest.json
+            install-inputs/previous/sodapop-${{ inputs.previous_version }}-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.targeted_artifacts }}
         with:
           name: verified-install-inputs
           path: install-inputs/
           if-no-files-found: error
           retention-days: 7
 
-  native:
+  portable-npm:
     needs: assemble
     strategy:
       fail-fast: false
@@ -83,14 +105,19 @@ jobs:
         include:
           - runner: macos-15
             target: darwin/arm64
+            artifact: darwin-arm64
           - runner: macos-15-intel
             target: darwin/amd64
+            artifact: darwin-amd64
           - runner: ubuntu-24.04
             target: linux/amd64
+            artifact: linux-amd64
           - runner: ubuntu-24.04-arm
             target: linux/arm64
+            artifact: linux-arm64
           - runner: windows-2025
             target: windows/amd64
+            artifact: windows-amd64
     runs-on: ${{ matrix.runner }}
     env:
       VERSION: ${{ inputs.version }}
@@ -103,13 +130,29 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.targeted_artifacts }}
         with:
           name: verified-install-inputs
+          path: install-inputs
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts
+        with:
+          name: ${{ inputs.current_artifact_prefix }}${{ matrix.artifact }}
+          path: install-inputs/current
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts && inputs.previous_artifact_prefix != ''
+        with:
+          name: ${{ inputs.previous_artifact_prefix }}${{ matrix.artifact }}
+          path: install-inputs/previous
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts
+        with:
+          name: verified-install-manifests
           path: install-inputs
       - name: Build native installation verifier
         shell: bash
@@ -117,6 +160,18 @@ jobs:
           helper="$RUNNER_TEMP/releasectl$(go env GOEXE)"
           go build -o "$helper" ./scripts/releasectl
           printf 'SODAPOP_RELEASECTL=%s\n' "$helper" >> "$GITHUB_ENV"
+      - name: Verify target-specific installation inputs
+        if: inputs.targeted_artifacts
+        shell: bash
+        run: |
+          "$SODAPOP_RELEASECTL" verify --dir install-inputs/current \
+            --manifest "install-inputs/current/sodapop-$VERSION-manifest.json" \
+            --platform "$SODAPOP_TARGET"
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            "$SODAPOP_RELEASECTL" verify --dir install-inputs/previous \
+              --manifest "install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json" \
+              --platform "$SODAPOP_TARGET"
+          fi
       - name: Execute archived and copied portable commands
         shell: bash
         run: |
@@ -134,27 +189,6 @@ jobs:
                    --previous-manifest "$GITHUB_WORKSPACE/install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json")
           fi
           npm run test:install --prefix npm -- "${args[@]}"
-      - name: Set up Homebrew on the disposable native runner
-        if: runner.os != 'Windows'
-        uses: Homebrew/actions/setup-homebrew@f8d4222eb633e65c2a0157383cf80861fc7fae7f
-        with:
-          core: false
-          cask: false
-          stable: true
-          brew-gh-api-token: ''
-      - name: Exercise real Homebrew installation and removal
-        if: runner.os != 'Windows'
-        env:
-          SODAPOP_HOMEBREW_ALLOW_ORDINARY_PREFIX: '1'
-        shell: bash
-        run: |
-          args=(--release-dir "$GITHUB_WORKSPACE/install-inputs/current"
-                --manifest "$GITHUB_WORKSPACE/install-inputs/current/sodapop-$VERSION-manifest.json")
-          if [[ -n "$PREVIOUS_VERSION" ]]; then
-            args+=(--previous-release-dir "$GITHUB_WORKSPACE/install-inputs/previous"
-                   --previous-manifest "$GITHUB_WORKSPACE/install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json")
-          fi
-          bash scripts/test-homebrew-install.sh "${args[@]}"
       - name: Exercise the Windows portable installer and generate channel manifests
         if: runner.os == 'Windows'
         shell: pwsh
@@ -177,3 +211,93 @@ jobs:
             ${{ runner.temp }}/windows-portable-evidence/native-evidence.json
           if-no-files-found: error
           retention-days: 7
+
+  homebrew:
+    needs: assemble
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin/arm64
+            artifact: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin/amd64
+            artifact: darwin-amd64
+          - runner: ubuntu-24.04
+            target: linux/amd64
+            artifact: linux-amd64
+          - runner: ubuntu-24.04-arm
+            target: linux/arm64
+            artifact: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    env:
+      VERSION: ${{ inputs.version }}
+      PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      SODAPOP_TARGET: ${{ matrix.target }}
+      SODAPOP_HOMEBREW_ALLOW_ORDINARY_PREFIX: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/download-artifact@v4
+        if: ${{ !inputs.targeted_artifacts }}
+        with:
+          name: verified-install-inputs
+          path: install-inputs
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts
+        with:
+          pattern: ${{ inputs.current_artifact_prefix }}*
+          path: install-inputs/current
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts && inputs.previous_artifact_prefix != ''
+        with:
+          pattern: ${{ inputs.previous_artifact_prefix }}*
+          path: install-inputs/previous
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: inputs.targeted_artifacts
+        with:
+          name: verified-install-manifests
+          path: install-inputs
+      - name: Build native installation verifier
+        shell: bash
+        run: |
+          helper="$RUNNER_TEMP/releasectl$(go env GOEXE)"
+          go build -o "$helper" ./scripts/releasectl
+          printf 'SODAPOP_RELEASECTL=%s\n' "$helper" >> "$GITHUB_ENV"
+      - name: Verify target-specific installation inputs
+        if: inputs.targeted_artifacts
+        shell: bash
+        run: |
+          "$SODAPOP_RELEASECTL" verify --dir install-inputs/current \
+            --manifest "install-inputs/current/sodapop-$VERSION-manifest.json" \
+            --platform "$SODAPOP_TARGET"
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            "$SODAPOP_RELEASECTL" verify --dir install-inputs/previous \
+              --manifest "install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json" \
+              --platform "$SODAPOP_TARGET"
+          fi
+      - name: Set up Homebrew on the disposable native runner
+        uses: Homebrew/actions/setup-homebrew@f8d4222eb633e65c2a0157383cf80861fc7fae7f
+        with:
+          core: false
+          cask: false
+          stable: true
+          brew-gh-api-token: ''
+      - name: Exercise real Homebrew installation and removal
+        shell: bash
+        run: |
+          args=(--release-dir "$GITHUB_WORKSPACE/install-inputs/current"
+                --manifest "$GITHUB_WORKSPACE/install-inputs/current/sodapop-$VERSION-manifest.json")
+          if [[ -n "$PREVIOUS_VERSION" ]]; then
+            args+=(--previous-release-dir "$GITHUB_WORKSPACE/install-inputs/previous"
+                   --previous-manifest "$GITHUB_WORKSPACE/install-inputs/previous/sodapop-$PREVIOUS_VERSION-manifest.json")
+          fi
+          bash scripts/test-homebrew-install.sh "${args[@]}"

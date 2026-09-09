@@ -23,6 +23,43 @@ Before release, prove that a user token issued to **this application** can list 
 
 Cancellation, denied authorization, expired device codes, unavailable network, and Copilot entitlement failures are distinct outcomes. Sodapop does not silently retry a coding action after authentication changes.
 
+## GitHub is signed in, but Copilot is unavailable
+
+Sodapop retains the GitHub account when Copilot access fails. A background
+startup failure stays inline; an access failure following an explicit sign-in
+or manual recheck can open a dismissible account dialog. Drafts, the current
+transcript, and local commands such as `/help`, `/theme`, and `/diff` remain
+available.
+
+Open `/login` to choose the appropriate recovery action:
+
+- **Get Copilot** opens the [official plans page](https://github.com/features/copilot/plans)
+  for an uncertain authorization/access failure. Use the GitHub account shown in
+  Sodapop, which may differ from the account currently signed in to your browser.
+  Review Free eligibility, personal plans, or an organization-provided seat.
+- **Sign in again** renews Sodapop's GitHub authorization when the credential
+  is rejected or expired. It does not replace the application's OAuth registration.
+- **Open Copilot settings** is available for quota, rate-limit, and billing
+  conditions. Organization-managed accounts may need administrator assistance.
+- **Check access again** creates a fresh connection for the same account after
+  you resolve the problem. It does not start another OAuth flow, send a probe
+  prompt, or replay an earlier request.
+
+Browser opening and copying the fixed GitHub links require an explicit action.
+If the platform cannot open a browser, the account dialog keeps the link visible
+and provides a copy action. Rechecking is manual only, not triggered by browser
+focus or a polling loop. Stop an unresolved turn with Ctrl+C before reconnecting;
+the normal cancellation/idle barrier still applies.
+
+The pinned SDK does not expose a definitive subscription-active flag at startup.
+An empty catalog or generic authorization failure is therefore described as
+access unavailable, not proof that a subscription is missing. Supported Free
+access is not rejected for being Free. Policy-disabled models, rejected
+credentials, quota/billing conditions, and network failures are not presented
+as a requirement to buy another plan. Fresh model discovery establishes
+connection/model availability, not a guarantee that every later request will
+be authorized.
+
 ## Credential storage
 
 Persistent credentials belong in the macOS Keychain, Linux Secret Service, or Windows Credential Manager. If the host has no usable secure store, choose session-only sign-in or cancel; Sodapop does not write token files into its preferences, state directory, project, or default Copilot configuration.
@@ -36,3 +73,10 @@ Never include tokens, client secrets, OAuth responses, or private device codes i
 ## Release qualification
 
 The public client registration, minimum scopes, actual Copilot access, and native platform behavior must be qualified with owner-approved test identities. A missing client ID remains a visible blocker rather than a successful mock session. Routine CI uses injected HTTP and credential stores and never requires real account credentials.
+
+Definitively diagnosing a missing subscription requires supported provider
+evidence for the pinned SDK/runtime. A generic 403 or missing optional metadata
+is not that evidence. An owner-authorized no-entitlement account can qualify the
+real service response separately; do not log credentials, private device codes,
+account identities, or full provider payloads, and do not call a model merely
+to probe a subscription.

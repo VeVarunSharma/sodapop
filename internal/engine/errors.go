@@ -16,6 +16,7 @@ var (
 	ErrVariableContext    = errors.New("context usage is unavailable for a model with a per-turn context window")
 	ErrBusy               = errors.New("Copilot is busy; finish or cancel the current operation first")
 	ErrNoToken            = errors.New("no Sodapop authentication token is available; sign in to Sodapop first")
+	ErrNoModels           = errors.New("no Copilot models are available for this Sodapop account; check entitlement and organization policy")
 	ErrAlreadyResolved    = errors.New("this request has already been resolved")
 	ErrQuestionCanceled   = errors.New("the user canceled the question")
 )

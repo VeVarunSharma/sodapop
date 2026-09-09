@@ -47,7 +47,7 @@ func (m *Model) sendResult(msg sentMsg) tea.Cmd {
 		} else if finished {
 			advice = "The turn already ended. No prompt was automatically retried."
 		}
-		m.report(m.recoveryCopy("Send could not be confirmed: "+msg.err.Error()+". "+advice), true)
+		m.report(m.recoveryCopy("Send could not be confirmed: "+m.accessErrorText(msg.err, nil)+". "+advice), true)
 		m.renderDirty = true
 		m.flushTimeline()
 		cmd = tea.Batch(m.cancelDecisions(), m.startMoment(reactionRecovery))
