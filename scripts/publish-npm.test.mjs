@@ -125,6 +125,7 @@ test("mode-only retries accept only the expected native executable normalization
     valid.replace("old mode 100644\nnew mode 100755", "old mode 100755\nnew mode 100644")
   ), true);
   assert.equal(expectedNativeModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
+  assert.equal(expectedNativeModeDifference(valid.replaceAll("sodapop", "sodapop.js")), true);
   for (const invalid of [
     valid.replace("new mode 100755", "new mode 100644"),
     valid.replace("new mode 100755", "new mode 100700"),
