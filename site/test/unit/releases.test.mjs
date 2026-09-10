@@ -389,7 +389,7 @@ test('a four-Unix npm manifest exposes only its declared packages, not every nat
   const f = await releaseFixture(t, { npm: true });
   const catalog = await resolveReleases(f.options);
   assert.deepEqual(catalog.channels.npm, {
-    status: 'published', command: 'npm install --global @sodapop-sh/cli', version,
+    status: 'published', command: 'npm install --global @sodapop-sh/cli@latest', version,
     url: 'https://www.npmjs.com/package/@sodapop-sh/cli', platforms: platforms.slice(0, 4),
   });
   assert.deepEqual(catalog.channels.homebrew, unavailable);

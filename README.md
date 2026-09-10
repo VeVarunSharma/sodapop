@@ -48,16 +48,16 @@ sodapop
 
 `SODAPOP_INSTALL_DIR` overrides the installation directory. Relative paths resolve from the repository root; the installer prints an absolute directory for PATH setup. Installation does not edit your shell profile.
 
-## Install the published preview
+## Install the stable release
 
 The current public release is
-[`v0.1.0-rc.9`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.0-rc.9).
+[`v0.1.1`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.1).
 Its native archives are available from that release, and the npm launcher is
-published under the `preview` dist-tag:
+published under the `latest` dist-tag:
 
 ```sh
 # npm launcher (macOS, glibc-based Linux, and Windows x64)
-npm install --global @sodapop-sh/cli@preview
+npm install --global @sodapop-sh/cli@latest
 
 # Windows x64: download the matching .zip from the GitHub Release,
 # verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.

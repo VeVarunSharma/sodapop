@@ -7,11 +7,11 @@ channel is published. An unavailable method is not a working installation
 command.
 
 The generated installation choices below come from the same public release
-catalog as the download page, including an exact preview dist-tag when a
-prerelease is selected. Channels that have not passed public verification are
-omitted. The [source-build guide](development.md) remains available for
-developers. Local builds need the existing Sodapop public-client configuration
-to sign in; they do not need a new OAuth app.
+catalog as the download page, using `latest` for a stable npm release and
+`preview` when a prerelease is selected. Channels that have not passed public
+verification are omitted. The [source-build guide](development.md) remains
+available for developers. Local builds need the existing Sodapop public-client
+configuration to sign in; they do not need a new OAuth app.
 
 <!-- SODAPOP_INSTALLATION_REFERENCE -->
 
