@@ -315,7 +315,7 @@ function packageIdentity(value, name) {
   record(value, 'npm package');
   const version = releaseVersion(value.version, 'npm package version');
   if (value.name !== name || value.private === true || value.deprecated ||
-      value.repository?.url !== `https://github.com/${releaseIdentities.repository}.git`) {
+      value.repository?.url !== `git+https://github.com/${releaseIdentities.repository}.git`) {
     fail('Published npm package identity does not match the owned source package');
   }
   const basename = name.slice(name.indexOf('/') + 1);

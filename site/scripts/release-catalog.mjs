@@ -207,7 +207,7 @@ function validateConfiguration(value) {
 }
 
 async function sourceIdentity(root) {
-  const repositoryURL = `https://github.com/${releaseIdentities.repository}.git`;
+  const repositoryURL = `git+https://github.com/${releaseIdentities.repository}.git`;
   const unix = nativePlatforms.filter(({ platform }) => !platform.startsWith('windows/'));
   const names = nativePlatforms.map(({ platform }) => npmTarget(platform).name);
   const cli = parseReleaseJSON(await readText(path.join(root, 'npm/packages/cli/package.json'), 'Source npm package'), 'Source npm package');
