@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
   commandFailureDetail,
-  expectedExecutableModeDifference,
   publishPackages,
   validVersion
 } from "./publish-npm.mjs";
@@ -24,6 +23,10 @@ function fixture(t) {
   for (const [directory, metadata] of entries) {
     mkdirSync(path.join(root, directory), { recursive: true });
     writeFileSync(path.join(root, directory, "package.json"), JSON.stringify(metadata));
+    const executable = metadata.name === "@sodapop-sh/cli" ? "bin/sodapop.js" : "bin/sodapop";
+    mkdirSync(path.join(root, directory, "bin"), { recursive: true });
+    writeFileSync(path.join(root, directory, executable), "fixture executable\n", { mode: 0o644 });
+    chmodSync(path.join(root, directory, executable), 0o644);
   }
   return root;
 }
@@ -36,10 +39,20 @@ function registry(mode = "missing") {
   const runner = (args, options = {}) => {
     if (args[0] === "pack") {
       const metadata = JSON.parse(readFileSync(path.join(args.at(-1), "package.json")));
+      const executable = metadata.name === "@sodapop-sh/cli" ? "bin/sodapop.js" : "bin/sodapop";
+      assert.notEqual(statSync(path.join(args.at(-1), executable)).mode & 0o111, 0);
       const filename = metadata.name.replace("@", "").replace("/", "-") + "-1.2.3.tgz";
       const destination = args[args.indexOf("--pack-destination") + 1];
       writeFileSync(path.join(destination, filename), data);
-      return { status: 0, stdout: JSON.stringify([{ ...metadata, filename, integrity }]) };
+      return {
+        status: 0,
+        stdout: JSON.stringify([{
+          ...metadata,
+          filename,
+          integrity,
+          files: [{ path: executable, mode: mode === "non-executable-pack" ? 0o644 : 0o755 }]
+        }])
+      };
     }
     if (args[0] === "view") {
       if (args[2] === "dist-tags") {
@@ -51,7 +64,9 @@ function registry(mode = "missing") {
       }
       return {
         status: 1,
-        stdout: JSON.stringify({ error: { code: ["missing", "publish-error"].includes(mode) ? "E404" : "ENOTCONN" } })
+        stdout: JSON.stringify({
+          error: { code: ["missing", "publish-error", "non-executable-pack"].includes(mode) ? "E404" : "ENOTCONN" }
+        })
       };
     }
     if (args[0] === "diff") {
@@ -107,7 +122,10 @@ test("retry accepts only identical already-published package contents", (t) => {
   assert.deepEqual(matching.published, []);
   assert.equal(matching.compared.length, 2);
   const modeOnly = registry("mode-only");
-  publishPackages({ directory, version: "1.2.3", tag: "latest" }, modeOnly.runner, () => {});
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, modeOnly.runner, () => {}),
+    /different published package contents/
+  );
   assert.deepEqual(modeOnly.published, []);
   const different = registry("different");
   assert.throws(
@@ -123,29 +141,25 @@ test("retry accepts only identical already-published package contents", (t) => {
   assert.deepEqual(wrongTag.published, []);
 });
 
-test("mode-only retries accept only the expected executable normalization", () => {
-  const valid = [
-    "diff --git a/bin/sodapop b/bin/sodapop",
-    "old mode 100644",
-    "new mode 100755",
-    "index v1.2.3..v1.2.3",
-    "--- a/bin/sodapop",
-    "+++ b/bin/sodapop"
-  ].join("\n");
-  assert.equal(expectedExecutableModeDifference(valid), true);
-  assert.equal(expectedExecutableModeDifference(
-    valid.replace("old mode 100644\nnew mode 100755", "old mode 100755\nnew mode 100644")
-  ), true);
-  assert.equal(expectedExecutableModeDifference(valid.replaceAll("sodapop", "sodapop.exe")), true);
-  assert.equal(expectedExecutableModeDifference(valid.replaceAll("sodapop", "sodapop.js")), true);
-  for (const invalid of [
-    valid.replace("new mode 100755", "new mode 100644"),
-    valid.replace("new mode 100755", "new mode 100700"),
-    valid.replaceAll("bin/sodapop", "package.json"),
-    `${valid}\n@@ -1 +1 @@\n-old\n+new`
-  ]) {
-    assert.equal(expectedExecutableModeDifference(invalid), false);
-  }
+test("publication restores executable modes lost during artifact transfer", (t) => {
+  const directory = fixture(t);
+  const native = path.join(directory, "platforms/darwin-arm64/bin/sodapop");
+  const launcher = path.join(directory, "cli/bin/sodapop.js");
+  assert.equal(statSync(native).mode & 0o111, 0);
+  assert.equal(statSync(launcher).mode & 0o111, 0);
+  publishPackages({ directory, version: "1.2.3", tag: "latest" }, registry().runner, () => {});
+  assert.notEqual(statSync(native).mode & 0o111, 0);
+  assert.notEqual(statSync(launcher).mode & 0o111, 0);
+});
+
+test("publication rejects a packed payload without executable mode", (t) => {
+  const directory = fixture(t);
+  const failed = registry("non-executable-pack");
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, failed.runner, () => {}),
+    /does not contain executable bin\/sodapop/
+  );
+  assert.deepEqual(failed.published, []);
 });
 
 test("published-package comparison failures stop without publishing", (t) => {
