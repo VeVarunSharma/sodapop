@@ -92,6 +92,19 @@ Use the same channel that owns your installation. For a manually extracted
 archive, keep the old executable until the new download has passed integrity
 checks. Avoid overwriting a package manager's symlink with a manual copy.
 
+The deprecated npm `0.1.1` release installed Unix native payloads without
+executable permissions. If it reports `SODAPOP_MISSING_PAYLOAD`, upgrade through
+the same npm channel using the current command shown on the
+[download page](/download/), then check the installed version:
+
+```sh
+sodapop --version
+```
+
+The installed version should be `0.1.2` or later. Do not work around the old
+package by disabling integrity checks or running a payload from another
+platform.
+
 Removing the installed command is not the same as signing out. Run `/logout`
 if you also want to remove Sodapop's saved credential. Uninstallation is not a
 request to erase preferences, account-scoped session history, or runtime caches.
