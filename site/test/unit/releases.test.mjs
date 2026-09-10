@@ -553,7 +553,7 @@ test('an exact published prerelease resolves native downloads and npm preview wi
 test('npm metadata rejects wrong identities, unsupported platforms, bad URLs, and manifest mismatches', async (t) => {
   const cases = [
     ['launcher identity', (f) => { f.npm.get('cli').name = '@different/cli'; }],
-    ['repository', (f) => { f.npm.get('cli').repository.url = 'git+https://example.test/sodapop.git'; }],
+    ['repository', (f) => { f.npm.get('cli').repository.url = 'https://example.test/sodapop.git'; }],
     ['private package', (f) => { f.npm.get('cli').private = true; }],
     ['deprecated package', (f) => { f.npm.get('cli').deprecated = 'do not install'; }],
     ['command name', (f) => { f.npm.get('cli').bin = { other: 'bin/sodapop.js' }; }],
