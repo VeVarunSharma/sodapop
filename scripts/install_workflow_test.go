@@ -185,8 +185,7 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 		"gh release verify ", "gh release verify-asset ",
 		"environment: npm-publish", "environment: homebrew-publish",
 		"SODAPOP_STABLE_RELEASE_QUALIFIED", "SODAPOP_NPM_PUBLISH_ENABLED",
-		"id-token: write", "registry-url: https://registry.npmjs.org",
-		"npm@11.19.0", "node scripts/publish-npm.mjs",
+		"id-token: write", "npm@11.19.0", "node scripts/publish-npm.mjs",
 		"ref: ${{ github.event.repository.default_branch }}",
 		"permission-contents: write", "permission-pull-requests: write",
 		"repositories: homebrew-sodapop", "gh pr create", "--registry-install",
@@ -212,6 +211,9 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 	}
 	if strings.Contains(npmJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
 		t.Fatal("stable npm publication must not depend on deferred Homebrew and live qualification")
+	}
+	if strings.Contains(npmJob, "registry-url:") {
+		t.Fatal("OIDC-only npm publication must not create token-based registry configuration")
 	}
 	if !strings.Contains(homebrewJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
 		t.Fatal("stable Homebrew publication must retain the owner qualification gate")

@@ -7,7 +7,7 @@
   "homepage": "https://sodapop.sh",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VeVarunSharma/sodapop.git"
+    "url": "https://github.com/VeVarunSharma/sodapop.git"
   },
   "os": [
     "linux"
