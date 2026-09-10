@@ -160,8 +160,11 @@ reviewers. Creating a workflow that names an environment does not configure thos
 reviewers. Confirm ownership of every `@sodapop-sh` package, perform initial registry
 bootstrap if necessary, and authorize this exact workflow/environment as a trusted
 publisher. The pinned npm publishing CLI supports OIDC; no npm write token is
-stored in source. `SODAPOP_NPM_PUBLISH_ENABLED=true` is an explicit owner switch,
-not a substitute for registry permission.
+stored in source. The protected publisher uses `actions/setup-node@v7` with the
+public registry configured and package-manager caching disabled; older action
+versions can inject a dummy token that prevents npm from selecting OIDC.
+`SODAPOP_NPM_PUBLISH_ENABLED=true` is an explicit owner switch, not a substitute
+for registry permission.
 
 Because npm trusted publishers and staged publishing require an existing package,
 the first `@sodapop-sh` versions use the separate, manually dispatched

@@ -201,19 +201,25 @@ func TestChannelPublicationRequiresAttestationsAndOwnerGates(t *testing.T) {
 			t.Errorf("publication workflow unexpectedly contains %q", excluded)
 		}
 	}
-	_, npmJob, found := strings.Cut(text, "  npm:\n")
+	_, npmJob, found := strings.Cut(text, "\n  npm:\n")
 	if !found {
 		t.Fatal("npm publication job is missing")
 	}
-	npmJob, homebrewJob, found := strings.Cut(npmJob, "  homebrew:\n")
+	npmJob, homebrewJob, found := strings.Cut(npmJob, "\n  homebrew:\n")
 	if !found {
 		t.Fatal("Homebrew publication job is missing")
 	}
 	if strings.Contains(npmJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
 		t.Fatal("stable npm publication must not depend on deferred Homebrew and live qualification")
 	}
-	if strings.Contains(npmJob, "registry-url:") {
-		t.Fatal("OIDC-only npm publication must not create token-based registry configuration")
+	for _, requirement := range []string{
+		"uses: actions/setup-node@v7",
+		"registry-url: https://registry.npmjs.org",
+		"package-manager-cache: false",
+	} {
+		if !strings.Contains(npmJob, requirement) {
+			t.Errorf("npm publication job is missing OIDC setup %q", requirement)
+		}
 	}
 	if !strings.Contains(homebrewJob, "SODAPOP_STABLE_RELEASE_QUALIFIED") {
 		t.Fatal("stable Homebrew publication must retain the owner qualification gate")
