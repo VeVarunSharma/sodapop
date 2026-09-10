@@ -51,7 +51,7 @@ sodapop
 ## Install the stable release
 
 The current public release is
-[`v0.1.1`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.1).
+[`v0.1.2`](https://github.com/VeVarunSharma/sodapop/releases/tag/v0.1.2).
 Its native archives are available from that release, and the npm launcher is
 published under the `latest` dist-tag:
 
