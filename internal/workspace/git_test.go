@@ -19,8 +19,12 @@ import (
 
 func isolateGit(t *testing.T) {
 	t.Helper()
-	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
-	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+	config := filepath.Join(t.TempDir(), "empty.gitconfig")
+	if err := os.WriteFile(config, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_CONFIG_GLOBAL", config)
+	t.Setenv("GIT_CONFIG_SYSTEM", config)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 }
 
