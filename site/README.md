@@ -63,7 +63,7 @@ Reduced-motion visitors keep the static poster. Preserve those controls.
 `src/data/channels.json` explicitly selects either a source-only **pre-release**
 state or an exact public stable/prerelease tag. Source-only mode does not invent
 a version, download URL, npm command, or published tap. The current production
-configuration selects `v0.1.0-rc.9`, verifies npm's `preview` dist-tag, and keeps
+configuration selects `v0.1.2`, verifies npm's `latest` dist-tag, and keeps
 Homebrew unavailable. Source-build guidance remains available with its actual
 prerequisites.
 

@@ -7,11 +7,11 @@ channel is published. An unavailable method is not a working installation
 command.
 
 The generated installation choices below come from the same public release
-catalog as the download page, including an exact preview dist-tag when a
-prerelease is selected. Channels that have not passed public verification are
-omitted. The [source-build guide](development.md) remains available for
-developers. Local builds need the existing Sodapop public-client configuration
-to sign in; they do not need a new OAuth app.
+catalog as the download page, using `latest` for a stable npm release and
+`preview` when a prerelease is selected. Channels that have not passed public
+verification are omitted. The [source-build guide](development.md) remains
+available for developers. Local builds need the existing Sodapop public-client
+configuration to sign in; they do not need a new OAuth app.
 
 <!-- SODAPOP_INSTALLATION_REFERENCE -->
 
@@ -94,6 +94,19 @@ application. Follow [getting started](getting-started.md) for the full flow.
 Use the same channel that owns your installation. For a manually extracted
 archive, keep the old executable until the new download has passed integrity
 checks. Avoid overwriting a package manager's symlink with a manual copy.
+
+The deprecated npm `0.1.1` release installed Unix native payloads without
+executable permissions. If it reports `SODAPOP_MISSING_PAYLOAD`, upgrade through
+the same npm channel using the current command shown on the
+[download page](/download/), then check the installed version:
+
+```sh
+sodapop --version
+```
+
+The installed version should be `0.1.2` or later. Do not work around the old
+package by disabling integrity checks or running a payload from another
+platform.
 
 Removing the installed command is not the same as signing out. Run `/logout`
 if you also want to remove Sodapop's saved credential. Uninstallation is not a

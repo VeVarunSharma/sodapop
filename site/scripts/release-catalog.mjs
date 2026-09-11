@@ -31,12 +31,14 @@ export const releaseIdentities = Object.freeze({
 });
 
 export const installCommands = Object.freeze({
-  npm: 'npm install --global @sodapop-sh/cli',
+  npm: 'npm install --global @sodapop-sh/cli@latest',
   homebrew: 'brew install VeVarunSharma/sodapop/sodapop',
 });
 
 export function npmInstallCommand(version) {
-  return version.includes('-') ? `${installCommands.npm}@preview` : installCommands.npm;
+  return version.includes('-')
+    ? 'npm install --global @sodapop-sh/cli@preview'
+    : installCommands.npm;
 }
 
 export const nativePlatforms = Object.freeze(/** @type {const} */ ([

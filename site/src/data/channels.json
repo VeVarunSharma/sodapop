@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "mode": "release",
   "repository": "VeVarunSharma/sodapop",
-  "releaseTag": "v0.1.0-rc.9",
+  "releaseTag": "v0.1.2",
   "channels": {
     "npm": {
       "verify": true,

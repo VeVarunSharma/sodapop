@@ -33,7 +33,7 @@ export function installMethods(catalog) {
       description: 'Windows ARM64 or x64 source build from Git Bash. Read the build guide for the Go toolchain, public-client configuration, and executable path.',
     },
   ];
-  for (const id of /** @type {const} */ (['npm', 'homebrew'])) {
+  for (const id of /** @type {const} */ (['homebrew', 'npm'])) {
     const channel = catalog.channels[id];
     if (!channel || !['published', 'unpublished'].includes(channel.status)) {
       throw new Error(`Installation catalog is missing a valid ${id} channel`);

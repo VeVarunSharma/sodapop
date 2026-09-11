@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { chmodSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -12,6 +12,15 @@ const platformNames = new Set([
   "@sodapop-sh/linux-arm64",
   "@sodapop-sh/windows-amd64",
   "@sodapop-sh/windows-arm64"
+]);
+const executablePaths = new Map([
+  ["@sodapop-sh/cli", "bin/sodapop.js"],
+  ["@sodapop-sh/darwin-amd64", "bin/sodapop"],
+  ["@sodapop-sh/darwin-arm64", "bin/sodapop"],
+  ["@sodapop-sh/linux-amd64", "bin/sodapop"],
+  ["@sodapop-sh/linux-arm64", "bin/sodapop"],
+  ["@sodapop-sh/windows-amd64", "bin/sodapop.exe"],
+  ["@sodapop-sh/windows-arm64", "bin/sodapop.exe"]
 ]);
 
 export function validVersion(version) {
@@ -51,7 +60,7 @@ function readPackages(directory, version) {
       throw new Error(`Invalid generated package metadata in ${packageDirectory}`);
     }
     seen.add(metadata.name);
-    return { directory: packageDirectory, metadata };
+    return { directory: packageDirectory, metadata, executable: executablePaths.get(metadata.name) };
   });
   const dependencies = packages.at(-1).metadata.optionalDependencies ?? {};
   const native = packages.slice(0, -1).map((entry) => entry.metadata.name).sort();
@@ -60,6 +69,17 @@ function readPackages(directory, version) {
     throw new Error("CLI optional dependencies must exactly match all generated native packages");
   }
   return packages;
+}
+
+function restoreExecutableModes(packages) {
+  for (const entry of packages) {
+    if (!entry.executable) throw new Error(`No executable path declared for ${entry.metadata.name}`);
+    const filename = path.join(entry.directory, entry.executable);
+    if (!lstatSync(filename).isFile()) {
+      throw new Error(`Expected a regular executable payload for ${entry.metadata.name}`);
+    }
+    chmodSync(filename, 0o755);
+  }
 }
 
 function resultJSON(result, operation) {
@@ -86,20 +106,6 @@ export function commandFailureDetail(result) {
   return output ? output.slice(-4096) : `exit ${result.status}`;
 }
 
-export function expectedExecutableModeDifference(output) {
-  const lines = output.trim().split(/\r?\n/).map((line) => line.trimEnd());
-  if (lines.length !== 6) return false;
-  const match = lines[0].match(/^diff --git a\/(bin\/sodapop(?:\.exe|\.js)?) b\/\1$/);
-  const oldMode = lines[1].match(/^old mode (100644|100755)$/)?.[1];
-  const newMode = lines[2].match(/^new mode (100644|100755)$/)?.[1];
-  if (!match || !oldMode || !newMode || oldMode === newMode ||
-      !/^index \S+\.\.\S+(?: \d+)?$/.test(lines[3]) ||
-      lines[4] !== `--- a/${match[1]}` || lines[5] !== `+++ b/${match[1]}`) {
-    return false;
-  }
-  return true;
-}
-
 export function publishPackages({ directory, version, tag }, runner = npm, log = console.log) {
   if (!directory || !validVersion(version) || !["preview", "latest"].includes(tag)) {
     throw new Error("Provide a generated package directory, exact SemVer, and preview or latest tag");
@@ -108,9 +114,10 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
     throw new Error("A prerelease must not be published under latest");
   }
   const packages = readPackages(path.resolve(directory), version);
+  restoreExecutableModes(packages);
   const staging = mkdtempSync(path.join(tmpdir(), "sodapop-npm-publish-"));
   try {
-    for (const { directory: packageDirectory, metadata } of packages) {
+    for (const { directory: packageDirectory, metadata, executable } of packages) {
       const specification = `${metadata.name}@${version}`;
       const existing = runner(["view", specification, "dist.integrity", "--json", "--registry=https://registry.npmjs.org"]);
       if (!existing.error && existing.status === 0) {
@@ -126,12 +133,9 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
           throw new Error(`Could not compare published contents for ${specification}`);
         }
         const difference = comparison.stdout.trim();
-        if (difference !== "" && !expectedExecutableModeDifference(difference)) {
+        if (difference !== "") {
           const detail = difference.slice(0, 4096);
           throw new Error(`Refusing to replace different published package contents for ${specification}: ${detail}`);
-        }
-        if (difference !== "") {
-          log(`Published payload differs only by npm's executable mode normalization: ${specification}`);
         }
         const tags = resultJSON(runner([
           "view", metadata.name, "dist-tags", "--json", "--registry=https://registry.npmjs.org"
@@ -163,6 +167,11 @@ export function publishPackages({ directory, version, tag }, runner = npm, log =
           typeof receipt.filename !== "string" ||
           !/^[A-Za-z0-9][A-Za-z0-9.-]*\.tgz$/.test(receipt.filename)) {
         throw new Error(`Unexpected npm pack receipt for ${metadata.name}`);
+      }
+      const packedExecutable = receipt.files?.find((entry) => entry.path === executable);
+      if (!packedExecutable || !Number.isInteger(packedExecutable.mode) ||
+          (packedExecutable.mode & 0o111) === 0) {
+        throw new Error(`Packed ${metadata.name} does not contain executable ${executable}`);
       }
       const tarball = path.join(staging, receipt.filename);
       const integrity = "sha512-" + createHash("sha512").update(readFileSync(tarball)).digest("base64");

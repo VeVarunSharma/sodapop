@@ -18,7 +18,7 @@ test('pre-release has real platform-specific source commands, never invented pac
 
 test('UI and documentation share verified channel commands', () => {
   const catalog = { mode: 'release', channels: channels() };
-  catalog.channels.npm = { status: 'published', command: 'npm install --global @sodapop-sh/cli', platforms: ['darwin/arm64', 'windows/arm64', 'windows/amd64'] };
+  catalog.channels.npm = { status: 'published', command: 'npm install --global @sodapop-sh/cli@latest', platforms: ['darwin/arm64', 'windows/arm64', 'windows/amd64'] };
   const methods = installMethods(catalog);
   assert.equal(methods[0].id, 'npm');
   assert.ok(installationReference(catalog).includes(methods[0].command));
@@ -30,4 +30,20 @@ test('UI and documentation share verified channel commands', () => {
   assert.throws(() => installMethods(catalog), /platform set/);
   catalog.channels.npm.command = null;
   assert.throws(() => installMethods(catalog), /no installation command/);
+});
+
+test('npm remains the first install option when Homebrew is also published', () => {
+  const catalog = { mode: 'release', channels: channels() };
+  catalog.channels.npm = {
+    status: 'published',
+    command: 'npm install --global @sodapop-sh/cli@latest',
+    platforms: ['darwin/arm64', 'linux/amd64', 'windows/amd64'],
+  };
+  catalog.channels.homebrew = {
+    status: 'published',
+    command: 'brew install VeVarunSharma/sodapop/sodapop',
+    platforms: ['darwin/arm64', 'linux/amd64'],
+  };
+  assert.deepEqual(installMethods(catalog).map(({ id }) => id),
+    ['npm', 'homebrew', 'source', 'source-windows']);
 });
