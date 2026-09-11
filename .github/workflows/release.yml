@@ -37,6 +37,9 @@ jobs:
           - runner: windows-2025
             target: windows/amd64
             artifact: windows-amd64
+          - runner: windows-11-vs2026-arm
+            target: windows/arm64
+            artifact: windows-arm64
     runs-on: ${{ matrix.runner }}
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -71,15 +74,33 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert native ARM64 runner and Node
+        if: endsWith(matrix.target, '/arm64')
+        shell: pwsh
+        run: |
+          $osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($osArchitecture -ne 'Arm64') {
+            throw "Expected an ARM64 operating system, found $osArchitecture."
+          }
+          $nodeArchitecture = node -p "process.arch"
+          if ($LASTEXITCODE -ne 0 -or $nodeArchitecture.Trim() -ne 'arm64') {
+            throw "Expected native ARM64 Node.js, found $nodeArchitecture."
+          }
       - name: Bundle pinned native runtime
         shell: bash
         run: bash scripts/bundle.sh
       - name: Test
         if: runner.os != 'Windows'
         run: go test -race ./...
-      - name: Test Windows
-        if: runner.os == 'Windows'
+      - name: Test Windows x64 with race detection
+        if: matrix.target == 'windows/amd64'
         run: go test -race ./internal/... ./scripts/installcheck ./scripts/releasectl ./scripts/windows
+      - name: Test Windows ARM64
+        if: matrix.target == 'windows/arm64'
+        run: go test ./internal/... ./scripts/installcheck ./scripts/releasectl ./scripts/windows
       - name: Build Windows command
         if: runner.os == 'Windows'
         run: go build ./cmd/sodapop
@@ -202,8 +223,8 @@ jobs:
           archives=(dist/current/sodapop-"$SODAPOP_VERSION"-*.tar.gz dist/current/sodapop-"$SODAPOP_VERSION"-*.zip)
           checksums=(dist/current/sodapop-"$SODAPOP_VERSION"-*.tar.gz.sha256 dist/current/sodapop-"$SODAPOP_VERSION"-*.zip.sha256)
           manifest="dist/current/sodapop-${SODAPOP_VERSION}-manifest.json"
-          if (( ${#archives[@]} != 5 || ${#checksums[@]} != 5 )) || [[ ! -f "$manifest" ]]; then
-            printf 'Expected five archives, five checksums, and one release manifest.\n' >&2
+          if (( ${#archives[@]} != 6 || ${#checksums[@]} != 6 )) || [[ ! -f "$manifest" ]]; then
+            printf 'Expected six archives, six checksums, and one release manifest.\n' >&2
             exit 1
           fi
           release_flags=(--draft)

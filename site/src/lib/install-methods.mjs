@@ -9,6 +9,7 @@ const platformLabels = {
   'darwin/amd64': 'macOS Intel',
   'linux/arm64': 'Linux ARM64 (glibc)',
   'linux/amd64': 'Linux x64 (glibc)',
+  'windows/arm64': 'Windows ARM64',
   'windows/amd64': 'Windows x64',
 };
 
@@ -29,7 +30,7 @@ export function installMethods(catalog) {
       id: 'source-windows',
       label: 'Source: Windows',
       command: 'bash scripts/build.sh',
-      description: 'Windows x64 source build from Git Bash. Read the build guide for the Go toolchain, public-client configuration, and executable path.',
+      description: 'Windows ARM64 or x64 source build from Git Bash. Read the build guide for the Go toolchain, public-client configuration, and executable path.',
     },
   ];
   for (const id of /** @type {const} */ (['npm', 'homebrew'])) {

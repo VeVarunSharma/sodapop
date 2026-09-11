@@ -282,7 +282,7 @@ func inspectArchive(dir, version string, artifact Artifact, output *os.Root) (st
 }
 
 func walkArchive(file *os.File, platform string, p *payload, output *os.Root) error {
-	if platform == "windows/amd64" {
+	if BinaryName(platform) == "sodapop.exe" {
 		info, err := file.Stat()
 		if err != nil {
 			return err

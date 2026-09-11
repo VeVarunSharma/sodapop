@@ -36,7 +36,7 @@ type Artifact struct {
 }
 
 var (
-	defaultPlatforms = []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64"}
+	defaultPlatforms = []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"}
 	versionPattern   = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
 	commitPattern    = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	digestPattern    = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -87,14 +87,14 @@ func PackageName(version, platform string) string {
 
 func ArchiveName(version, platform string) string {
 	suffix := ".tar.gz"
-	if platform == "windows/amd64" {
+	if strings.HasPrefix(platform, "windows/") {
 		suffix = ".zip"
 	}
 	return PackageName(version, platform) + suffix
 }
 
 func BinaryName(platform string) string {
-	if platform == "windows/amd64" {
+	if strings.HasPrefix(platform, "windows/") {
 		return "sodapop.exe"
 	}
 	return "sodapop"
@@ -115,7 +115,7 @@ func ValidateManifest(m Manifest, expected []string) error {
 		return fmt.Errorf("commit must be a lowercase full 40-character Git commit")
 	}
 	if len(m.Artifacts) == 0 || len(m.Artifacts) > len(defaultPlatforms) {
-		return fmt.Errorf("manifest must contain between one and five artifacts")
+		return fmt.Errorf("manifest must contain between one and six artifacts")
 	}
 	var platforms []string
 	for _, artifact := range m.Artifacts {

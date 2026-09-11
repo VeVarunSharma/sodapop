@@ -77,9 +77,15 @@ func TestWindowsInstallerWorkflowRequiresExplicitNativePrerequisites(t *testing.
 	}
 	for _, requirement := range []string{
 		"Assert-DisposableRunner",
+		"architecture:",
+		"x64_runner_labels:",
+		"arm64_runner_labels:",
 		"accept_wix_terms:",
 		"SODAPOP_WINDOWS_DISPOSABLE: '1'",
-		"fromJSON(inputs.runner_labels)",
+		"fromJSON(inputs.architecture == 'arm64' && inputs.arm64_runner_labels || inputs.x64_runner_labels)",
+		"PLATFORM: ${{ inputs.architecture == 'arm64' && 'windows/arm64' || 'windows/amd64' }}",
+		"-Architecture $env:ARCHITECTURE",
+		"windows-installer-evidence-${{ inputs.architecture }}",
 		"gh @('release', 'verify'",
 		"Build-Msi.ps1",
 		"-MsiLifecycle -AllowUnsignedCandidate",

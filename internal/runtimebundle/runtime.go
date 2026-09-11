@@ -72,7 +72,7 @@ func resolve(install func() string, goos, goarch string) (string, error) {
 
 func supportedPlatform(goos, goarch string) bool {
 	return (goos == "darwin" || goos == "linux") && (goarch == "arm64" || goarch == "amd64") ||
-		goos == "windows" && goarch == "amd64"
+		goos == "windows" && (goarch == "amd64" || goarch == "arm64")
 }
 
 func runtimeExecutableName(goos string) string {

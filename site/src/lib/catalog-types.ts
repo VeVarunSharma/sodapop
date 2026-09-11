@@ -12,6 +12,7 @@ export type NativePlatform =
   | 'darwin/amd64'
   | 'linux/arm64'
   | 'linux/amd64'
+  | 'windows/arm64'
   | 'windows/amd64';
 
 export interface NativeArtifact {
@@ -77,7 +78,7 @@ export interface PublishedReleaseCatalog {
   commit: string;
   copilotSdkVersion: string;
   copilotRuntimeVersion: string;
-  /** All five advertised public targets; local-check subsets cannot replace them. */
+  /** All six advertised public targets; local-check subsets cannot replace them. */
   artifacts: NativeArtifact[];
   /** npm follows its published manifest's declared set; Homebrew remains Unix-only. */
   channels: { npm: InstallChannel; homebrew: InstallChannel };

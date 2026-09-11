@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -57,8 +59,8 @@ func packageFixture(t *testing.T) string {
 	root := scriptFixture(t)
 	for _, target := range distribution.DefaultPlatforms() {
 		license := "internal/runtimebundle/zcopilot_1.0.83_" + strings.ReplaceAll(target, "/", "_") + ".license"
-		if target == "windows/amd64" {
-			license = "internal/runtimebundle/zcopilot_1.0.83_windows_amd64.exe.license"
+		if strings.HasPrefix(target, "windows/") {
+			license = "internal/runtimebundle/zcopilot_1.0.83_" + strings.ReplaceAll(target, "/", "_") + ".exe.license"
 		}
 		writeFixtureFile(t, root, license, "runtime terms", 0600)
 		stage := "dist/" + distribution.PackageName(packageVersion, target)
@@ -106,7 +108,11 @@ func packageManifest(t *testing.T, root string, platforms []string) distribution
 }
 
 func TestPackageIncludesLicensedDocumentationAndExcludesUnrelatedFiles(t *testing.T) {
-	for _, target := range distribution.DefaultPlatforms() {
+	targets := distribution.DefaultPlatforms()
+	if runtime.GOOS == "windows" {
+		targets = []string{"windows/amd64", "windows/arm64"}
+	}
+	for _, target := range targets {
 		t.Run(target, func(t *testing.T) {
 			root := packageFixture(t)
 			name := distribution.PackageName(packageVersion, target)
@@ -151,13 +157,13 @@ func TestPackageIncludesLicensedDocumentationAndExcludesUnrelatedFiles(t *testin
 					t.Errorf("required archive file missing or changed: %s", path)
 				}
 			}
-			if len(files) != len(packageDocumentation())+3 || files[packageBinary(target)] != fixtureExecutable ||
+			if len(files) != len(packageDocumentation())+3 || files[packageBinary(target)] != string(fixtureBinary(target)) ||
 				files["LICENSES/copilot-runtime.license"] != "runtime terms" ||
 				files["LICENSES/dependency.license"] != "fixture dependency license" {
 				t.Fatalf("archive has missing, changed, or unexpected payloads: %v", files)
 			}
 			info, err := os.Stat(filepath.Join(payload, packageBinary(target)))
-			if err != nil || info.Mode().Perm() != 0755 {
+			if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 				t.Fatalf("native executable mode: %v, %v", info, err)
 			}
 			data, err := os.ReadFile(filepath.Join(root, "dist", archive))
@@ -205,7 +211,11 @@ func TestPackageRequiresProjectLicenseAndLinkedDocumentation(t *testing.T) {
 }
 
 func TestReleaseArchiveExecutionRequiresProductionVerification(t *testing.T) {
-	for _, target := range []string{"linux/amd64", "windows/amd64"} {
+	targets := []string{"linux/amd64", "windows/amd64", "windows/arm64"}
+	if runtime.GOOS == "windows" {
+		targets = []string{"windows/amd64", "windows/arm64"}
+	}
+	for _, target := range targets {
 		for _, corrupt := range []bool{false, true} {
 			root := packageFixture(t)
 			if output, err := runPackage(t, root, "SODAPOP_TARGET="+target); err != nil {
@@ -235,9 +245,14 @@ func TestReleaseArchiveExecutionRequiresProductionVerification(t *testing.T) {
 				}
 				continue
 			}
-			// This cross-target fixture checks archive-before-execution wiring,
-			// not the native runtime: its .exe is deliberately a shell script.
 			binary := filepath.Join(extracted, distribution.PackageName(packageVersion, target), packageBinary(target))
+			if strings.HasPrefix(target, "windows/") {
+				data, err := os.ReadFile(binary)
+				if err != nil || !bytes.Equal(data, fixtureBinary(target)) {
+					t.Fatalf("verified Windows archive fixture: %x, %v", data, err)
+				}
+				continue
+			}
 			for _, argument := range []string{"--help", "--version", "--check-runtime"} {
 				output, err := runScriptFixture(t, root, []string{"bash", binary, argument})
 				if err != nil || output != "fixture Sodapop launched\n" {
@@ -249,6 +264,9 @@ func TestReleaseArchiveExecutionRequiresProductionVerification(t *testing.T) {
 }
 
 func TestReleaseManifestDescribesVerifiedNativeArtifacts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix executable permission fixtures are covered on Unix runners")
+	}
 	root := packageFixture(t)
 	for _, target := range distribution.DefaultPlatforms() {
 		if output, err := runPackage(t, root, "SODAPOP_TARGET="+target); err != nil {
@@ -257,10 +275,10 @@ func TestReleaseManifestDescribesVerifiedNativeArtifacts(t *testing.T) {
 	}
 	manifest := packageManifest(t, root, nil)
 	if manifest.SchemaVersion != 1 || manifest.Version != packageVersion || manifest.Commit != strings.Repeat("a", 40) ||
-		manifest.CopilotRuntimeVersion != "1.0.83" || manifest.CopilotSDKVersion != "1.0.13" || len(manifest.Artifacts) != 5 {
+		manifest.CopilotRuntimeVersion != "1.0.83" || manifest.CopilotSDKVersion != "1.0.13" || len(manifest.Artifacts) != 6 {
 		t.Fatalf("unexpected release manifest metadata: %+v", manifest)
 	}
-	binarySum := sha256.Sum256([]byte(fixtureExecutable))
+	binaryHashes := make(map[string]string)
 	for index, artifact := range manifest.Artifacts {
 		if artifact.Platform != distribution.DefaultPlatforms()[index] {
 			t.Fatalf("noncanonical artifact ordering: %+v", manifest.Artifacts)
@@ -270,14 +288,22 @@ func TestReleaseManifestDescribesVerifiedNativeArtifacts(t *testing.T) {
 			t.Fatal(err)
 		}
 		archiveSum := sha256.Sum256(archive)
+		binarySum := sha256.Sum256(fixtureBinary(artifact.Platform))
+		binaryHashes[artifact.Platform] = hex.EncodeToString(binarySum[:])
 		if artifact.Archive != distribution.ArchiveName(packageVersion, artifact.Platform) ||
-			artifact.ArchiveSHA256 != hex.EncodeToString(archiveSum[:]) || artifact.BinarySHA256 != hex.EncodeToString(binarySum[:]) {
+			artifact.ArchiveSHA256 != hex.EncodeToString(archiveSum[:]) || artifact.BinarySHA256 != binaryHashes[artifact.Platform] {
 			t.Fatalf("artifact hashes or name are incorrect: %+v", artifact)
 		}
+	}
+	if binaryHashes["windows/amd64"] == binaryHashes["windows/arm64"] {
+		t.Fatal("Windows architecture fixtures must have distinct binary hashes")
 	}
 }
 
 func TestReleaseManifestRejectsIncompleteOrCorruptArtifacts(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix executable permission fixtures are covered on Unix runners")
+	}
 	for _, mutation := range []string{"missing", "checksum", "multiline"} {
 		root := packageFixture(t)
 		for _, target := range distribution.DefaultPlatforms() {
@@ -312,7 +338,7 @@ func TestReleaseManifestRejectsIncompleteOrCorruptArtifacts(t *testing.T) {
 }
 
 func TestPackageRefusesExistingOutputsBeforeBuild(t *testing.T) {
-	for _, target := range []string{"linux/amd64", "windows/amd64"} {
+	for _, target := range []string{"linux/amd64", "windows/amd64", "windows/arm64"} {
 		for _, suffix := range []string{"", ".sha256"} {
 			root := packageFixture(t)
 			name := "dist/" + distribution.ArchiveName(packageVersion, target) + suffix
@@ -379,7 +405,8 @@ func TestTaggedReleaseWorkflowCreatesDraftAssets(t *testing.T) {
 		`version="${GITHUB_REF_NAME#v}"`,
 		`printf 'SODAPOP_VERSION=%s\n' "$version" >> "$GITHUB_ENV"`,
 		"SODAPOP_GITHUB_CLIENT_ID: ${{ vars.SODAPOP_GITHUB_CLIENT_ID }}",
-		"target: darwin/arm64", "target: darwin/amd64", "target: linux/arm64", "target: linux/amd64", "target: windows/amd64",
+		"target: darwin/arm64", "target: darwin/amd64", "target: linux/arm64", "target: linux/amd64",
+		"target: windows/amd64", "target: windows/arm64",
 		"needs: [package, installations, channels]", "contents: write",
 		"npm run build --prefix npm", "name: npm-packages",
 		"bash scripts/generate-homebrew-formula.sh", "name: homebrew-formula",

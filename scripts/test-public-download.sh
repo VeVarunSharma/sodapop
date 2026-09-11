@@ -16,7 +16,7 @@ if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
 fi
 case "$target" in
   darwin/amd64|darwin/arm64|linux/amd64|linux/arm64) extension=tar.gz ;;
-  windows/amd64) extension=zip ;;
+  windows/amd64|windows/arm64) extension=zip ;;
   *) printf 'Unsupported native download target: %s\n' "$target" >&2; exit 2 ;;
 esac
 if [[ "$target" != "$host" ]]; then

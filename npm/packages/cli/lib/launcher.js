@@ -10,6 +10,7 @@ const TARGETS = Object.freeze({
   "darwin-x64": { package: "@sodapop-sh/darwin-amd64", platform: "darwin/amd64", os: "darwin", cpu: "x64", binary: "sodapop" },
   "linux-arm64": { package: "@sodapop-sh/linux-arm64", platform: "linux/arm64", os: "linux", cpu: "arm64", binary: "sodapop" },
   "linux-x64": { package: "@sodapop-sh/linux-amd64", platform: "linux/amd64", os: "linux", cpu: "x64", binary: "sodapop" },
+  "win32-arm64": { package: "@sodapop-sh/windows-arm64", platform: "windows/arm64", os: "win32", cpu: "arm64", binary: "sodapop.exe" },
   "win32-x64": { package: "@sodapop-sh/windows-amd64", platform: "windows/amd64", os: "win32", cpu: "x64", binary: "sodapop.exe" }
 });
 const PLATFORM_PACKAGES = Object.freeze(Object.fromEntries(Object.entries(TARGETS).map(([key, target]) => [key, target.package])));

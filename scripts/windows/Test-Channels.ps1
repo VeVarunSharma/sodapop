@@ -5,14 +5,17 @@ param(
     [Parameter(Mandatory)][string] $Manifest,
     [Parameter(Mandatory)][string] $OutputDir,
     [string] $PackageIdentifier = 'VeVarunSharma.Sodapop',
+    [ValidateSet('x64', 'arm64')][string] $Architecture,
     [switch] $ValidateWinGet,
     [switch] $InstallWinGet,
     [switch] $TestScoop
 )
 . "$PSScriptRoot/Common.ps1"
-Assert-WindowsX64
+$platform = if ($Architecture) { Convert-WindowsArchitectureToPlatform $Architecture } else { Get-NativeWindowsPlatform }
+$Architecture = Convert-WindowsPlatformToArchitecture $platform
+Assert-NativeWindowsArchitecture $platform
 if (-not ($ValidateWinGet -or $InstallWinGet -or $TestScoop)) { throw 'Select a channel test explicitly.' }
-if ($InstallWinGet -or $TestScoop) { Assert-DisposableRunner }
+if ($InstallWinGet -or $TestScoop) { Assert-DisposableRunner $platform }
 if ($ValidateWinGet -or $InstallWinGet) { $null = Get-Command winget.exe -CommandType Application -ErrorAction Stop }
 if ($TestScoop) { $scoop = Get-Command scoop -ErrorAction Stop }
 $work = Get-NewDirectoryPath $OutputDir
@@ -20,7 +23,7 @@ $null = New-Item -ItemType Directory -Path $work
 $generated = Join-Path $work 'generated'
 Invoke-WindowsCtl @('manifests', '--dir', $ReleaseDir, '--manifest', $Manifest,
     '--output', $generated, '--package-id', $PackageIdentifier)
-$current = Get-VerifiedRelease $ReleaseDir $Manifest
+$current = Get-VerifiedRelease $ReleaseDir $Manifest $platform
 $wingetDir = Join-Path $generated ('winget/manifests/' + $PackageIdentifier.Substring(0, 1).ToLowerInvariant() +
     '/' + $PackageIdentifier.Replace('.', '/') + '/' + $current.Release.version)
 $results = [ordered]@{ manifest_validation = $false; winget_local_manifest_install = $false; scoop_local_manifest_install = $false }
@@ -44,7 +47,8 @@ if ($InstallWinGet) {
     }
     Assert-Hash $target $current.Artifact.binary_sha256
     & "$PSScriptRoot/Test-Native.ps1" -ReleaseDir $ReleaseDir -Manifest $Manifest `
-        -OutputDir (Join-Path $work 'winget-native') -InstalledBinary $target -InstalledCommand $link
+        -OutputDir (Join-Path $work 'winget-native') -Architecture $Architecture `
+        -InstalledBinary $target -InstalledCommand $link
     Invoke-Checked 'winget.exe' @('uninstall', '--id', $PackageIdentifier, '--exact', '--scope', 'user',
         '--disable-interactivity')
     if (Test-Path -LiteralPath $link) { throw 'WinGet uninstall left its portable alias.' }
@@ -61,7 +65,8 @@ if ($TestScoop) {
     $shim = Get-RegularFile (Join-Path $scoopRoot 'shims/sodapop.exe')
     if (-not $shim) { throw 'Scoop did not create its command shim.' }
     & "$PSScriptRoot/Test-Native.ps1" -ReleaseDir $ReleaseDir -Manifest $Manifest `
-        -OutputDir (Join-Path $work 'scoop-native') -InstalledBinary $installed -InstalledCommand $shim
+        -OutputDir (Join-Path $work 'scoop-native') -Architecture $Architecture `
+        -InstalledBinary $installed -InstalledCommand $shim
     Invoke-Checked $scoop.Source @('uninstall', 'sodapop')
     if (Test-Path -LiteralPath (Join-Path $scoopRoot 'shims/sodapop.exe')) { throw 'Scoop uninstall left its command shim.' }
     $results.scoop_local_manifest_install = $true

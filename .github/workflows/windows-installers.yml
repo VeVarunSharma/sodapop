@@ -11,10 +11,21 @@ on:
         description: Earlier published numeric version for the upgrade test
         type: string
         required: true
-      runner_labels:
+      architecture:
+        description: Native Windows architecture to qualify
+        type: choice
+        options:
+          - x64
+          - arm64
+        default: x64
+      x64_runner_labels:
         description: JSON labels for a disposable, non-elevated Windows x64 runner
         type: string
         default: '["self-hosted","Windows","X64","sodapop-disposable"]'
+      arm64_runner_labels:
+        description: JSON labels for a disposable, non-elevated Windows ARM64 runner
+        type: string
+        default: '["self-hosted","Windows","ARM64","sodapop-disposable"]'
       accept_wix_terms:
         description: I have reviewed and accept the WiX 7 EULA/maintenance terms for this build
         type: boolean
@@ -33,11 +44,14 @@ permissions:
 
 jobs:
   installers:
-    runs-on: ${{ fromJSON(inputs.runner_labels) }}
+    runs-on: ${{ fromJSON(inputs.architecture == 'arm64' && inputs.arm64_runner_labels || inputs.x64_runner_labels) }}
     environment: windows-installation-tests
     env:
       VERSION: ${{ inputs.version }}
       PREVIOUS_VERSION: ${{ inputs.previous_version }}
+      ARCHITECTURE: ${{ inputs.architecture }}
+      PLATFORM: ${{ inputs.architecture == 'arm64' && 'windows/arm64' || 'windows/amd64' }}
+      ARTIFACT_SUFFIX: ${{ inputs.architecture == 'arm64' && 'windows-arm64' || 'windows-amd64' }}
       ACCEPT_WIX: ${{ inputs.accept_wix_terms }}
       TEST_WINGET: ${{ inputs.test_winget }}
       TEST_SCOOP: ${{ inputs.test_scoop }}
@@ -53,7 +67,7 @@ jobs:
         shell: pwsh
         run: |
           . ./scripts/windows/Common.ps1
-          Assert-DisposableRunner
+          Assert-DisposableRunner $env:PLATFORM
           if ($env:ACCEPT_WIX -cne 'true') { throw 'WiX terms must be reviewed and accepted explicitly.' }
           foreach ($version in @($env:VERSION, $env:PREVIOUS_VERSION)) {
             if ($version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
@@ -90,10 +104,13 @@ jobs:
             Invoke-Checked gh @('release', 'download', "v$($pair[1])", '--repo', $env:GITHUB_REPOSITORY,
               '--dir', $directory, '--pattern', "sodapop-$($pair[1])-windows-amd64.zip",
               '--pattern', "sodapop-$($pair[1])-windows-amd64.zip.sha256",
+              '--pattern', "sodapop-$($pair[1])-windows-arm64.zip",
+              '--pattern', "sodapop-$($pair[1])-windows-arm64.zip.sha256",
               '--pattern', "sodapop-$($pair[1])-manifest.json")
             Invoke-Checked gh @('release', 'verify-asset', "v$($pair[1])", $manifest, '--repo', $env:GITHUB_REPOSITORY)
             & ./scripts/windows/Build-Msi.ps1 -ReleaseDir $directory -Manifest $manifest `
-              -OutputDir "$env:RUNNER_TEMP/msi-$($pair[0])" -UnsignedCandidate -WixEulaAccepted
+              -OutputDir "$env:RUNNER_TEMP/msi-$($pair[0])" -Architecture $env:ARCHITECTURE `
+              -UnsignedCandidate -WixEulaAccepted
           }
       - name: Install, repair, upgrade, and uninstall without administrator privileges
         shell: pwsh
@@ -101,12 +118,13 @@ jobs:
           & ./scripts/windows/Test-Native.ps1 `
             -ReleaseDir "$env:RUNNER_TEMP/release-current" `
             -Manifest "$env:RUNNER_TEMP/release-current/sodapop-$env:VERSION-manifest.json" `
-            -OutputDir "$env:RUNNER_TEMP/msi-evidence" -MsiLifecycle -AllowUnsignedCandidate `
-            -Msi "$env:RUNNER_TEMP/msi-current/sodapop-$env:VERSION-windows-amd64-unsigned.msi" `
+            -OutputDir "$env:RUNNER_TEMP/msi-evidence" -Architecture $env:ARCHITECTURE `
+            -MsiLifecycle -AllowUnsignedCandidate `
+            -Msi "$env:RUNNER_TEMP/msi-current/sodapop-$env:VERSION-$env:ARTIFACT_SUFFIX-unsigned.msi" `
             -MsiMetadata "$env:RUNNER_TEMP/msi-current/msi-candidate.json" `
             -PreviousReleaseDir "$env:RUNNER_TEMP/release-previous" `
             -PreviousManifest "$env:RUNNER_TEMP/release-previous/sodapop-$env:PREVIOUS_VERSION-manifest.json" `
-            -PreviousMsi "$env:RUNNER_TEMP/msi-previous/sodapop-$env:PREVIOUS_VERSION-windows-amd64-unsigned.msi" `
+            -PreviousMsi "$env:RUNNER_TEMP/msi-previous/sodapop-$env:PREVIOUS_VERSION-$env:ARTIFACT_SUFFIX-unsigned.msi" `
             -PreviousMsiMetadata "$env:RUNNER_TEMP/msi-previous/msi-candidate.json"
       - name: Exercise explicitly selected Windows package-manager channels
         if: inputs.test_winget || inputs.test_scoop
@@ -116,6 +134,7 @@ jobs:
             ReleaseDir = "$env:RUNNER_TEMP/release-current"
             Manifest = "$env:RUNNER_TEMP/release-current/sodapop-$env:VERSION-manifest.json"
             OutputDir = "$env:RUNNER_TEMP/channel-evidence"
+            Architecture = $env:ARCHITECTURE
           }
           if ($env:TEST_WINGET -ceq 'true') { $options.ValidateWinGet = $true; $options.InstallWinGet = $true }
           if ($env:TEST_SCOOP -ceq 'true') { $options.TestScoop = $true }
@@ -124,7 +143,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-installer-evidence
+          name: windows-installer-evidence-${{ inputs.architecture }}
           path: |
             ${{ runner.temp }}/msi-evidence
             ${{ runner.temp }}/channel-evidence

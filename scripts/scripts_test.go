@@ -17,7 +17,7 @@ func TestBuildInputsAreRejectedBeforeBundling(t *testing.T) {
 	}{
 		{"unsupported target", "bundle.sh", []string{"SODAPOP_TARGET=freebsd/amd64"}, "Unsupported Sodapop target"},
 		{"unsupported platform alias", "bundle.sh", []string{"SODAPOP_TARGET=macos/arm64"}, "Unsupported Sodapop target"},
-		{"unsupported build target", "build.sh", []string{"SODAPOP_TARGET=windows/arm64"}, "Unsupported Sodapop target"},
+		{"unsupported build target", "build.sh", []string{"SODAPOP_TARGET=windows/386"}, "Unsupported Sodapop target"},
 		{"invalid version", "build.sh", []string{"SODAPOP_TARGET=darwin/arm64", "SODAPOP_VERSION=invalid version"}, "SODAPOP_VERSION"},
 		{"invalid client ID", "build.sh", []string{"SODAPOP_TARGET=darwin/arm64", "SODAPOP_GITHUB_CLIENT_ID=not a client ID"}, "SODAPOP_GITHUB_CLIENT_ID"},
 		{"invalid package target", "package.sh", []string{"SODAPOP_TARGET=linux/unsupported"}, "Unsupported Sodapop target"},

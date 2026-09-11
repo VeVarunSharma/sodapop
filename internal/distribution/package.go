@@ -47,7 +47,7 @@ func Archive(stage, dir, version, platform string) (Artifact, error) {
 	var tarWriter *tar.Writer
 	var gzipWriter *gzip.Writer
 	var zipWriter *zip.Writer
-	if platform == "windows/amd64" {
+	if BinaryName(platform) == "sodapop.exe" {
 		zipWriter = zip.NewWriter(writer)
 	} else {
 		gzipWriter = gzip.NewWriter(writer)

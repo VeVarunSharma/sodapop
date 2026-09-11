@@ -14,13 +14,17 @@ import {
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const entries = [
-    ["platforms/darwin-arm64", { name: "@sodapop-sh/darwin-arm64", version: "1.2.3" }],
-    ["cli", {
-      name: "@sodapop-sh/cli", version: "1.2.3",
-      optionalDependencies: { "@sodapop-sh/darwin-arm64": "1.2.3" }
-    }]
+  const native = [
+    "darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64",
+    "windows-amd64", "windows-arm64"
   ];
+  const dependencies = Object.fromEntries(native.map((id) => [`@sodapop-sh/${id}`, "1.2.3"]));
+  const entries = native.map((id) => [
+    `platforms/${id}`, { name: `@sodapop-sh/${id}`, version: "1.2.3" }
+  ]);
+  entries.push(["cli", {
+    name: "@sodapop-sh/cli", version: "1.2.3", optionalDependencies: dependencies
+  }]);
   for (const [directory, metadata] of entries) {
     mkdirSync(path.join(root, directory), { recursive: true });
     writeFileSync(path.join(root, directory, "package.json"), JSON.stringify(metadata));
@@ -56,8 +60,8 @@ function registry(mode = "missing") {
     }
     if (args[0] === "diff") {
       compared.push(args);
-      assert.ok(options.cwd.endsWith(path.join("platforms", "darwin-arm64")) ||
-        options.cwd.endsWith("cli"));
+      assert.ok(options.cwd.endsWith("cli") ||
+        options.cwd.includes(`${path.sep}platforms${path.sep}`));
       assert.equal(args.filter((arg) => arg.startsWith("--diff=")).length, 1);
       assert.ok(!args.includes("--diff-name-only"));
       if (mode === "comparison-error") return { status: 1, stdout: "", stderr: "registry unavailable" };
@@ -97,7 +101,15 @@ test("publishes platform tarballs before the exact-version launcher", (t) => {
   const directory = fixture(t);
   const { runner, published } = registry();
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, runner, () => {});
-  assert.deepEqual(published, ["sodapop-sh-darwin-arm64-1.2.3.tgz", "sodapop-sh-cli-1.2.3.tgz"]);
+  assert.deepEqual(published, [
+    "sodapop-sh-darwin-amd64-1.2.3.tgz",
+    "sodapop-sh-darwin-arm64-1.2.3.tgz",
+    "sodapop-sh-linux-amd64-1.2.3.tgz",
+    "sodapop-sh-linux-arm64-1.2.3.tgz",
+    "sodapop-sh-windows-amd64-1.2.3.tgz",
+    "sodapop-sh-windows-arm64-1.2.3.tgz",
+    "sodapop-sh-cli-1.2.3.tgz"
+  ]);
 });
 
 test("retry accepts only identical already-published package contents", (t) => {
@@ -105,7 +117,7 @@ test("retry accepts only identical already-published package contents", (t) => {
   const matching = registry("matching");
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, matching.runner, () => {});
   assert.deepEqual(matching.published, []);
-  assert.equal(matching.compared.length, 2);
+  assert.equal(matching.compared.length, 7);
   const modeOnly = registry("mode-only");
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, modeOnly.runner, () => {});
   assert.deepEqual(modeOnly.published, []);
@@ -197,6 +209,18 @@ test("rejects mismatched dependencies and prereleases under latest", (t) => {
   metadata.optionalDependencies["@sodapop-sh/darwin-arm64"] = "^1.2.3";
   writeFileSync(filename, JSON.stringify(metadata));
   assert.throws(() => publishPackages({ directory, version: "1.2.3", tag: "latest" }), /exactly match/);
+});
+
+test("rejects generated native package names outside the six-platform allowlist", (t) => {
+  const directory = fixture(t);
+  const metadata = { name: "@sodapop-sh/windows-ia32", version: "1.2.3" };
+  const packageDirectory = path.join(directory, "platforms", "windows-ia32");
+  mkdirSync(packageDirectory);
+  writeFileSync(path.join(packageDirectory, "package.json"), JSON.stringify(metadata));
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }),
+    /Invalid generated package metadata/
+  );
 });
 
 test("requires exact npm-compatible release versions", () => {

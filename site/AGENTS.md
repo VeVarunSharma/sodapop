@@ -10,8 +10,9 @@ Scope: `site/`. Apply the [repository rules](../AGENTS.md) first.
   the supplied mascot, readable dark demo panels, and restrained carbonation.
 - Keep prose canonical under root `docs/`; generate the Starlight copy from an
   explicit public-content map. Never publish the checkout or whole docs tree.
-- Share one validated availability catalog between downloads and installation
-  references. Pre-release is explicit; errors are not evidence of availability.
+- Share one validated six-platform availability catalog between downloads and
+  installation references. Homebrew remains exactly four Unix platforms.
+  Pre-release is explicit; errors are not evidence of availability.
 - Essential links/text work without hydration. Only small controls need React.
   Use the selected shadcn primitives and consistent Lucide SVG icons.
 - Give ongoing motion a stop control and reduced-motion users static posters.

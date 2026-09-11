@@ -44,6 +44,7 @@ export const nativePlatforms = Object.freeze(/** @type {const} */ ([
   { platform: 'darwin/amd64', label: 'macOS (Intel x64)' },
   { platform: 'linux/arm64', label: 'Linux (ARM64)' },
   { platform: 'linux/amd64', label: 'Linux (x64)' },
+  { platform: 'windows/arm64', label: 'Windows (ARM64)' },
   { platform: 'windows/amd64', label: 'Windows (x64)' },
 ]));
 
@@ -328,7 +329,7 @@ export function catalogFromManifest(value, configuration) {
     throw new Error('Manifest copilot_sdk_version is invalid');
   }
   if (!Array.isArray(value.artifacts) || value.artifacts.length !== nativePlatforms.length) {
-    throw new Error('Release manifest must contain all five native platforms exactly once');
+    throw new Error('Release manifest must contain all six native platforms exactly once');
   }
   const entries = new Map();
   for (const artifact of value.artifacts) {
@@ -348,7 +349,7 @@ export function catalogFromManifest(value, configuration) {
   const artifacts = nativePlatforms.map(({ platform, label }) => {
     const artifact = entries.get(platform);
     const stem = `sodapop-${version}-${platform.replace('/', '-')}`;
-    const windows = platform === 'windows/amd64';
+    const windows = platform.startsWith('windows/');
     if (artifact.archive !== `${stem}${windows ? '.zip' : '.tar.gz'}`) {
       throw new Error(`Manifest archive filename does not match version/platform for ${platform}`);
     }
@@ -433,7 +434,8 @@ export function validateCatalog(value, configuration) {
         throw new Error(`Published ${name} channel has invalid declared platforms`);
       }
       const platforms = expected.artifacts.filter(({ platform }) => declared.has(platform)).map(({ platform }) => platform);
-      if (name === 'homebrew' && (platforms.length !== 4 || platforms.includes('windows/amd64'))) {
+      if (name === 'homebrew' && (platforms.length !== 4 ||
+          platforms.some((platform) => platform.startsWith('windows/')))) {
         throw new Error('Published Homebrew channel requires exactly the four Unix platforms');
       }
       expected.channels[name] = { status: 'published', command, version: expected.version, url, platforms };

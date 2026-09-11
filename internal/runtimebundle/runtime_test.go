@@ -79,24 +79,52 @@ func TestUnsupportedPlatformDoesNotExtract(t *testing.T) {
 	_, err := resolve(func() string {
 		t.Fatal("unsupported platform extracted runtime")
 		return ""
-	}, "windows", "arm64")
+	}, "windows", "386")
 	if !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("expected unsupported platform: %v", err)
 	}
 }
 
 func TestWindowsRuntimeUsesNativeExecutableName(t *testing.T) {
-	dir := t.TempDir()
-	executable := filepath.Join(dir, "copilot-runtime.exe")
-	if err := os.WriteFile(executable, []byte("fixture"), 0600); err != nil {
-		t.Fatal(err)
+	for _, goarch := range []string{"amd64", "arm64"} {
+		t.Run(goarch, func(t *testing.T) {
+			dir := t.TempDir()
+			executable := filepath.Join(dir, "copilot-runtime.exe")
+			if err := os.WriteFile(executable, []byte("fixture"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "runtime.node"), []byte("fixture"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			path, err := resolve(func() string { return filepath.Join(dir, "copilot.exe") }, "windows", goarch)
+			if err != nil || path != executable {
+				t.Fatalf("Windows runtime path = %q, %v", path, err)
+			}
+		})
 	}
-	if err := os.WriteFile(filepath.Join(dir, "runtime.node"), []byte("fixture"), 0600); err != nil {
-		t.Fatal(err)
+}
+
+func TestSupportedPlatformsAreExact(t *testing.T) {
+	for _, platform := range []struct {
+		goos, goarch string
+	}{
+		{"darwin", "amd64"}, {"darwin", "arm64"},
+		{"linux", "amd64"}, {"linux", "arm64"},
+		{"windows", "amd64"}, {"windows", "arm64"},
+	} {
+		if !supportedPlatform(platform.goos, platform.goarch) {
+			t.Errorf("supported platform rejected: %s/%s", platform.goos, platform.goarch)
+		}
 	}
-	path, err := resolve(func() string { return filepath.Join(dir, "copilot.exe") }, "windows", "amd64")
-	if err != nil || path != executable {
-		t.Fatalf("Windows runtime path = %q, %v", path, err)
+	for _, platform := range []struct {
+		goos, goarch string
+	}{
+		{"darwin", "386"}, {"linux", "386"}, {"windows", "386"},
+		{"freebsd", "amd64"}, {"windows", "ppc64"},
+	} {
+		if supportedPlatform(platform.goos, platform.goarch) {
+			t.Errorf("unsupported platform accepted: %s/%s", platform.goos, platform.goarch)
+		}
 	}
 }
 

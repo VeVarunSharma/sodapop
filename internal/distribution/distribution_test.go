@@ -204,6 +204,23 @@ func TestManifestRejectsAmbiguousOrInvalidMetadata(t *testing.T) {
 	}
 }
 
+func TestManifestArtifactCardinalityError(t *testing.T) {
+	m := Manifest{
+		SchemaVersion:         1,
+		Version:               testVersion,
+		Commit:                strings.Repeat("a", 40),
+		CopilotRuntimeVersion: "1.0.83",
+		CopilotSDKVersion:     "1.0.13",
+	}
+	for _, count := range []int{0, 7} {
+		m.Artifacts = make([]Artifact, count)
+		err := ValidateManifest(m, nil)
+		if err == nil || err.Error() != "manifest must contain between one and six artifacts" {
+			t.Fatalf("artifact count %d error = %v", count, err)
+		}
+	}
+}
+
 type testEntry struct {
 	name string
 	mode os.FileMode
@@ -229,7 +246,7 @@ func malformedArchive(t *testing.T, platform string, entries []testEntry, transf
 	t.Helper()
 	dir := t.TempDir()
 	var buffer bytes.Buffer
-	if platform == "windows/amd64" {
+	if BinaryName(platform) == "sodapop.exe" {
 		writer := zip.NewWriter(&buffer)
 		for _, entry := range entries {
 			header := &zip.FileHeader{Name: entry.name, Method: zip.Store}
@@ -302,7 +319,7 @@ func assertRejectedUnchanged(t *testing.T, dir string, m Manifest) {
 }
 
 func TestVerifierRejectsUnsafeArchivePayloadsInBothFormats(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "windows/amd64"} {
+	for _, platform := range []string{"linux/amd64", "windows/amd64", "windows/arm64"} {
 		cases := map[string]func([]testEntry) []testEntry{
 			"duplicate binary": func(e []testEntry) []testEntry { return append(e, e[0]) },
 			"case alias": func(e []testEntry) []testEntry {
@@ -362,7 +379,7 @@ func TestVerifierRejectsUnsafeArchivePayloadsInBothFormats(t *testing.T) {
 			},
 			"setuid": func(e []testEntry) []testEntry { e[0].mode |= os.ModeSetuid; return e },
 		}
-		if platform != "windows/amd64" {
+		if BinaryName(platform) != "sodapop.exe" {
 			cases["hardlink"] = func(e []testEntry) []testEntry { e[0].kind, e[0].link = tar.TypeLink, "outside"; return e }
 			cases["not executable"] = func(e []testEntry) []testEntry { e[0].mode = 0644; return e }
 		}
@@ -379,9 +396,9 @@ func TestVerifierRejectsUnsafeArchivePayloadsInBothFormats(t *testing.T) {
 }
 
 func TestVerifierRejectsChecksumsCorruptionAndBinaryMismatch(t *testing.T) {
-	platforms := []string{"linux/amd64", "windows/amd64"}
+	platforms := []string{"linux/amd64", "windows/amd64", "windows/arm64"}
 	if runtime.GOOS == "windows" {
-		platforms = []string{"windows/amd64"}
+		platforms = []string{"windows/amd64", "windows/arm64"}
 	}
 	for _, platform := range platforms {
 		for _, mutation := range []string{"archive bytes", "archive hash", "binary hash", "checksum basename", "multiline", "uppercase", "no newline", "empty", "short", "checksum symlink", "archive symlink", "manifest symlink"} {
@@ -528,7 +545,17 @@ func TestVersionPlatformAndPinValidation(t *testing.T) {
 			t.Fatalf("invalid version accepted: %q", version)
 		}
 	}
-	for _, set := range []string{"", "linux/amd64,", " linux/amd64", "linux/amd64,linux/amd64", "windows/arm64"} {
+	wantPlatforms := []string{"darwin/amd64", "darwin/arm64", "linux/amd64", "linux/arm64", "windows/amd64", "windows/arm64"}
+	if got := DefaultPlatforms(); !slices.Equal(got, wantPlatforms) {
+		t.Fatalf("default platforms = %v, want %v", got, wantPlatforms)
+	}
+	for _, platform := range []string{"windows/amd64", "windows/arm64"} {
+		if ArchiveName(testVersion, platform) != PackageName(testVersion, platform)+".zip" ||
+			BinaryName(platform) != "sodapop.exe" {
+			t.Fatalf("incorrect Windows distribution names for %s", platform)
+		}
+	}
+	for _, set := range []string{"", "linux/amd64,", " linux/amd64", "linux/amd64,linux/amd64", "windows/386"} {
 		if _, err := ParsePlatforms(set); err == nil {
 			t.Fatalf("invalid set accepted: %q", set)
 		}
@@ -564,9 +591,9 @@ func TestVersionPlatformAndPinValidation(t *testing.T) {
 }
 
 func TestArchiveRejectsBadStagingAndExistingOutputs(t *testing.T) {
-	platforms := []string{"linux/amd64", "windows/amd64"}
+	platforms := []string{"linux/amd64", "windows/amd64", "windows/arm64"}
 	if runtime.GOOS == "windows" {
-		platforms = []string{"windows/amd64"}
+		platforms = []string{"windows/amd64", "windows/arm64"}
 	}
 	for _, platform := range platforms {
 		stage := stageFixture(t, platform)

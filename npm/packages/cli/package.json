@@ -37,7 +37,8 @@
     "@sodapop-sh/darwin-arm64": "0.0.0-development",
     "@sodapop-sh/linux-amd64": "0.0.0-development",
     "@sodapop-sh/linux-arm64": "0.0.0-development",
-    "@sodapop-sh/windows-amd64": "0.0.0-development"
+    "@sodapop-sh/windows-amd64": "0.0.0-development",
+    "@sodapop-sh/windows-arm64": "0.0.0-development"
   },
   "publishConfig": {
     "access": "public"

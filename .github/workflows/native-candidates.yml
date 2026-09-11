@@ -46,6 +46,9 @@ jobs:
           - runner: windows-2025
             target: windows/amd64
             artifact: windows-amd64
+          - runner: windows-11-vs2026-arm
+            target: windows/arm64
+            artifact: windows-arm64
     runs-on: ${{ matrix.runner }}
     env:
       SODAPOP_TARGET: ${{ matrix.target }}
@@ -59,6 +62,21 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert native ARM64 runner and Node
+        if: endsWith(matrix.target, '/arm64')
+        shell: pwsh
+        run: |
+          $osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($osArchitecture -ne 'Arm64') {
+            throw "Expected an ARM64 operating system, found $osArchitecture."
+          }
+          $nodeArchitecture = node -p "process.arch"
+          if ($LASTEXITCODE -ne 0 -or $nodeArchitecture.Trim() -ne 'arm64') {
+            throw "Expected native ARM64 Node.js, found $nodeArchitecture."
+          }
       - name: Bundle the pinned runtime once
         shell: bash
         run: bash scripts/bundle.sh

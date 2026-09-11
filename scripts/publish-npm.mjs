@@ -10,7 +10,8 @@ const platformNames = new Set([
   "@sodapop-sh/darwin-arm64",
   "@sodapop-sh/linux-amd64",
   "@sodapop-sh/linux-arm64",
-  "@sodapop-sh/windows-amd64"
+  "@sodapop-sh/windows-amd64",
+  "@sodapop-sh/windows-arm64"
 ]);
 
 export function validVersion(version) {

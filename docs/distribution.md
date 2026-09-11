@@ -29,7 +29,7 @@ after verifying each adjacent checksum. Missing, duplicate, malformed, or
 unexpected platform entries fail the release rather than producing a partial
 manifest.
 
-The default release set contains all five supported targets. The manifest tool's
+The default release set contains all six supported targets. The manifest tool's
 explicit `--platforms` option permits a declared subset for local tests; it must
 not be used to hide a failed platform that a public channel still advertises.
 Windows portable packages use ZIP, not a Unix-only extraction instruction.
@@ -196,26 +196,30 @@ secret in GitHub, not in this checkout or chat. It opens a version-update PR; it
 does not create the tap, merge the PR, or imply that the public tap has updated.
 
 Stable npm publication is bound to a stable, immutable, attested GitHub release,
-the protected npm environment, and the five-platform public-registry installation
+the protected npm environment, and the six-platform public-registry installation
 checks. It does not claim Apple notarization, Homebrew readiness, or live Copilot
 qualification; those gates may complete independently after npm publication.
-The Windows npm package uses the verified portable release archive. Production
-Authenticode, MSI, WinGet, and Scoop publication remain deferred and are not
-implied by npm availability.
+The Windows ARM64 and x64 npm packages use their verified portable release
+archives. Node on Windows ARM64 selects `@sodapop-sh/windows-arm64`; x64 Node
+continues to select `@sodapop-sh/windows-amd64`. Production Authenticode and
+ARM64 MSI, WinGet, and Scoop publication remain phase 2 until natively qualified
+and are not implied by core ZIP/npm availability.
 Stable tap updates still require `SODAPOP_STABLE_RELEASE_QUALIFIED=true`. This
 records owner sign-off after the broader native, signing/notarization, and sign-in
 qualification; it is not an automated signature validator. Leave it unset until
 that evidence exists.
 Registering WinGet/Scoop channels, configuring signing credentials, and obtaining
-native ARM64 evidence remain separate external/platform gates.
+ARM64 installer evidence remain separate external/platform gates.
 
 ## Windows installer execution
 
-The five-platform install workflow exercises the native Windows portable path
-and generates channel manifests. `windows-installers.yml` is a separate manual
-gate for MSI and opt-in WinGet/Scoop installation. It consumes two published,
-attested numeric releases and tests actual installation, repair, upgrade, and
-removal. Those public releases must exist before that workflow can succeed.
+The six-platform install workflow exercises the native Windows ARM64/x64
+portable paths and generates channel manifests. `windows-installers.yml` is a
+separate manual gate for MSI and opt-in WinGet/Scoop installation. Its current
+x64 qualification consumes two published, attested numeric releases and tests
+actual installation, repair, upgrade, and removal. ARM64 MSI/WinGet/Scoop
+qualification is phase 2. Those public releases must exist before either
+installer workflow can succeed.
 
 Its runner labels must identify a provisioned, disposable, **non-elevated**
 Windows x64 user. The default `sodapop-disposable` label is a requirement to

@@ -8,13 +8,24 @@ param(
     [switch] $UnsignedCandidate
 )
 . "$PSScriptRoot/Common.ps1"
-Assert-WindowsX64
 $msiPath = Get-RegularFile $Msi
 $inputPath = Get-RegularFile $InputMetadata
 $outputPath = Get-NewDirectoryPath $Output
 if ([IO.Path]::GetExtension($msiPath) -ine '.msi') { throw 'Expected an MSI file.' }
 $inputData = Get-Content -LiteralPath $inputPath -Raw | ConvertFrom-Json
+if ($inputData.platform -notin @('windows/amd64', 'windows/arm64') -or
+    $inputData.architecture -cne (Convert-WindowsPlatformToArchitecture $inputData.platform) -or
+    $inputData.wix_architecture -cne $inputData.architecture -or
+    $inputData.archive -cne "sodapop-$($inputData.version)-$($inputData.platform.Replace('/', '-')).zip") {
+    throw 'MSI input has invalid or inconsistent architecture metadata.'
+}
+Assert-NativeWindowsArchitecture $inputData.platform
 Assert-StagedPayload ([IO.Path]::GetDirectoryName($inputPath)) $inputData
+$expectedMsi = "sodapop-$($inputData.version)-$($inputData.platform.Replace('/', '-'))" +
+    $(if ($UnsignedCandidate) { '-unsigned.msi' } else { '.msi' })
+if ([IO.Path]::GetFileName($msiPath) -cne $expectedMsi) {
+    throw "MSI filename must be $expectedMsi"
+}
 $signature = Get-AuthenticodeSignature -LiteralPath $msiPath
 $status = 'unsigned-candidate'
 $thumbprint = $null
@@ -34,7 +45,9 @@ if ($UnsignedCandidate) {
 Write-NewJson $outputPath ([ordered]@{
     schema_version = 1
     version = $inputData.version
-    architecture = 'x64'
+    platform = $inputData.platform
+    architecture = $inputData.architecture
+    wix_architecture = $inputData.wix_architecture
     scope = 'perUser'
     product_code = $inputData.product_code
     upgrade_code = $inputData.upgrade_code

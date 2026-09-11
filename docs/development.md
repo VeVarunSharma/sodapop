@@ -8,9 +8,9 @@ inside the application; they do not need to register an OAuth app.
 
 Use the Go version required by [go.mod](../go.mod) or later; the current
 requirement is Go 1.27.1. You also need Git and network access to fetch the pinned
-Go dependencies and Copilot runtime. Windows x64 source builds use Git Bash.
+Go dependencies and Copilot runtime. Windows ARM64 and x64 source builds use Git Bash.
 
-Native targets are macOS and glibc-based Linux on ARM64/x64, plus Windows x64.
+Native targets are macOS, glibc-based Linux, and Windows on ARM64/x64.
 The npm distribution tooling separately requires Node.js 18 or later.
 The website is a separate package with its own Node toolchain; it is not a
 dependency of a native application build.
@@ -49,7 +49,7 @@ make start
 The installed executable does not need Go, Node.js, or an existing Copilot
 installation.
 
-On Windows x64, with the public-client setting exported when sign-in is needed:
+On Windows ARM64 or x64, with the public-client setting exported when sign-in is needed:
 
 ```sh
 bash scripts/build.sh
@@ -106,16 +106,20 @@ version 1. A manifest binds the release version and commit, both
 and executable hashes. Windows portable artifacts use ZIP with `sodapop.exe`;
 macOS/Linux use `.tar.gz`.
 
-The default native release set contains all five supported targets. An explicit
+The default native release set contains all six supported targets. An explicit
 `--platforms` subset is useful for local checks, but every declared artifact must
 exist. Never silently drop a missing platform that the public channel advertises.
 When the npm builder receives `--platforms`, it must exactly match the manifest.
 
 The [npm packaging guide](../npm/README.md) describes manifest-derived,
-exact-version optional dependencies. A qualified Windows ZIP can supply
-`@sodapop-sh/windows-amd64`; a four-Unix manifest does not advertise that dependency.
-The four-Unix `npm/packages/cli/package.json` is a development template, not
-the published support matrix.
+exact-version optional dependencies. Qualified Windows ZIPs can supply
+`@sodapop-sh/windows-arm64` and `@sodapop-sh/windows-amd64`; Node selects ARM64
+on Windows ARM64 and x64 on Windows x64. `npm/packages/cli/package.json` is a
+development template, not publication evidence or the published support matrix.
+
+Core Windows ARM64 ZIP and npm delivery are part of the six-platform release
+contract. ARM64 MSI, WinGet, and Scoop remain phase 2 until native installer
+qualification is complete.
 
 Generating packages and matching hashes do not establish registry availability,
 publisher identity, verified attestations, or code signing. Public channels

@@ -50,7 +50,7 @@ func TestNativeInstallWorkflowsExerciseRealPackages(t *testing.T) {
 				t.Fatal(err)
 			}
 			text := string(data)
-			for _, value := range append(required, "macos-15", "macos-15-intel", "ubuntu-24.04", "ubuntu-24.04-arm", "windows-2025") {
+			for _, value := range append(required, "macos-15", "macos-15-intel", "ubuntu-24.04", "ubuntu-24.04-arm", "windows-2025", "windows-11-vs2026-arm", "windows/arm64") {
 				if !strings.Contains(text, value) {
 					t.Errorf("missing native install contract %q", value)
 				}
@@ -79,8 +79,10 @@ func TestTargetedInstallDownloadsMatchChannelNeeds(t *testing.T) {
 	}
 	exact := "name: ${{ inputs.current_artifact_prefix }}${{ matrix.artifact }}"
 	pattern := "pattern: ${{ inputs.current_artifact_prefix }}*"
-	if !strings.Contains(portable, exact) || strings.Contains(portable, pattern) {
-		t.Fatal("portable npm must download only its matrix target")
+	windowsPattern := "pattern: ${{ inputs.current_artifact_prefix }}windows-*"
+	if !strings.Contains(portable, exact) || strings.Contains(portable, pattern) ||
+		!strings.Contains(portable, windowsPattern) || !strings.Contains(portable, "runner.os == 'Windows'") {
+		t.Fatal("portable npm must download its exact non-Windows target and both Windows archives for combined channel manifests")
 	}
 	if !strings.Contains(homebrew, pattern) || !strings.Contains(homebrew, "merge-multiple: true") ||
 		strings.Contains(homebrew, exact) {
@@ -366,6 +368,8 @@ func TestNPMBootstrapWorkflowIsOneTimeAndProtected(t *testing.T) {
 		"gh release verify ", "gh release verify-asset ", "go run ./scripts/releasectl verify",
 		"registry-url: https://registry.npmjs.org", "npm@11.15.0",
 		"node scripts/publish-npm.mjs", "preview",
+		"Expected six native packages including windows-arm64",
+		"@sodapop-sh/windows-arm64",
 	} {
 		if !strings.Contains(text, requirement) {
 			t.Errorf("npm bootstrap workflow is missing %q", requirement)

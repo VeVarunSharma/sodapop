@@ -84,10 +84,12 @@ When enabling release mode, configure the public repository, an exact release
 tag when selecting a prerelease, and separately published npm/Homebrew channels
 as defined in the channel configuration. A prerelease npm channel must match
 the `preview` dist-tag; stable npm must match `latest`. The
-resolver validates release and manifest identity, platform assets, and checksum
-metadata before replacing the local resolved catalog. Failure must leave previous
-valid metadata/deployment intact. The website never publishes an application
-release, npm package, or tap formula itself.
+resolver validates the six-platform release and manifest identity, platform
+assets, and checksum metadata before replacing the local resolved catalog. npm
+advertises Windows ARM64 only when the matching release ZIP, manifest entry, and
+`@sodapop-sh/windows-arm64` metadata align; Homebrew remains exactly four Unix
+platforms. Failure must leave previous valid metadata/deployment intact. The
+website never publishes an application release, npm package, or tap formula itself.
 
 For offline review when production configuration requires resolved release data:
 
