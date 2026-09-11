@@ -51,12 +51,16 @@ type release struct {
 }
 
 type options struct {
-	command, dir, manifest, output, tool, packageID, tag string
+	command, dir, manifest, output, tool, packageID, tag, platform string
 }
 
-// There is intentionally no ARM64 entry until native release evidence exists.
-var architectures = map[string]struct{ winget, scoop string }{
-	"windows/amd64": {"x64", "64bit"},
+type architecture struct {
+	winget, scoop, wix string
+}
+
+var architectures = map[string]architecture{
+	"windows/amd64": {"x64", "64bit", "x64"},
+	"windows/arm64": {"arm64", "arm64", "arm64"},
 }
 
 func main() {
@@ -78,6 +82,7 @@ func run(args []string) error {
 	f.StringVar(&o.tool, "releasectl", os.Getenv("SODAPOP_RELEASECTL"), "native shared verifier executable")
 	f.StringVar(&o.packageID, "package-id", "VeVarunSharma.Sodapop", "WinGet identifier")
 	f.StringVar(&o.tag, "tag", "", "exact public tag (default vVERSION)")
+	f.StringVar(&o.platform, "platform", "windows/amd64", "selected Windows platform for portable/MSI operations")
 	if err := f.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -90,6 +95,9 @@ func run(args []string) error {
 	if len(o.packageID) > 128 || !idRE.MatchString(o.packageID) {
 		return errors.New("invalid WinGet package identifier")
 	}
+	if _, ok := architectures[o.platform]; !ok {
+		return errors.New("--platform must be windows/amd64 or windows/arm64")
+	}
 	var err error
 	for _, p := range []*string{&o.dir, &o.manifest, &o.output, &o.tool} {
 		*p, err = filepath.Abs(*p)
@@ -100,7 +108,7 @@ func run(args []string) error {
 	if err := newDestination(o.output); err != nil {
 		return err
 	}
-	r, a, err := readRelease(o.manifest)
+	r, artifacts, err := readRelease(o.manifest)
 	if err != nil {
 		return err
 	}
@@ -115,20 +123,38 @@ func run(args []string) error {
 			return err
 		}
 	}
-	if err := invokeVerifier(o, "verify", ""); err != nil {
-		return err
-	}
 	if o.command == "portable" {
+		if _, ok := artifacts[o.platform]; !ok {
+			return fmt.Errorf("missing %s release artifact", o.platform)
+		}
+		if err := invokeVerifier(o, o.platform, "verify", ""); err != nil {
+			return err
+		}
 		// The shared extractor owns path/link/root and archive/binary verification.
-		return invokeVerifier(o, "extract", o.output)
+		return invokeVerifier(o, o.platform, "extract", o.output)
+	}
+	if o.command == "prepare-msi" {
+		if _, ok := artifacts[o.platform]; !ok {
+			return fmt.Errorf("missing %s release artifact", o.platform)
+		}
+		if err := invokeVerifier(o, o.platform, "verify", ""); err != nil {
+			return err
+		}
+	}
+	if o.command == "manifests" {
+		for _, platform := range sortedPlatforms(artifacts) {
+			if err := invokeVerifier(o, platform, "verify", ""); err != nil {
+				return err
+			}
+		}
 	}
 	if err := os.Mkdir(o.output, 0755); err != nil {
 		return err
 	}
 	if o.command == "manifests" {
-		return writeManifests(o, r, a)
+		return writeManifests(o, r, artifacts)
 	}
-	return prepareMSI(o, r, a)
+	return prepareMSI(o, r, artifacts[o.platform])
 }
 
 func newDestination(destination string) error {
@@ -154,9 +180,9 @@ func newDestination(destination string) error {
 	}
 }
 
-func readRelease(filename string) (release, artifact, error) {
+func readRelease(filename string) (release, map[string]artifact, error) {
 	var r release
-	var selected artifact
+	selected := make(map[string]artifact)
 	info, err := os.Lstat(filename)
 	if err != nil {
 		return r, selected, err
@@ -194,15 +220,15 @@ func readRelease(filename string) (release, artifact, error) {
 			return r, selected, errors.New("duplicate platform or invalid release hash")
 		}
 		seen[a.Platform] = true
-		if a.Platform == "windows/amd64" {
-			if a.Archive != archiveRoot(r.Version)+".zip" {
+		if _, ok := architectures[a.Platform]; ok {
+			if a.Archive != archiveRoot(r.Version, a.Platform)+".zip" {
 				return r, selected, errors.New("Windows archive name does not match release version and platform")
 			}
-			selected = a
+			selected[a.Platform] = a
 		}
 	}
-	if selected.Platform == "" {
-		return r, selected, errors.New("missing windows/amd64 release artifact")
+	if len(selected) == 0 {
+		return r, selected, errors.New("missing Windows release artifact")
 	}
 	return r, selected, nil
 }
@@ -240,10 +266,21 @@ func msiVersion(v string) error {
 	return nil
 }
 
-func archiveRoot(version string) string { return "sodapop-" + version + "-windows-amd64" }
+func archiveRoot(version, platform string) string {
+	return "sodapop-" + version + "-" + strings.ReplaceAll(platform, "/", "-")
+}
 
-func invokeVerifier(o options, action, output string) error {
-	args := []string{action, "--dir", o.dir, "--manifest", o.manifest, "--platform", "windows/amd64"}
+func sortedPlatforms(artifacts map[string]artifact) []string {
+	platforms := make([]string, 0, len(artifacts))
+	for platform := range artifacts {
+		platforms = append(platforms, platform)
+	}
+	sort.Strings(platforms)
+	return platforms
+}
+
+func invokeVerifier(o options, platform, action, output string) error {
+	args := []string{action, "--dir", o.dir, "--manifest", o.manifest, "--platform", platform}
 	if output != "" {
 		args = append(args, "--output", output)
 	}
@@ -278,7 +315,7 @@ func writeJSON(filename string, value any) error {
 	return writeNew(filename, append(data, '\n'))
 }
 
-func writeManifests(o options, r release, a artifact) error {
+func writeManifests(o options, r release, artifacts map[string]artifact) error {
 	parts := strings.Split(o.packageID, ".")
 	rel := append([]string{"winget", "manifests", strings.ToLower(o.packageID[:1])}, parts...)
 	rel = append(rel, r.Version)
@@ -290,18 +327,37 @@ func writeManifests(o options, r release, a artifact) error {
 		}
 	}
 	common := "PackageIdentifier: " + yamlString(o.packageID) + "\nPackageVersion: " + yamlString(r.Version) + "\n"
-	url := repository + "/releases/download/" + o.tag + "/" + a.Archive
 	blob := repository + "/blob/" + o.tag + "/"
-	arch := architectures[a.Platform]
+	var installers strings.Builder
+	var unsupported = []string{"x86", "arm"}
+	if len(artifacts) == 1 {
+		if _, ok := artifacts["windows/amd64"]; ok {
+			unsupported = append(unsupported, "arm64")
+		} else {
+			unsupported = append(unsupported, "x64")
+		}
+	}
+	for _, platform := range sortedPlatforms(artifacts) {
+		a := artifacts[platform]
+		arch := architectures[platform]
+		url := repository + "/releases/download/" + o.tag + "/" + a.Archive
+		fmt.Fprintf(&installers,
+			"  - Architecture: %s\n    InstallerUrl: %s\n    InstallerSha256: %s\n"+
+				"    NestedInstallerFiles:\n      - RelativeFilePath: %s\n        PortableCommandAlias: sodapop\n",
+			arch.winget, yamlString(url), yamlString(strings.ToUpper(a.ArchiveSHA256)),
+			yamlString(archiveRoot(r.Version, platform)+`\sodapop.exe`))
+	}
+	var unsupportedYAML strings.Builder
+	for _, item := range unsupported {
+		fmt.Fprintf(&unsupportedYAML, "  - %s\n", item)
+	}
 	files := map[string]string{
 		"": common + "DefaultLocale: en-US\nManifestType: version\n",
 		".installer": common + "InstallerType: zip\nNestedInstallerType: portable\n" +
-			"NestedInstallerFiles:\n  - RelativeFilePath: " + yamlString(archiveRoot(r.Version)+`\sodapop.exe`) +
-			"\n    PortableCommandAlias: sodapop\nScope: user\nElevationRequirement: elevationProhibited\n" +
+			"Scope: user\nElevationRequirement: elevationProhibited\n" +
 			"UpgradeBehavior: uninstallPrevious\nCommands:\n  - sodapop\n" +
-			"UnsupportedOSArchitectures:\n  - x86\n  - arm\n  - arm64\n" +
-			"Installers:\n  - Architecture: " + arch.winget + "\n    InstallerUrl: " + yamlString(url) +
-			"\n    InstallerSha256: " + yamlString(strings.ToUpper(a.ArchiveSHA256)) + "\nManifestType: installer\n",
+			"UnsupportedOSArchitectures:\n" + unsupportedYAML.String() +
+			"Installers:\n" + installers.String() + "ManifestType: installer\n",
 		".locale.en-US": common + "PackageLocale: en-US\nPublisher: VeVarunSharma\n" +
 			"PublisherUrl: " + yamlString(repository) + "\nPackageName: Sodapop\nPackageUrl: 'https://sodapop.sh'\n" +
 			"License: 'MIT (Sodapop); separate bundled runtime and dependency terms'\nLicenseUrl: " + yamlString(blob+"LICENSE") +
@@ -323,15 +379,22 @@ func writeManifests(o options, r release, a artifact) error {
 			return err
 		}
 	}
+	scoopArchitectures := make(map[string]any, len(artifacts))
+	for platform, a := range artifacts {
+		arch := architectures[platform]
+		scoopArchitectures[arch.scoop] = map[string]string{
+			"url":         repository + "/releases/download/" + o.tag + "/" + a.Archive,
+			"hash":        strings.ToLower(a.ArchiveSHA256),
+			"extract_dir": archiveRoot(r.Version, platform),
+		}
+	}
 	scoop := map[string]any{
-		"version":     r.Version,
-		"description": "Terminal coding assistant backed by the official GitHub Copilot SDK.",
-		"homepage":    "https://sodapop.sh",
-		"license":     map[string]string{"identifier": "Proprietary", "url": blob + "THIRD_PARTY_NOTICES.md"},
-		"architecture": map[string]any{arch.scoop: map[string]string{
-			"url": url, "hash": strings.ToLower(a.ArchiveSHA256), "extract_dir": archiveRoot(r.Version),
-		}},
-		"bin": "sodapop.exe",
+		"version":      r.Version,
+		"description":  "Terminal coding assistant backed by the official GitHub Copilot SDK.",
+		"homepage":     "https://sodapop.sh",
+		"license":      map[string]string{"identifier": "Proprietary", "url": blob + "THIRD_PARTY_NOTICES.md"},
+		"architecture": scoopArchitectures,
+		"bin":          "sodapop.exe",
 		"notes": []string{
 			"Sodapop source is MIT; the bundled Copilot runtime has separate terms. See included LICENSE, THIRD_PARTY_NOTICES.md and LICENSES.",
 			blob + "THIRD_PARTY_NOTICES.md",
@@ -347,6 +410,9 @@ type stagedFile struct {
 
 type msiInput struct {
 	Version      string       `json:"version"`
+	Platform     string       `json:"platform"`
+	Architecture string       `json:"architecture"`
+	WixArch      string       `json:"wix_architecture"`
 	ProductCode  string       `json:"product_code"`
 	UpgradeCode  string       `json:"upgrade_code"`
 	Archive      string       `json:"archive"`
@@ -362,10 +428,10 @@ func prepareMSI(o options, r release, a artifact) (result error) {
 		return err
 	}
 	defer func() { result = errors.Join(result, os.RemoveAll(extracted)) }()
-	if err := invokeVerifier(o, "extract", extracted); err != nil {
+	if err := invokeVerifier(o, a.Platform, "extract", extracted); err != nil {
 		return err
 	}
-	root := filepath.Join(extracted, archiveRoot(r.Version))
+	root := filepath.Join(extracted, archiveRoot(r.Version, a.Platform))
 	files, err := payloadFiles(root)
 	if err != nil {
 		return err
@@ -375,7 +441,8 @@ func prepareMSI(o options, r release, a artifact) (result error) {
 		return err
 	}
 	input := msiInput{
-		Version: r.Version, ProductCode: stableGUID("product:windows/amd64:" + r.Version),
+		Version: r.Version, Platform: a.Platform, Architecture: architectures[a.Platform].winget,
+		WixArch: architectures[a.Platform].wix, ProductCode: stableGUID("product:" + a.Platform + ":" + r.Version),
 		UpgradeCode: upgradeCode, Archive: a.Archive, ArchiveHash: a.ArchiveSHA256,
 		BinaryHash: a.BinarySHA256, SigningState: "unsigned-candidate",
 	}

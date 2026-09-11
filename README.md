@@ -25,7 +25,7 @@ The welcome panel introduces Sodapop's happy soda-can mascot: it lifts its pull 
 
 ## Build and run
 
-Development requires Go 1.27.1 or later, Git, and network access to fetch the pinned dependencies and runtime. Node.js 18 or later is also needed for npm distribution checks and package generation. The supported targets are macOS (`darwin/arm64`, `darwin/amd64`), glibc-based Linux (`linux/arm64`, `linux/amd64`), and Windows x64 (`windows/amd64`).
+Development requires Go 1.27.1 or later, Git, and network access to fetch the pinned dependencies and runtime. Node.js 18 or later is also needed for npm distribution checks and package generation. The six supported targets are macOS (`darwin/arm64`, `darwin/amd64`), glibc-based Linux (`linux/arm64`, `linux/amd64`), and Windows (`windows/arm64`, `windows/amd64`).
 
 ```sh
 make build
@@ -34,7 +34,7 @@ make start
 
 The build downloads the explicitly pinned Copilot runtime, verifies the upstream asset checksums, and embeds it. End users of the resulting executable do not need Go, Node.js, or an existing Copilot installation.
 
-On Windows x64, run `bash scripts/build.sh` from Git Bash and launch `bin/sodapop.exe`. Windows release packaging likewise uses `bash scripts/package.sh`; `make install` remains the Unix local-install helper.
+On Windows ARM64 or x64, run `bash scripts/build.sh` from Git Bash and launch `bin/sodapop.exe`. Windows release packaging likewise uses `bash scripts/package.sh`; `make install` remains the Unix local-install helper.
 
 `make start` rebuilds and launches Sodapop; `make run` is an alias. Both use `SODAPOP_OUTPUT` when set, otherwise `bin/sodapop`. Run `make help` to list the available development commands. For local OAuth configuration, copy `.sodapop.env.example` to `.sodapop.env` and set only `SODAPOP_GITHUB_CLIENT_ID` to the project's existing public GitHub OAuth Client ID. The ignored `.sodapop.env` file is loaded automatically by the Makefile, not by direct script invocations or the installed executable.
 
@@ -56,10 +56,10 @@ Its native archives are available from that release, and the npm launcher is
 published under the `latest` dist-tag:
 
 ```sh
-# npm launcher (macOS, glibc-based Linux, and Windows x64)
+# npm launcher (macOS, glibc-based Linux, and Windows ARM64/x64)
 npm install --global @sodapop-sh/cli@latest
 
-# Windows x64: download the matching .zip from the GitHub Release,
+# Windows ARM64/x64: download the matching .zip from the GitHub Release,
 # verify its .sha256 sidecar, then extract sodapop.exe into a PATH directory.
 ```
 
@@ -69,9 +69,10 @@ as if it were public. Direct archives remain available for every supported
 platform. Package-manager installs do not require Go or a separate Copilot
 installation; the npm launcher does require Node.js. The exact asset, checksum,
 manifest, and installed-command checks are defined in
-[distribution testing](docs/distribution.md). Windows MSI, WinGet, and Scoop
-publication have additional native installation and ownership gates; generated
-installer metadata alone does not mean a public channel is available.
+[distribution testing](docs/distribution.md). The core Windows ARM64 release ZIP
+and `@sodapop-sh/windows-arm64` npm package are supported. ARM64 MSI, WinGet, and
+Scoop delivery remains separately gated until those installer paths are natively
+qualified; generated installer metadata alone does not mean a public channel is available.
 See [Windows delivery](packaging/windows/README.md) for verified ZIP extraction,
 per-user MSI recipes, and WinGet/Scoop manifests.
 
@@ -230,7 +231,7 @@ make runtime-smoke
 SODAPOP_TARGET=linux/amd64 SODAPOP_VERSION=0.0.2 make package
 ```
 
-Windows builds use `bin/sodapop.exe` by default. Cross-compilation checks build tags and packaging, but Windows ACL enforcement, session locking, Credential Manager access, and the bundled runtime handshake must run on a native Windows x64 runner.
+Windows builds use `bin/sodapop.exe` by default. Cross-compilation checks build tags and packaging, but Windows ACL enforcement, session locking, Credential Manager access, and the bundled runtime handshake must run on a native Windows runner for the matching architecture.
 
 Normal tests are credential-free. `make coverage` enforces both the committed total statement-coverage baseline and package floors for `internal/app`, `internal/engine`, `internal/skills`, and handwritten `internal/runtimebundle` code. Generated embedded-runtime sources are excluded from the runtime package floor but remain compiled and covered by native smoke checks. `make check` adds race testing and vet. Feature, bug-fix, and observable behavior changes should add or update focused tests in the same change. If the full suite genuinely raises coverage, run `make coverage-baseline` and review the baseline increase; the command refuses to keep or lower the existing value.
 
@@ -319,6 +320,6 @@ for content, release metadata, and deployment configuration.
 
 ## Boundaries
 
-The first release supports macOS, glibc-based Linux, Windows x64 local coding, explicit local stdio MCP servers, and explicit bundled/local/public-Git skills. Windows ARM64, BYOK, remote MCP transports and OAuth, plugin management, private Git skill authentication, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
+The first release supports macOS, glibc-based Linux, Windows ARM64/x64 local coding, explicit local stdio MCP servers, and explicit bundled/local/public-Git skills. ARM64 MSI/WinGet/Scoop delivery, BYOK, remote MCP transports and OAuth, plugin management, private Git skill authentication, fleet orchestration, remote sessions, IDE integration, and automatic rollback are not included.
 
 Sodapop is an independent application, not the official GitHub Copilot CLI. See [third-party notices](THIRD_PARTY_NOTICES.md).

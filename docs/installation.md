@@ -25,22 +25,25 @@ These are application build targets, not a claim that every channel is public.
 | macOS | Intel x64 | `darwin/amd64` | `.tar.gz` |
 | Linux with glibc | ARM64 | `linux/arm64` | `.tar.gz` |
 | Linux with glibc | x64 | `linux/amd64` | `.tar.gz` |
+| Windows | ARM64 | `windows/arm64` | `.zip` |
 | Windows | x64 | `windows/amd64` | `.zip` |
 
 Homebrew is scoped to the four macOS/Linux targets. npm's supported platform set
 comes from the exact release manifest and matching package version, not from
 the repository's development package template.
 
-Windows x64 npm support is conditional: `@sodapop-sh/windows-amd64` is available only
-when the release manifest includes the qualified Windows ZIP and the matching
-npm package version is actually published. A four-Unix release does not
-advertise a Windows dependency. Check the [download page](/download/) for
-confirmed channel availability; package-generation code is not evidence of
-publication.
+Windows npm support is architecture-specific and conditional:
+`@sodapop-sh/windows-arm64` or `@sodapop-sh/windows-amd64` is advertised only
+when the six-platform release manifest includes the matching qualified ZIP and
+that exact npm package version is published. Node on Windows ARM64 selects the
+ARM64 package; x64 Node continues to select the x64 package. Check the
+[download page](/download/) for confirmed channel availability; package-generation
+code is not evidence of publication.
 
-Windows ARM64 and musl-based Linux are not supported native targets. Do not
-substitute an archive or npm package for a different operating system or
-architecture.
+The core Windows ARM64 ZIP and npm path are supported. ARM64 MSI, WinGet, and
+Scoop delivery remains phase 2 until each installer path has native qualification.
+Musl-based Linux is not a supported target. Do not substitute an archive or npm
+package for a different operating system or architecture.
 
 Native executables include the pinned Copilot runtime. End users of native or
 Homebrew installations do not need Go, Node.js, or a separately installed

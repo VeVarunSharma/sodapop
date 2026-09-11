@@ -42,7 +42,7 @@ trust before installation. Skill instructions cannot grant tool permissions.
 
 The runtime and SDK pins are in `internal/runtimebundle/version.go` and `go.mod`. The build invokes the official SDK bundler with an explicit runtime version and supported target. Generated artifacts stay out of Git.
 
-The first-party module is `github.com/VeVarunSharma/sodapop`; `cmd/sodapop` builds to `bin/sodapop` by default and `bin/sodapop.exe` on Windows. Supported target names are `darwin/arm64`, `darwin/amd64`, `linux/arm64`, `linux/amd64`, and `windows/amd64`. The project lives at [sodapop.sh](https://sodapop.sh) and [github.com/VeVarunSharma/sodapop](https://github.com/VeVarunSharma/sodapop).
+The first-party module is `github.com/VeVarunSharma/sodapop`; `cmd/sodapop` builds to `bin/sodapop` by default and `bin/sodapop.exe` on Windows. Supported target names are `darwin/arm64`, `darwin/amd64`, `linux/arm64`, `linux/amd64`, `windows/arm64`, and `windows/amd64`. The project lives at [sodapop.sh](https://sodapop.sh) and [github.com/VeVarunSharma/sodapop](https://github.com/VeVarunSharma/sodapop).
 
 Packaging uses fresh temporary staging and an explicit payload list, so local
 environment files and stale output cannot enter a candidate archive. macOS/Linux

@@ -472,11 +472,13 @@ test('the real curated prose generates all approved routes using isolated fixtur
   assert.doesNotMatch(generated['installation.md'].toString(), /\b(?:npm install|brew install)\b/);
   const installation = generated['installation.md'].toString().replace(/\s+/g, ' ');
   assert.match(installation, /Homebrew is scoped to the four macOS\/Linux targets/);
-  assert.match(installation, /Windows x64 npm support is conditional/);
-  assert.match(installation, /qualified Windows ZIP and the matching npm package version is actually published/);
+  assert.match(installation, /`windows\/arm64`/);
+  assert.match(installation, /`@sodapop-sh\/windows-arm64` or `@sodapop-sh\/windows-amd64`/);
+  assert.match(installation, /x64 Node continues to select the x64 package/);
+  assert.match(installation, /ARM64 MSI, WinGet, and Scoop delivery remains phase 2/);
   assert.match(installation, /Matching hashes do not verify release attestations/);
   const troubleshooting = generated['troubleshooting.md'].toString().replace(/\s+/g, ' ');
-  assert.match(troubleshooting, /@sodapop-sh\/windows-amd64` package version being published/);
+  assert.match(troubleshooting, /@sodapop-sh\/windows-arm64` or `@sodapop-sh\/windows-amd64` package version/);
   assert.match(troubleshooting, /Launcher and native package versions must match/);
   assert.match(generated['getting-started.md'].toString(), /end users do not need to register an OAuth app/);
   assert.match(generated['development/authentication.md'].toString(),
@@ -485,7 +487,9 @@ test('the real curated prose generates all approved routes using isolated fixtur
   assert.ok(generated['development/index.md'].toString()
     .includes(`[npm packaging guide](${canonicalRepository}/blob/HEAD/npm/README.md)`));
   const development = generated['development/index.md'].toString().replace(/\s+/g, ' ');
-  assert.match(development, /development template, not the published support matrix/);
+  assert.match(development, /development template, not publication evidence or the published support matrix/);
+  assert.match(development, /default native release set contains all six supported targets/);
+  assert.match(development, /Node selects ARM64 on Windows ARM64 and x64 on Windows x64/);
   assert.match(development, /select an exact stable or prerelease tag/);
   assert.match(development, /prerelease npm uses `preview`, while Homebrew remains stable-only/);
   const distribution = generated['development/distribution.md'].toString().replace(/\s+/g, ' ');
@@ -495,6 +499,8 @@ test('the real curated prose generates all approved routes using isolated fixtur
   assert.match(distribution, /declared subset for local tests/);
   assert.match(distribution, /must not be used to hide a failed platform that a public channel still advertises/);
   assert.match(distribution, /Windows portable packages use ZIP/);
+  assert.match(distribution, /default release set contains all six supported targets/);
+  assert.match(distribution, /ARM64 MSI, WinGet, and Scoop publication remain phase 2/);
   assert.match(distribution, /not by itself proof of publisher identity/);
   assert.deepEqual(await tree(f.repositoryRoot), sourceBefore);
 });

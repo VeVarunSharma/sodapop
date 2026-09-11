@@ -25,9 +25,12 @@ function fixture(target = host, binary = runner) {
   return { ...paths, directory, env, packageRoot: paths.cli, platform: target.os, arch: target.cpu, getReport: () => ({ header: { glibcVersionRuntime: "2.36" } }) };
 }
 
-test("maps all supported targets including Windows x64 and rejects unknown CPUs", () => {
+test("maps all supported targets including native Windows architectures and rejects unknown CPUs", () => {
+  assert.equal(Object.keys(TARGETS).length, 6);
   for (const target of Object.values(TARGETS)) assert.equal(platformPackage(target.os, target.cpu), target.package);
-  for (const pair of [["win32", "arm64"], ["linux", "riscv64"], ["freebsd", "x64"], ["darwin", "amd64"]]) {
+  assert.equal(platformPackage("win32", "arm64"), "@sodapop-sh/windows-arm64");
+  assert.equal(platformPackage("win32", "x64"), "@sodapop-sh/windows-amd64");
+  for (const pair of [["win32", "ia32"], ["linux", "riscv64"], ["freebsd", "x64"], ["darwin", "amd64"]]) {
     assert.throws(() => platformPackage(...pair), { code: "SODAPOP_UNSUPPORTED_PLATFORM" });
   }
 });
@@ -65,12 +68,14 @@ test("payload resolution distinguishes unavailable, ambiguous, missing, version,
   assert.throws(() => resolvePayload(missing), { code: "SODAPOP_MISSING_PAYLOAD" });
 });
 
-test("Windows resolves an actual cross-compiled PE fixture as bin/sodapop.exe", () => {
-  const target = TARGETS["win32-x64"];
-  const binary = process.platform === "win32" ? runner : buildRunner(root, target);
-  assert.equal(readFileSync(binary).subarray(0, 2).toString(), "MZ");
-  const f = fixture(target, binary);
-  assert.equal(resolvePayload(f), path.join(f.platformRoot, "bin/sodapop.exe"));
+test("Windows x64 and arm64 resolve their architecture-matched PE fixtures", () => {
+  for (const key of ["win32-x64", "win32-arm64"]) {
+    const target = TARGETS[key];
+    const binary = target === host ? runner : buildRunner(root, target);
+    assert.equal(readFileSync(binary).subarray(0, 2).toString(), "MZ");
+    const f = fixture(target, binary);
+    assert.equal(resolvePayload(f), path.join(f.platformRoot, "bin/sodapop.exe"));
+  }
 });
 
 test("injected subprocess inherits exact stdio, cwd, arguments, and native status", async () => {

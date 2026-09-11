@@ -23,6 +23,12 @@ function sandboxFixture(t, registryInstall = false) {
   return createNpmSandbox(path.join(root, "isolated"), { registryInstall });
 }
 
+test("install fixtures expose all six architecture-specific native packages", () => {
+  assert.equal(Object.keys(TARGETS).length, 6);
+  assert.equal(TARGETS["win32-arm64"].package, "@sodapop-sh/windows-arm64");
+  assert.equal(TARGETS["win32-x64"].package, "@sodapop-sh/windows-amd64");
+});
+
 test("native install command requires current inputs and an optional complete previous pair", () => {
   for (const args of [
     [], ["--release-dir", "current"], ["--manifest", "current.json"],

@@ -13,7 +13,10 @@ by this package's release metadata:
 
 - macOS on Apple silicon or Intel
 - glibc-based Linux on arm64 or amd64
-- Windows x64, only in releases with a qualified Windows payload
+- Windows on arm64 or x64, only in releases with the matching qualified payload
+
+Selection follows Node's `process.arch`: ARM64 Node selects the Windows arm64
+payload, while x64 Node running on Windows ARM selects the Windows x64 payload.
 
 Other operating system or CPU combinations, musl Linux, and ambiguous Linux
 libc detection are not supported.

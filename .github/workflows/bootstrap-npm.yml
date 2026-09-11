@@ -30,7 +30,6 @@ jobs:
       VERSION: ${{ inputs.version }}
       CONFIRMATION: ${{ inputs.confirmation }}
       BOOTSTRAP_ENABLED: ${{ vars.SODAPOP_NPM_BOOTSTRAP_ENABLED }}
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +45,8 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org
       - name: Require explicit one-time bootstrap approval
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         shell: bash
         run: |
           if [[ "$BOOTSTRAP_ENABLED" != true || "$CONFIRMATION" != 'BOOTSTRAP @sodapop-sh' ]]; then
@@ -84,8 +85,40 @@ jobs:
             --release-dir "$GITHUB_WORKSPACE/publication/release" \
             --manifest "$GITHUB_WORKSPACE/publication/release/sodapop-$VERSION-manifest.json" \
             --output "$GITHUB_WORKSPACE/publication/npm"
+      - name: Verify the initial Windows ARM64 package and complete native set
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, readdirSync } from "node:fs";
+          import path from "node:path";
+
+          const output = path.join(process.env.GITHUB_WORKSPACE, "publication", "npm");
+          const platforms = path.join(output, "platforms");
+          const directories = readdirSync(platforms, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory())
+            .map((entry) => entry.name)
+            .sort();
+          if (directories.length !== 6 || !directories.includes("windows-arm64")) {
+            throw new Error(`Expected six native packages including windows-arm64, found: ${directories.join(", ")}`);
+          }
+          const windowsArm64 = JSON.parse(readFileSync(
+            path.join(platforms, "windows-arm64", "package.json"), "utf8"
+          ));
+          if (windowsArm64.name !== "@sodapop-sh/windows-arm64" ||
+              windowsArm64.version !== process.env.VERSION ||
+              JSON.stringify(windowsArm64.os) !== JSON.stringify(["win32"]) ||
+              JSON.stringify(windowsArm64.cpu) !== JSON.stringify(["arm64"])) {
+            throw new Error("Generated Windows ARM64 package metadata is not bootstrap-safe");
+          }
+          const launcher = JSON.parse(readFileSync(path.join(output, "cli", "package.json"), "utf8"));
+          if (launcher.optionalDependencies?.["@sodapop-sh/windows-arm64"] !== process.env.VERSION) {
+            throw new Error("Launcher does not pin the initial Windows ARM64 package");
+          }
+          NODE
       - name: Install the pinned publishing CLI
         run: npm install --global npm@11.15.0 --ignore-scripts
-      - name: Publish the first package versions under preview
+      - name: Publish all native package versions before the launcher under preview
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_BOOTSTRAP_TOKEN }}
         shell: bash
         run: node scripts/publish-npm.mjs "$GITHUB_WORKSPACE/publication/npm" "$VERSION" preview

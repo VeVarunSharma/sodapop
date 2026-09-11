@@ -10,7 +10,8 @@ const platformNames = new Set([
   "@sodapop-sh/darwin-arm64",
   "@sodapop-sh/linux-amd64",
   "@sodapop-sh/linux-arm64",
-  "@sodapop-sh/windows-amd64"
+  "@sodapop-sh/windows-amd64",
+  "@sodapop-sh/windows-arm64"
 ]);
 const executablePaths = new Map([
   ["@sodapop-sh/cli", "bin/sodapop.js"],
@@ -18,7 +19,8 @@ const executablePaths = new Map([
   ["@sodapop-sh/darwin-arm64", "bin/sodapop"],
   ["@sodapop-sh/linux-amd64", "bin/sodapop"],
   ["@sodapop-sh/linux-arm64", "bin/sodapop"],
-  ["@sodapop-sh/windows-amd64", "bin/sodapop.exe"]
+  ["@sodapop-sh/windows-amd64", "bin/sodapop.exe"],
+  ["@sodapop-sh/windows-arm64", "bin/sodapop.exe"]
 ]);
 
 export function validVersion(version) {

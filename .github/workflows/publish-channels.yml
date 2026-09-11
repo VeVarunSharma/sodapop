@@ -237,10 +237,17 @@ jobs:
       matrix:
         include:
           - runner: macos-15
+            target: darwin/arm64
           - runner: macos-15-intel
+            target: darwin/amd64
           - runner: ubuntu-24.04
+            target: linux/amd64
           - runner: ubuntu-24.04-arm
+            target: linux/arm64
           - runner: windows-2025
+            target: windows/amd64
+          - runner: windows-11-vs2026-arm
+            target: windows/arm64
     runs-on: ${{ matrix.runner }}
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
@@ -258,6 +265,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Assert native ARM64 runner and Node
+        if: endsWith(matrix.target, '/arm64')
+        shell: pwsh
+        run: |
+          $osArchitecture = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+          if ($osArchitecture -ne 'Arm64') {
+            throw "Expected an ARM64 operating system, found $osArchitecture."
+          }
+          $nodeArchitecture = node -p "process.arch"
+          if ($LASTEXITCODE -ne 0 -or $nodeArchitecture.Trim() -ne 'arm64') {
+            throw "Expected native ARM64 Node.js, found $nodeArchitecture."
+          }
       - uses: actions/download-artifact@v4
         with:
           name: approved-channel-inputs

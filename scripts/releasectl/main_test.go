@@ -52,9 +52,9 @@ func cliRelease(t *testing.T, platform string) (string, string) {
 }
 
 func TestCLIEndToEnd(t *testing.T) {
-	platforms := []string{"linux/amd64", "windows/amd64"}
+	platforms := []string{"linux/amd64", "windows/amd64", "windows/arm64"}
 	if runtime.GOOS == "windows" {
-		platforms = []string{"windows/amd64"}
+		platforms = []string{"windows/amd64", "windows/arm64"}
 	}
 	for _, platform := range platforms {
 		t.Run(platform, func(t *testing.T) {
@@ -115,6 +115,9 @@ func TestCLIRejectsInvalidArgumentsBeforeOutput(t *testing.T) {
 		}
 	}
 	if output, err := runCLI("validate", "--version", "1.2.3", "--platform", "windows/amd64"); err != nil || output != "" {
+		t.Fatalf("valid input rejected: %s: %v", output, err)
+	}
+	if output, err := runCLI("validate", "--version", "1.2.3", "--platform", "windows/arm64"); err != nil || output != "" {
 		t.Fatalf("valid input rejected: %s: %v", output, err)
 	}
 }

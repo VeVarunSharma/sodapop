@@ -4,6 +4,7 @@ param(
     [Parameter(Mandatory)][string] $ReleaseDir,
     [Parameter(Mandatory)][string] $Manifest,
     [Parameter(Mandatory)][string] $OutputDir,
+    [ValidateSet('x64', 'arm64')][string] $Architecture,
     [string] $InstalledBinary,
     [string] $InstalledCommand,
     [switch] $PublicDownload,
@@ -17,9 +18,11 @@ param(
     [switch] $AllowUnsignedCandidate
 )
 . "$PSScriptRoot/Common.ps1"
-Assert-WindowsX64
+$platform = if ($Architecture) { Convert-WindowsArchitectureToPlatform $Architecture } else { Get-NativeWindowsPlatform }
+$Architecture = Convert-WindowsPlatformToArchitecture $platform
+Assert-NativeWindowsArchitecture $platform
 if ($InstalledCommand -and -not $InstalledBinary) { throw '-InstalledCommand requires an independently hash-checked -InstalledBinary.' }
-if ($MsiLifecycle) { Assert-DisposableRunner }
+if ($MsiLifecycle) { Assert-DisposableRunner $platform }
 $work = Get-NewDirectoryPath $OutputDir
 $null = New-Item -ItemType Directory -Path $work
 $manifestPath = Get-RegularFile $Manifest
@@ -30,8 +33,9 @@ if ($PublicDownload) {
     if ($downloadRelease.version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
         throw 'Invalid public version.'
     }
-    $asset = @($downloadRelease.artifacts | Where-Object platform -CEQ 'windows/amd64')
-    if ($asset.Count -ne 1 -or $asset[0].archive -cne "sodapop-$($downloadRelease.version)-windows-amd64.zip") {
+    $asset = @($downloadRelease.artifacts | Where-Object platform -CEQ $platform)
+    if ($asset.Count -ne 1 -or
+        $asset[0].archive -cne "sodapop-$($downloadRelease.version)-$($platform.Replace('/', '-')).zip") {
         throw 'Invalid public Windows archive.'
     }
     $ReleaseDir = Join-Path $work 'download'
@@ -42,7 +46,7 @@ if ($PublicDownload) {
     Assert-Hash $zip $asset[0].archive_sha256
     Invoke-WebRequest -Uri "$url.sha256" -OutFile "$zip.sha256" -MaximumRedirection 5
 }
-$current = Get-VerifiedRelease $ReleaseDir $manifestPath
+$current = Get-VerifiedRelease $ReleaseDir $manifestPath $platform
 $evidence = [Collections.Generic.List[object]]::new()
 $profile = Join-Path $work 'isolated-profile'
 foreach ($child in @('', 'AppData/Roaming', 'AppData/Local', 'Temp', 'project')) {
@@ -50,6 +54,7 @@ foreach ($child in @('', 'AppData/Roaming', 'AppData/Local', 'Temp', 'project'))
 }
 
 function Test-CommandBytes([string] $Binary, $ReleaseInfo, [string] $Phase, [string] $LaunchPath = '') {
+    Assert-WindowsExecutableArchitecture $Binary $ReleaseInfo.Platform
     Assert-Hash $Binary $ReleaseInfo.Artifact.binary_sha256
     if (-not $LaunchPath) { $LaunchPath = $Binary }
     foreach ($argument in @('--help', '--version', '--check-runtime', '--check-runtime')) {
@@ -89,8 +94,9 @@ function Test-CommandBytes([string] $Binary, $ReleaseInfo, [string] $Phase, [str
 }
 
 $portable = Join-Path $work 'portable'
-Invoke-WindowsCtl @('portable', '--dir', $ReleaseDir, '--manifest', $manifestPath, '--output', $portable)
-$binary = Join-Path $portable "sodapop-$($current.Release.version)-windows-amd64/sodapop.exe"
+Invoke-WindowsCtl @('portable', '--dir', $ReleaseDir, '--manifest', $manifestPath, '--output', $portable,
+    '--platform', $platform)
+$binary = Join-Path $portable "$($current.ArchiveRoot)/sodapop.exe"
 Test-CommandBytes $binary $current 'portable'
 if ($InstalledBinary) {
     Test-CommandBytes (Get-RegularFile $InstalledBinary) $current 'channel-installed'
@@ -105,7 +111,7 @@ if ($MsiLifecycle) {
         if (-not $value) { throw 'MSI lifecycle requires current and previous MSI, MSI metadata, release directories and final manifests.' }
     }
     $null = Get-Command msiexec.exe -CommandType Application -ErrorAction Stop
-    $previous = Get-VerifiedRelease $PreviousReleaseDir $PreviousManifest
+    $previous = Get-VerifiedRelease $PreviousReleaseDir $PreviousManifest $platform
     if ($current.Release.version -notmatch '^\d+\.\d+\.\d+$' -or $previous.Release.version -notmatch '^\d+\.\d+\.\d+$' -or
         [version] $previous.Release.version -ge [version] $current.Release.version) {
         throw 'MSI upgrade needs two strictly increasing numeric release versions.'
@@ -114,7 +120,9 @@ if ($MsiLifecycle) {
     function Read-MsiEvidence([string] $Package, [string] $Metadata, $ReleaseInfo) {
         $packagePath = Get-RegularFile $Package
         $record = Get-Content -LiteralPath (Get-RegularFile $Metadata) -Raw | ConvertFrom-Json
-        if ($record.schema_version -ne 1 -or $record.scope -cne 'perUser' -or $record.architecture -cne 'x64' -or
+        if ($record.schema_version -ne 1 -or $record.scope -cne 'perUser' -or
+            $record.platform -cne $platform -or $record.architecture -cne $Architecture -or
+            $record.wix_architecture -cne $Architecture -or
             $record.version -cne $ReleaseInfo.Release.version -or $record.binary_sha256 -ine $ReleaseInfo.Artifact.binary_sha256 -or
             $record.source_archive_sha256 -ine $ReleaseInfo.Artifact.archive_sha256 -or
             $record.source_archive -cne $ReleaseInfo.Artifact.archive -or $record.msi -cne [IO.Path]::GetFileName($packagePath) -or
@@ -233,7 +241,8 @@ if ($MsiLifecycle) {
 }
 Write-NewJson (Join-Path $work 'native-evidence.json') ([ordered]@{
     version = $current.Release.version
-    native_platform = 'windows/amd64'
+    native_platform = $platform
+    native_architecture = $Architecture
     source = $(if ($PublicDownload) { 'public-download' } else { 'local-candidate' })
     msi_lifecycle = [bool] $MsiLifecycle
     checks = $evidence.ToArray()

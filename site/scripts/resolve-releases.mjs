@@ -7,7 +7,7 @@
  * - repository: the canonical VeVarunSharma/sodapop identity, never an endpoint.
  * - releaseTag: null for public latest stable, or an exact vX.Y.Z release tag.
  * - channels.npm.verify: opt in to checking @sodapop-sh/cli and every package declared
- *   by its published sodapop manifest, including Windows x64 when declared.
+ *   by its published sodapop manifest, including Windows ARM64/x64 when declared.
  * - channels.homebrew.verify: opt in after setting repository to the confirmed
  *   public VeVarunSharma/homebrew-sodapop tap; formula must remain "sodapop".
  *
@@ -220,8 +220,8 @@ function releaseMetadata(value, configuration) {
       (configuration.releaseTag !== null && value.tag_name !== configuration.releaseTag)) {
     fail('GitHub release URL, publication metadata, or configured tag is invalid');
   }
-  if (!Array.isArray(value.assets) || value.assets.length !== 11) {
-    fail('Public release must contain exactly five archives, five sidecars, and one manifest');
+  if (!Array.isArray(value.assets) || value.assets.length !== 13) {
+    fail('Public release must contain exactly six archives, six sidecars, and one manifest');
   }
   const assets = new Map();
   const ids = new Set();

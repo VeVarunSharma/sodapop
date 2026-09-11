@@ -14,7 +14,7 @@ When changing root Make targets, also use this guide and the [Makefile](../Makef
 - Preserve archive naming and basename-based checksum files; exercise the extracted
   archive, not a staging binary that packaging deliberately removes.
 - Release packaging requires the public OAuth client ID and a SemVer without a
-  `v` prefix. The release manifest describes all five native archives by default,
+  `v` prefix. The release manifest describes all six native archives by default,
   with commit, SDK/runtime pins, platform, archive checksum, and binary checksum.
   Explicit phase subsets must be complete for their declared `--platforms` set.
 - [releasectl](releasectl/main.go) and

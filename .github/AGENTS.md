@@ -7,11 +7,11 @@ Scope: `.github/`. Apply the [repository rules](../AGENTS.md) first.
 - Keep toolchain selection tied to `go.mod` and preserve macOS/Linux CI coverage,
   race, vet, and formatting gates plus native Windows tests so one developer's
   platform is not the only evidence.
-- Retain all five native release targets and checks on the extracted archive.
+- Retain all six native release targets and checks on the extracted archive.
   Cross-compilation alone does not exercise the packaged runtime.
 - Read `SODAPOP_GITHUB_CLIENT_ID` from the existing Actions variable, not a token
   or client secret. Preserve the OAuth registration and grants during branding changes.
-- Tagged releases build the five native archives, verify their checksums and extracted
+- Tagged releases build the six native archives, verify their checksums and extracted
   executables, then create a draft GitHub Release. Never replace assets on an existing
   release; draft review is the publication boundary.
 - Installation jobs must consume those same archives, not rebuild a replacement.

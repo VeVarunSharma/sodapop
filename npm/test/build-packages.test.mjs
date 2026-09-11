@@ -53,8 +53,8 @@ function writeWebsiteFixtures(directory) {
 }
 
 function assertWebsitePayloadIsolation(t, includeWindows) {
-  const selected = new Map([...runners].filter(([platform]) => includeWindows || platform !== "windows/amd64"));
-  assert.equal(selected.size, includeWindows ? 5 : 4);
+  const selected = new Map([...runners].filter(([platform]) => includeWindows || !platform.startsWith("windows/")));
+  assert.equal(selected.size, includeWindows ? 6 : 4);
   const f = releaseFixture(t, tools, selected);
   const repository = path.join(f.root, "repository");
   const sources = [
@@ -90,6 +90,7 @@ function assertWebsitePayloadIsolation(t, includeWindows) {
     .filter((target) => selected.has(target.platform)).map((target) => target.package).sort();
   assert.deepEqual(Object.keys(cli.optionalDependencies).sort(), expectedDependencies);
   assert.equal(cli.optionalDependencies["@sodapop-sh/windows-amd64"], includeWindows ? f.version : undefined);
+  assert.equal(cli.optionalDependencies["@sodapop-sh/windows-arm64"], includeWindows ? f.version : undefined);
   assert.deepEqual(cli.sodapop, f.data);
   const sandbox = createNpmSandbox(path.join(f.root, "sandbox"));
   for (const id of ids) {
@@ -117,7 +118,7 @@ function assertWebsitePayloadIsolation(t, includeWindows) {
   }
 }
 
-for (const [platformSet, includeWindows] of [["four-Unix", false], ["five-platform", true]]) {
+for (const [platformSet, includeWindows] of [["four-Unix", false], ["six-platform", true]]) {
   test(`website fixtures stay out of ${platformSet} npm build and pack payloads`, (t) => {
     assertWebsitePayloadIsolation(t, includeWindows);
   });
@@ -130,7 +131,7 @@ test("shared verification/extraction builds declared platforms and exact pinned 
   assert.equal(cli.version, f.version);
   assert.equal(cli.private, undefined);
   assert.deepEqual(cli.sodapop, f.data);
-  assert.equal(Object.keys(cli.optionalDependencies).length, 5);
+  assert.equal(Object.keys(cli.optionalDependencies).length, 6);
   for (const target of Object.values(TARGETS)) {
     assert.equal(cli.optionalDependencies[target.package], f.version);
     const directory = path.join(f.output, "platforms", target.platform.replace("/", "-"));
@@ -146,14 +147,17 @@ test("shared verification/extraction builds declared platforms and exact pinned 
 
 test("four-Unix and explicit host-only manifests never advertise absent payloads", (t) => {
   for (const selected of [
-    new Map([...runners].filter(([platform]) => platform !== "windows/amd64")),
+    new Map([...runners].filter(([platform]) => !platform.startsWith("windows/"))),
     new Map([[host.platform, runners.get(host.platform)]])
   ]) {
     const f = releaseFixture(t, tools, selected);
     buildPackages({ ...f, platforms: [...selected.keys()].join(",") });
     const cli = metadata(path.join(f.output, "cli"));
     assert.equal(Object.keys(cli.optionalDependencies).length, selected.size);
-    assert.equal(Object.keys(cli.optionalDependencies).includes("@sodapop-sh/windows-amd64"), host.os === "win32" && selected.size === 1);
+    assert.equal(Object.keys(cli.optionalDependencies).includes("@sodapop-sh/windows-amd64"),
+      host.os === "win32" && host.cpu === "x64" && selected.size === 1);
+    assert.equal(Object.keys(cli.optionalDependencies).includes("@sodapop-sh/windows-arm64"),
+      host.os === "win32" && host.cpu === "arm64" && selected.size === 1);
   }
 });
 
@@ -280,7 +284,7 @@ test("real npm pack and offline global install/reinstall/upgrade/uninstall use g
   preserve();
 });
 
-test("real pack checks all five platform file allowlists without cross-platform execution", (t) => {
+test("real pack checks all six platform file allowlists without cross-platform execution", (t) => {
   const f = releaseFixture(t, tools, runners);
   buildPackages(f);
   const sandbox = createNpmSandbox(path.join(f.root, "sandbox"));

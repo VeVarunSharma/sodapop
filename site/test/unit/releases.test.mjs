@@ -137,7 +137,7 @@ test('release-mode builds require local metadata rather than silently consulting
   assert.equal(f.requests.length, 0);
 });
 
-test('actual snake_case native manifest resolves all five targets without archive downloads', async (t) => {
+test('actual snake_case native manifest resolves all six targets without archive downloads', async (t) => {
   const f = await releaseFixture(t);
   const catalog = await resolveReleases(f.options);
   assert.equal(catalog.mode, 'release');
@@ -147,8 +147,10 @@ test('actual snake_case native manifest resolves all five targets without archiv
   assert.equal(catalog.copilotRuntimeVersion, f.manifest.copilot_runtime_version);
   assert.equal(catalog.copilotSdkVersion, f.manifest.copilot_sdk_version);
   assert.deepEqual(catalog.artifacts.map(({ platform }) => platform), platforms);
-  assert.equal(catalog.artifacts[4].binary, 'sodapop.exe');
-  assert.equal(catalog.artifacts[4].format, 'zip');
+  for (const artifact of catalog.artifacts.filter(({ platform }) => platform.startsWith('windows/'))) {
+    assert.equal(artifact.binary, 'sodapop.exe');
+    assert.equal(artifact.format, 'zip');
+  }
   for (const [index, artifact] of catalog.artifacts.entries()) {
     assert.equal(artifact.archive, f.manifest.artifacts[index].archive);
     assert.equal(artifact.archiveSha256, f.manifest.artifacts[index].archive_sha256);
@@ -156,7 +158,7 @@ test('actual snake_case native manifest resolves all five targets without archiv
     assert.equal(artifact.checksumUrl, `${artifact.archiveUrl}.sha256`);
     assert.equal(f.requests.some(({ url }) => url === artifact.archiveUrl), false);
   }
-  assert.equal(f.requests.length, 9);
+  assert.equal(f.requests.length, 10);
   assert.deepEqual(catalog.channels, { npm: unavailable, homebrew: unavailable });
   assert.deepEqual(await readCatalog(f.readOptions), catalog);
   const data = await snapshot(f);
@@ -165,16 +167,41 @@ test('actual snake_case native manifest resolves all five targets without archiv
   assert.equal(f.requests.some(({ url }) => url.startsWith(registry) || url.startsWith(tapAPI)), false);
 });
 
-test('documented SDK field and Windows ZIP remain explicit, with deterministic platform ordering', async (t) => {
+test('documented SDK field and Windows ZIPs remain explicit, with deterministic platform ordering', async (t) => {
   const f = await releaseFixture(t, { windowsZip: true, sdk: true });
   f.manifest.artifacts.reverse();
   f.refreshManifest();
   const catalog = await resolveReleases(f.options);
   assert.deepEqual(catalog.artifacts.map(({ platform }) => platform), platforms);
   assert.equal(catalog.copilotSdkVersion, '1.0.13');
-  assert.equal(catalog.artifacts[4].archive, `sodapop-${version}-windows-amd64.zip`);
-  assert.equal(catalog.artifacts[4].format, 'zip');
-  assert.equal(catalog.artifacts[4].binary, 'sodapop.exe');
+  assert.deepEqual(catalog.artifacts.slice(4).map(({ archive }) => archive), [
+    `sodapop-${version}-windows-arm64.zip`,
+    `sodapop-${version}-windows-amd64.zip`,
+  ]);
+  for (const artifact of catalog.artifacts.slice(4)) {
+    assert.equal(artifact.format, 'zip');
+    assert.equal(artifact.binary, 'sodapop.exe');
+  }
+});
+
+test('Windows ARM64 is unavailable unless its release archive, sidecar, and manifest entry all align', async (t) => {
+  for (const missingPart of ['archive', 'sidecar', 'manifest']) {
+    await t.test(missingPart, async (t) => {
+      const f = await releaseFixture(t, { npm: true, npmPlatforms: platforms });
+      const artifact = f.manifest.artifacts.find(({ platform }) => platform === 'windows/arm64');
+      if (missingPart === 'manifest') {
+        f.manifest.artifacts = f.manifest.artifacts.filter(({ platform }) => platform !== 'windows/arm64');
+        f.refreshManifest();
+      } else {
+        const name = missingPart === 'archive' ? artifact.archive : `${artifact.archive}.sha256`;
+        f.release.assets = f.release.assets.filter((asset) => asset.name !== name);
+      }
+      await assert.rejects(resolveReleases(f.options), missingPart === 'manifest'
+        ? /all six native platforms/
+        : /exactly six archives, six sidecars, and one manifest/);
+      await assert.rejects(readFile(f.resolvedPath), { code: 'ENOENT' });
+    });
+  }
 });
 
 test('exact configured stable tags use the tagged release endpoint, never latest/download', async (t) => {
@@ -233,8 +260,8 @@ test('malformed native schema, platform, version, filename, and hashes cannot pr
     ...['dev', '0.0.0', 'v1.2.3', '01.2.3', '1.2.3-rc.1', '1.2.3+local', '1.2.3\n', '1.2.3/other']
       .map((version) => [`version ${JSON.stringify(version)}`, (m) => { m.version = version; }]),
     ['missing native target', (m) => { m.artifacts.pop(); }],
-    ['duplicate target', (m) => { m.artifacts[4] = { ...m.artifacts[0] }; }],
-    ['unsupported Windows arm64', (m) => { m.artifacts[4].platform = 'windows/arm64'; }],
+    ['duplicate target', (m) => { m.artifacts[5] = { ...m.artifacts[0] }; }],
+    ['unsupported Windows architecture', (m) => { m.artifacts[4].platform = 'windows/386'; }],
     ['extra native target', (m) => { m.artifacts.push({ ...m.artifacts[0], platform: 'freebsd/amd64' }); }],
     ['artifact object', (m) => { m.artifacts = {}; }],
     ['artifact null', (m) => { m.artifacts[0] = null; }],
@@ -364,7 +391,7 @@ test('sidecars bind the exact manifest digest and basename and contain only one 
 test('GitHub optional asset digests are cross-checked when supplied, not fabricated when absent', async (t) => {
   const f = await releaseFixture(t);
   for (const asset of f.release.assets) delete asset.digest;
-  assert.equal((await resolveReleases(f.options)).artifacts.length, 5);
+  assert.equal((await resolveReleases(f.options)).artifacts.length, 6);
   f.release.assets.at(-1).digest = `sha256:${'f'.repeat(64)}`;
   await assert.rejects(resolveReleases(f.options), /manifest bytes.*size\/digest/);
 });
@@ -396,16 +423,18 @@ test('a four-Unix npm manifest exposes only its declared packages, not every nat
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
   assert.equal(requests.length, 6);
   assert.equal(requests.some(({ url }) => /windows|\.tgz/.test(url)), false);
-  assert.equal(catalog.artifacts[4].platform, 'windows/amd64');
+  assert.deepEqual(catalog.artifacts.slice(4).map(({ platform }) => platform), ['windows/arm64', 'windows/amd64']);
+  assert.equal(f.npm.has('windows-arm64'), true);
   assert.equal(f.npm.has('windows-amd64'), true);
   assert.deepEqual(await readCatalog(f.readOptions), catalog);
 });
 
-test('npm can publish the manifest-declared Windows ZIP independently of the four-Unix development template', async (t) => {
+test('npm can publish both manifest-declared Windows ZIPs independently of the development template', async (t) => {
   const f = await releaseFixture(t, { npm: true, homebrew: true, npmPlatforms: platforms });
   const source = await f.copySources();
   const filename = path.join(source, 'npm/packages/cli/package.json');
   const template = JSON.parse(await readFile(filename, 'utf8'));
+  delete template.optionalDependencies['@sodapop-sh/windows-arm64'];
   delete template.optionalDependencies['@sodapop-sh/windows-amd64'];
   await writeFile(filename, JSON.stringify(template));
   f.npm.get('cli').sodapop.artifacts.reverse();
@@ -413,10 +442,13 @@ test('npm can publish the manifest-declared Windows ZIP independently of the fou
   assert.equal(catalog.channels.npm.status, 'published');
   assert.deepEqual(catalog.channels.npm.platforms, platforms);
   assert.deepEqual(catalog.channels.homebrew.platforms, platforms.slice(0, 4));
-  assert.equal(catalog.artifacts[4].archive, `sodapop-${version}-windows-amd64.zip`);
-  assert.equal(catalog.artifacts[4].binary, 'sodapop.exe');
+  assert.deepEqual(catalog.artifacts.slice(4).map(({ archive, binary }) => ({ archive, binary })), [
+    { archive: `sodapop-${version}-windows-arm64.zip`, binary: 'sodapop.exe' },
+    { archive: `sodapop-${version}-windows-amd64.zip`, binary: 'sodapop.exe' },
+  ]);
   const requests = f.requests.filter(({ url }) => url.startsWith(registry));
-  assert.equal(requests.length, 7);
+  assert.equal(requests.length, 8);
+  assert.ok(requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-arm64/${version}`));
   assert.ok(requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-amd64/${version}`));
   assert.equal(f.requests.some(({ url }) => /\.tgz$|\.zip$|\.tar\.gz$/.test(url)), false);
   assert.deepEqual(await readCatalog(f.readOptions), catalog);
@@ -427,7 +459,9 @@ test('npm can publish the manifest-declared Windows ZIP independently of the fou
 });
 
 test('public npm metadata reports its exact nonempty declared subset without implying cross-platform readiness', async (t) => {
-  for (const declared of [['darwin/arm64'], ['windows/amd64'], ['linux/amd64', 'darwin/arm64']]) {
+  for (const declared of [
+    ['darwin/arm64'], ['windows/arm64'], ['windows/amd64'], ['linux/amd64', 'darwin/arm64'],
+  ]) {
     await t.test(declared.join(','), async (t) => {
       const f = await releaseFixture(t, { npm: true, npmPlatforms: declared });
       const catalog = await resolveReleases(f.options);
@@ -446,35 +480,44 @@ test('public npm metadata reports its exact nonempty declared subset without imp
   }
 });
 
-test('a missing declared Windows package keeps npm unpublished instead of silently advertising only Unix', async (t) => {
-  const f = await releaseFixture(t, { npm: true, homebrew: true, npmPlatforms: platforms });
-  missing(f, `${registry}/@sodapop-sh%2fwindows-amd64/${version}`);
-  const catalog = await resolveReleases(f.options);
-  assert.deepEqual(catalog.channels.npm, unavailable);
-  assert.equal(catalog.channels.homebrew.status, 'published');
-  assert.deepEqual(catalog.channels.homebrew.platforms, platforms.slice(0, 4));
-  assert.equal(catalog.artifacts.length, 5);
-  assert.ok(f.requests.some(({ url }) => url === `${registry}/@sodapop-sh%2fwindows-amd64/${version}`));
+test('a missing declared Windows package keeps npm unpublished instead of silently advertising another architecture', async (t) => {
+  for (const id of ['windows-arm64', 'windows-amd64']) {
+    await t.test(id, async (t) => {
+      const f = await releaseFixture(t, { npm: true, homebrew: true, npmPlatforms: platforms });
+      missing(f, `${registry}/@sodapop-sh%2f${id}/${version}`);
+      const catalog = await resolveReleases(f.options);
+      assert.deepEqual(catalog.channels.npm, unavailable);
+      assert.equal(catalog.channels.homebrew.status, 'published');
+      assert.deepEqual(catalog.channels.homebrew.platforms, platforms.slice(0, 4));
+      assert.equal(catalog.artifacts.length, 6);
+      assert.ok(f.requests.some(({ url }) => url === `${registry}/@sodapop-sh%2f${id}/${version}`));
+    });
+  }
 });
 
-test('declared Windows npm metadata must match win32/x64 and the public ZIP/binary release binding', async (t) => {
-  for (const [name, mutate] of [
-    ['Go OS instead of npm OS', (pkg) => { pkg.os = ['windows']; }],
-    ['Go architecture instead of npm CPU', (pkg) => { pkg.cpu = ['amd64']; }],
-    ['wrong package', (pkg) => { pkg.name = '@sodapop-sh/windows-arm64'; }],
-    ['wrong version', (pkg) => { pkg.version = '1.2.4'; }],
-    ['tarball instead of ZIP', (pkg) => { pkg.sodapop.artifact.archive = pkg.sodapop.artifact.archive.replace('.zip', '.tar.gz'); }],
-    ['archive digest', (pkg) => { pkg.sodapop.artifact.archive_sha256 = 'f'.repeat(64); }],
-    ['binary digest', (pkg) => { pkg.sodapop.artifact.binary_sha256 = 'f'.repeat(64); }],
-    ['runtime binding', (pkg) => { pkg.sodapop.copilot_runtime_version = '0.0.1'; }],
-    ['missing binding', (pkg) => { delete pkg.sodapop; }],
+test('declared Windows npm metadata must match win32/architecture and the public ZIP/binary release binding', async (t) => {
+  for (const [id, wrongCPU, wrongPackage] of [
+    ['windows-arm64', 'x64', '@sodapop-sh/windows-amd64'],
+    ['windows-amd64', 'amd64', '@sodapop-sh/windows-arm64'],
   ]) {
-    await t.test(name, async (t) => {
-      const f = await releaseFixture(t, { npm: true, npmPlatforms: platforms });
-      mutate(f.npm.get('windows-amd64'));
-      await assert.rejects(resolveReleases(f.options), /npm/);
-      await assert.rejects(readFile(f.resolvedPath), { code: 'ENOENT' });
-    });
+    for (const [name, mutate] of [
+      ['Go OS instead of npm OS', (pkg) => { pkg.os = ['windows']; }],
+      ['wrong npm CPU', (pkg) => { pkg.cpu = [wrongCPU]; }],
+      ['wrong package', (pkg) => { pkg.name = wrongPackage; }],
+      ['wrong version', (pkg) => { pkg.version = '1.2.4'; }],
+      ['tarball instead of ZIP', (pkg) => { pkg.sodapop.artifact.archive = pkg.sodapop.artifact.archive.replace('.zip', '.tar.gz'); }],
+      ['archive digest', (pkg) => { pkg.sodapop.artifact.archive_sha256 = 'f'.repeat(64); }],
+      ['binary digest', (pkg) => { pkg.sodapop.artifact.binary_sha256 = 'f'.repeat(64); }],
+      ['runtime binding', (pkg) => { pkg.sodapop.copilot_runtime_version = '0.0.1'; }],
+      ['missing binding', (pkg) => { delete pkg.sodapop; }],
+    ]) {
+      await t.test(`${id} ${name}`, async (t) => {
+        const f = await releaseFixture(t, { npm: true, npmPlatforms: platforms });
+        mutate(f.npm.get(id));
+        await assert.rejects(resolveReleases(f.options), /npm/);
+        await assert.rejects(readFile(f.resolvedPath), { code: 'ENOENT' });
+      });
+    }
   }
 });
 
@@ -494,30 +537,36 @@ test('development optionalDependencies are not the published npm platform set', 
   }
 });
 
-test('Windows npm source metadata uses win32/x64 and the executable payload filename', async (t) => {
-  for (const [name, mutate] of [
-    ['OS', (pkg) => { pkg.os = ['windows']; }],
-    ['CPU', (pkg) => { pkg.cpu = ['amd64']; }],
-    ['binary filename', (pkg) => { pkg.files = ['bin/sodapop']; }],
+test('Windows npm source metadata selects arm64 or x64 and the executable payload filename', async (t) => {
+  for (const [id, platform, wrongCPU] of [
+    ['windows-arm64', 'windows/arm64', 'x64'],
+    ['windows-amd64', 'windows/amd64', 'amd64'],
   ]) {
-    await t.test(name, async (t) => {
-      const f = await releaseFixture(t, { mode: 'pre-release' });
-      const source = await f.copySources();
-      const filename = path.join(source, 'npm/packages/windows-amd64/package.json');
-      const pkg = JSON.parse(await readFile(filename, 'utf8'));
-      mutate(pkg);
-      await writeFile(filename, JSON.stringify(pkg));
-      await assert.rejects(readCatalog(f.readOptions), /Source npm package identity\/platform differs for windows\/amd64/);
-      assert.equal(f.requests.length, 0);
-    });
+    for (const [name, mutate] of [
+      ['OS', (pkg) => { pkg.os = ['windows']; }],
+      ['CPU', (pkg) => { pkg.cpu = [wrongCPU]; }],
+      ['binary filename', (pkg) => { pkg.files = ['bin/sodapop']; }],
+    ]) {
+      await t.test(`${id} ${name}`, async (t) => {
+        const f = await releaseFixture(t, { mode: 'pre-release' });
+        const source = await f.copySources();
+        const filename = path.join(source, `npm/packages/${id}/package.json`);
+        const pkg = JSON.parse(await readFile(filename, 'utf8'));
+        mutate(pkg);
+        await writeFile(filename, JSON.stringify(pkg));
+        await assert.rejects(readCatalog(f.readOptions),
+          new RegExp(`Source npm package identity/platform differs for ${platform.replace('/', '\\/')}`));
+        assert.equal(f.requests.length, 0);
+      });
+    }
   }
 });
 
-test('local native subsets cannot silently replace the five advertised public downloads', async (t) => {
+test('local native subsets cannot silently replace the six advertised public downloads', async (t) => {
   const f = await releaseFixture(t, { npm: true, npmPlatforms: ['darwin/arm64'] });
   f.manifest.artifacts = [f.manifest.artifacts[0]];
   f.refreshManifest();
-  await assert.rejects(resolveReleases(f.options), /all five native platforms/);
+  await assert.rejects(resolveReleases(f.options), /all six native platforms/);
   await assert.rejects(readFile(f.resolvedPath), { code: 'ENOENT' });
 });
 
@@ -531,7 +580,7 @@ test('missing npm launcher/platforms and a stale dist-tag keep npm unavailable b
       const catalog = await resolveReleases(f.options);
       assert.deepEqual(catalog.channels.npm, unavailable);
       assert.equal(catalog.channels.homebrew.status, 'published');
-      assert.equal(catalog.artifacts.length, 5);
+      assert.equal(catalog.artifacts.length, 6);
     });
   }
 });
@@ -576,7 +625,7 @@ test('npm metadata rejects wrong identities, unsupported platforms, bad URLs, an
     ['empty manifest set', (f) => { f.npm.get('cli').sodapop.artifacts = []; f.npm.get('cli').optionalDependencies = {}; }],
     ['non-array manifest set', (f) => { f.npm.get('cli').sodapop.artifacts = {}; }],
     ['duplicate manifest platform', (f) => { f.npm.get('cli').sodapop.artifacts.push({ ...f.npm.get('cli').sodapop.artifacts[0] }); }],
-    ['unsupported manifest platform', (f) => { f.npm.get('cli').sodapop.artifacts[0].platform = 'windows/arm64'; }],
+    ['unsupported manifest platform', (f) => { f.npm.get('cli').sodapop.artifacts[0].platform = 'windows/386'; }],
     ['native archive', (f) => { f.npm.get('darwin-arm64').sodapop.artifact.archive = 'other.tar.gz'; }],
     ['native archive hash', (f) => { f.npm.get('darwin-arm64').sodapop.artifact.archive_sha256 = 'f'.repeat(64); }],
     ['native binary hash', (f) => { f.npm.get('darwin-arm64').sodapop.artifact.binary_sha256 = 'f'.repeat(64); }],
@@ -782,7 +831,7 @@ test('source package and tap identity drift is rejected even when channels are d
       } else {
         const filename = path.join(source, `npm/packages/${name.startsWith('launcher') ? 'cli' : 'darwin-amd64'}/package.json`);
         const pkg = JSON.parse(await readFile(filename, 'utf8'));
-        if (name === 'launcher') pkg.optionalDependencies['@sodapop-sh/windows-arm64'] = pkg.version;
+        if (name === 'launcher') pkg.optionalDependencies['@sodapop-sh/freebsd-amd64'] = pkg.version;
         else if (name === 'launcher joined keys') {
           pkg.optionalDependencies = { [Object.keys(pkg.optionalDependencies).sort().join('\n')]: pkg.version };
         }
@@ -833,7 +882,7 @@ test('offline release catalogs are revalidated for every build, including comman
     ['missing declared platforms', (r) => { delete r.catalog.channels.npm.platforms; }],
     ['empty published platforms', (r) => { r.catalog.channels.npm.platforms = []; }],
     ['non-array platforms', (r) => { r.catalog.channels.npm.platforms = 'darwin/arm64'; }],
-    ['unknown npm platform', (r) => { r.catalog.channels.npm.platforms = ['windows/arm64']; }],
+    ['unknown npm platform', (r) => { r.catalog.channels.npm.platforms = ['windows/386']; }],
     ['duplicate npm platform', (r) => { r.catalog.channels.npm.platforms = ['darwin/arm64', 'darwin/arm64']; }],
     ['Windows Homebrew platform', (r) => { r.catalog.channels.homebrew.platforms = platforms; }],
     ['incomplete Homebrew platforms', (r) => { r.catalog.channels.homebrew.platforms = ['darwin/arm64']; }],

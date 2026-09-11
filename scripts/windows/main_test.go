@@ -4,9 +4,12 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -15,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var verifierBuild struct {
@@ -24,13 +28,95 @@ var verifierBuild struct {
 }
 
 func TestMain(m *testing.M) {
+	if os.Getenv("SODAPOP_WINDOWS_TEST_VERIFIER") == "1" {
+		os.Exit(runTestVerifier(os.Args[1:]))
+	}
 	code := m.Run()
 	if verifierBuild.path != "" {
-		if err := os.RemoveAll(filepath.Dir(verifierBuild.path)); err != nil {
+		var err error
+		for range 20 {
+			if err = os.RemoveAll(filepath.Dir(verifierBuild.path)); err == nil {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		if err != nil {
 			panic(err)
 		}
 	}
 	os.Exit(code)
+}
+
+func runTestVerifier(args []string) int {
+	values := map[string]string{}
+	for i := 1; i+1 < len(args); i += 2 {
+		values[args[i]] = args[i+1]
+	}
+	if log := os.Getenv("SODAPOP_WINDOWS_TEST_VERIFIER_LOG"); log != "" {
+		f, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+		if err != nil {
+			return 1
+		}
+		_, err = fmt.Fprintln(f, args[0], values["--platform"])
+		if closeErr := f.Close(); err != nil || closeErr != nil {
+			return 1
+		}
+	}
+	if len(args) == 0 || (args[0] != "verify" && args[0] != "extract") {
+		return 1
+	}
+	if args[0] == "verify" {
+		return 0
+	}
+	data, err := os.ReadFile(values["--manifest"])
+	if err != nil {
+		return 1
+	}
+	var r release
+	if json.Unmarshal(data, &r) != nil {
+		return 1
+	}
+	var selected artifact
+	for _, a := range r.Artifacts {
+		if a.Platform == values["--platform"] {
+			selected = a
+		}
+	}
+	if selected.Platform == "" {
+		return 1
+	}
+	reader, err := zip.OpenReader(filepath.Join(values["--dir"], selected.Archive))
+	if err != nil {
+		return 1
+	}
+	defer reader.Close()
+	for _, entry := range reader.File {
+		name := filepath.FromSlash(entry.Name)
+		target := filepath.Join(values["--output"], name)
+		if entry.FileInfo().IsDir() {
+			if os.MkdirAll(target, 0755) != nil {
+				return 1
+			}
+			continue
+		}
+		if os.MkdirAll(filepath.Dir(target), 0755) != nil {
+			return 1
+		}
+		input, err := entry.Open()
+		if err != nil {
+			return 1
+		}
+		output, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			input.Close()
+			return 1
+		}
+		_, copyErr := io.Copy(output, input)
+		if errors.Join(copyErr, input.Close(), output.Close()) != nil {
+			return 1
+		}
+	}
+	return 0
 }
 
 func verifier(t *testing.T) string {
@@ -89,9 +175,13 @@ func hash(data []byte) string {
 }
 
 func makeFixture(t *testing.T, version string, mutate func(map[string][]byte)) fixture {
+	return makeArchitectureFixture(t, version, "windows/amd64", mutate)
+}
+
+func makeArchitectureFixture(t *testing.T, version, platform string, mutate func(map[string][]byte)) fixture {
 	t.Helper()
 	dir := tempDir(t)
-	root := archiveRoot(version)
+	root := archiveRoot(version, platform)
 	binary := []byte("MZ-fixture-not-a-native-executable")
 	files := map[string][]byte{
 		root + "/sodapop.exe":                          binary,
@@ -126,7 +216,7 @@ func makeFixture(t *testing.T, version string, mutate func(map[string][]byte)) f
 	r := release{
 		SchemaVersion: 1, Version: version, Commit: strings.Repeat("a", 40),
 		SDKVersion: "1.0.13", RuntimeVersion: "1.0.83",
-		Artifacts: []artifact{{"windows/amd64", archiveName, hash(archive.Bytes()), hash(binary)}},
+		Artifacts: []artifact{{platform, archiveName, hash(archive.Bytes()), hash(binary)}},
 	}
 	manifest := filepath.Join(dir, "sodapop-"+version+"-manifest.json")
 	f := fixture{dir, manifest, r, binary}
@@ -162,6 +252,17 @@ func (f fixture) writeManifest(t *testing.T) {
 func (f fixture) args(t *testing.T, command, output string) []string {
 	t.Helper()
 	return []string{command, "--dir", f.dir, "--manifest", f.manifest, "--output", output, "--releasectl", verifier(t)}
+}
+
+func addArchitecture(t *testing.T, f *fixture, platform string) {
+	t.Helper()
+	other := makeArchitectureFixture(t, f.release.Version, platform, nil)
+	a := other.release.Artifacts[0]
+	for _, name := range []string{a.Archive, a.Archive + ".sha256"} {
+		writeFixture(t, filepath.Join(f.dir, name), readFixture(t, filepath.Join(other.dir, name)))
+	}
+	f.release.Artifacts = append(f.release.Artifacts, a)
+	f.writeManifest(t)
 }
 
 func TestProductionManifestGenerator(t *testing.T) {
@@ -203,7 +304,7 @@ func TestProductionManifestGenerator(t *testing.T) {
 		t.Fatal(err)
 	}
 	arch := scoop.Architecture["64bit"]
-	if len(scoop.Architecture) != 1 || arch["extract_dir"] != archiveRoot("1.2.3") ||
+	if len(scoop.Architecture) != 1 || arch["extract_dir"] != archiveRoot("1.2.3", "windows/amd64") ||
 		arch["hash"] != f.release.Artifacts[0].ArchiveSHA256 || scoop.Bin != "sodapop.exe" ||
 		!strings.Contains(scoop.License["identifier"], "Proprietary") {
 		t.Fatalf("incorrect Scoop manifest: %+v", scoop)
@@ -213,13 +314,108 @@ func TestProductionManifestGenerator(t *testing.T) {
 	}
 }
 
+func TestDualArchitectureManifestGenerator(t *testing.T) {
+	f := makeFixture(t, "1.2.3", nil)
+	addArchitecture(t, &f, "windows/arm64")
+	t.Setenv("SODAPOP_WINDOWS_TEST_VERIFIER", "1")
+	log := filepath.Join(f.dir, "verifier.log")
+	t.Setenv("SODAPOP_WINDOWS_TEST_VERIFIER_LOG", log)
+	out := filepath.Join(f.dir, "generated")
+	args := []string{"manifests", "--dir", f.dir, "--manifest", f.manifest, "--output", out, "--releasectl", os.Args[0]}
+	if err := run(args); err != nil {
+		t.Fatal(err)
+	}
+	installer := string(readFixture(t, filepath.Join(out,
+		"winget/manifests/v/VeVarunSharma/Sodapop/1.2.3/VeVarunSharma.Sodapop.installer.yaml")))
+	for _, want := range []string{
+		"Architecture: x64",
+		"Architecture: arm64",
+		"sodapop-1.2.3-windows-amd64.zip",
+		"sodapop-1.2.3-windows-arm64.zip",
+		"RelativeFilePath: 'sodapop-1.2.3-windows-amd64\\sodapop.exe'",
+		"RelativeFilePath: 'sodapop-1.2.3-windows-arm64\\sodapop.exe'",
+	} {
+		if !strings.Contains(installer, want) {
+			t.Fatalf("dual WinGet manifest missing %q:\n%s", want, installer)
+		}
+	}
+	if strings.Contains(installer, "  - arm64\n") || strings.Contains(installer, "  - x64\n") {
+		t.Fatalf("dual manifest marked a supplied architecture unsupported:\n%s", installer)
+	}
+	var scoop struct {
+		Architecture map[string]map[string]string `json:"architecture"`
+	}
+	if err := json.Unmarshal(readFixture(t, filepath.Join(out, "scoop/bucket/sodapop.json")), &scoop); err != nil {
+		t.Fatal(err)
+	}
+	if len(scoop.Architecture) != 2 ||
+		scoop.Architecture["64bit"]["extract_dir"] != archiveRoot("1.2.3", "windows/amd64") ||
+		scoop.Architecture["arm64"]["extract_dir"] != archiveRoot("1.2.3", "windows/arm64") {
+		t.Fatalf("incorrect dual Scoop manifest: %+v", scoop)
+	}
+	verifierLog := string(readFixture(t, log))
+	for _, platform := range []string{"windows/amd64", "windows/arm64"} {
+		if strings.Count(verifierLog, "verify "+platform+"\n") != 1 {
+			t.Fatalf("verifier did not receive exactly one %s selection:\n%s", platform, verifierLog)
+		}
+	}
+}
+
+func TestARM64PortableAndMSIContracts(t *testing.T) {
+	f := makeArchitectureFixture(t, "1.2.3", "windows/arm64", nil)
+	t.Setenv("SODAPOP_WINDOWS_TEST_VERIFIER", "1")
+	portable := filepath.Join(f.dir, "portable")
+	args := []string{"portable", "--dir", f.dir, "--manifest", f.manifest, "--output", portable,
+		"--platform", "windows/arm64", "--releasectl", os.Args[0]}
+	if err := run(args); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFixture(t, filepath.Join(portable, archiveRoot("1.2.3", "windows/arm64"), "sodapop.exe")); !bytes.Equal(got, f.binary) {
+		t.Fatal("ARM64 portable consumer changed source binary")
+	}
+	stage := filepath.Join(f.dir, "msi")
+	args[0], args[6] = "prepare-msi", stage
+	if err := run(args); err != nil {
+		t.Fatal(err)
+	}
+	var input msiInput
+	if err := json.Unmarshal(readFixture(t, filepath.Join(stage, "msi-input.json")), &input); err != nil {
+		t.Fatal(err)
+	}
+	if input.Platform != "windows/arm64" || input.Architecture != "arm64" || input.WixArch != "arm64" ||
+		input.ProductCode != stableGUID("product:windows/arm64:1.2.3") ||
+		input.ProductCode == stableGUID("product:windows/amd64:1.2.3") ||
+		input.UpgradeCode != upgradeCode {
+		t.Fatalf("invalid ARM64 MSI contract: %+v", input)
+	}
+}
+
+func TestSelectedArchitectureMustBePresentAndMatch(t *testing.T) {
+	f := makeFixture(t, "1.2.3", nil)
+	t.Setenv("SODAPOP_WINDOWS_TEST_VERIFIER", "1")
+	out := filepath.Join(f.dir, "portable")
+	args := []string{"portable", "--dir", f.dir, "--manifest", f.manifest, "--output", out,
+		"--platform", "windows/arm64", "--releasectl", os.Args[0]}
+	if err := run(args); err == nil || !strings.Contains(err.Error(), "missing windows/arm64") {
+		t.Fatalf("absent selected architecture accepted: %v", err)
+	}
+	if _, err := os.Stat(out); !os.IsNotExist(err) {
+		t.Fatal("absent architecture emitted output")
+	}
+	f.release.Artifacts[0].Platform = "windows/arm64"
+	f.writeManifest(t)
+	if _, _, err := readRelease(f.manifest); err == nil || !strings.Contains(err.Error(), "archive name") {
+		t.Fatalf("mismatched platform/archive accepted: %v", err)
+	}
+}
+
 func TestProductionPortableAndMSIStaging(t *testing.T) {
 	f := makeFixture(t, "1.2.3", nil)
 	portable := filepath.Join(f.dir, "portable")
 	if err := run(f.args(t, "portable", portable)); err != nil {
 		t.Fatal(err)
 	}
-	if got := readFixture(t, filepath.Join(portable, archiveRoot("1.2.3"), "sodapop.exe")); !bytes.Equal(got, f.binary) {
+	if got := readFixture(t, filepath.Join(portable, archiveRoot("1.2.3", "windows/amd64"), "sodapop.exe")); !bytes.Equal(got, f.binary) {
 		t.Fatal("portable consumer changed source binary")
 	}
 	stage := filepath.Join(f.dir, "msi")
@@ -234,6 +430,7 @@ func TestProductionPortableAndMSIStaging(t *testing.T) {
 		t.Fatal(err)
 	}
 	if input.SigningState != "unsigned-candidate" || input.UpgradeCode != upgradeCode ||
+		input.Platform != "windows/amd64" || input.Architecture != "x64" || input.WixArch != "x64" ||
 		input.ProductCode != stableGUID("product:windows/amd64:1.2.3") || input.BinaryHash != hash(f.binary) || len(input.Files) != 6 {
 		t.Fatalf("invalid MSI input: %+v", input)
 	}
@@ -274,7 +471,7 @@ func TestProductionMSIStagingFlatNotices(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			body := []byte("independent dependency license terms")
 			f := makeFixture(t, "0.0.2", func(files map[string][]byte) {
-				root := archiveRoot("0.0.2")
+				root := archiveRoot("0.0.2", "windows/amd64")
 				delete(files, root+"/LICENSES/example.org__lib@v1/LICENSE")
 				files[root+"/LICENSES/"+name] = body
 			})
@@ -334,11 +531,11 @@ func TestProductionGeneratorRejectsUnverifiedArchives(t *testing.T) {
 						files[strings.Replace(name, "1.2.3", "1.2.4", 1)] = body
 					}
 				case "traversal":
-					files[archiveRoot("1.2.3")+"/../escape"] = []byte("bad")
+					files[archiveRoot("1.2.3", "windows/amd64")+"/../escape"] = []byte("bad")
 				case "extra-dll":
-					files[archiveRoot("1.2.3")+"/stale.dll"] = []byte("bad")
+					files[archiveRoot("1.2.3", "windows/amd64")+"/stale.dll"] = []byte("bad")
 				case "missing-notices":
-					delete(files, archiveRoot("1.2.3")+"/THIRD_PARTY_NOTICES.md")
+					delete(files, archiveRoot("1.2.3", "windows/amd64")+"/THIRD_PARTY_NOTICES.md")
 				}
 			})
 			switch kind {
@@ -372,7 +569,7 @@ func TestInvalidMetadataAndArguments(t *testing.T) {
 		"archive-hash":      func(r *release) { r.Artifacts[0].ArchiveSHA256 = "not-a-digest" },
 		"binary-hash":       func(r *release) { r.Artifacts[0].BinarySHA256 = strings.Repeat("x", 64) },
 		"duplicate":         func(r *release) { r.Artifacts = append(r.Artifacts, r.Artifacts[0]) },
-		"arm64-only":        func(r *release) { r.Artifacts[0].Platform = "windows/arm64" },
+		"unsupported-only":  func(r *release) { r.Artifacts[0].Platform = "windows/386" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			f := makeFixture(t, "1.2.3", nil)
@@ -426,8 +623,9 @@ func TestVersionRulesAndIdentifiers(t *testing.T) {
 	if stableGUID("product:1.2.3") == stableGUID("product:1.2.4") || stableGUID("product:1.2.3") != stableGUID("product:1.2.3") {
 		t.Fatal("product identifiers are not version-specific and stable")
 	}
-	if len(architectures) != 1 || architectures["windows/amd64"].winget != "x64" {
-		t.Fatal("unqualified architecture enabled")
+	if len(architectures) != 2 || architectures["windows/amd64"].winget != "x64" ||
+		architectures["windows/arm64"].winget != "arm64" {
+		t.Fatal("Windows architecture mapping is incomplete")
 	}
 	f := makeFixture(t, "1.2.3", nil)
 	for _, extra := range [][]string{
@@ -566,7 +764,7 @@ func TestNativeMSILifecycleSafetyGates(t *testing.T) {
 	}
 
 	script := string(readFixture(t, "Test-Native.ps1"))
-	consent := strings.Index(script, "if ($MsiLifecycle) { Assert-DisposableRunner }")
+	consent := strings.Index(script, "if ($MsiLifecycle) { Assert-DisposableRunner $platform }")
 	work := strings.Index(script, "$work = Get-NewDirectoryPath")
 	related := strings.Index(script, `$installer.RelatedProducts("{$($new.Record.upgrade_code)}")`)
 	rejection := strings.Index(script, "if ($relatedProducts.Count -ne 0)")
@@ -580,10 +778,103 @@ func TestNativeMSILifecycleSafetyGates(t *testing.T) {
 		"Refusing a pre-existing Sodapop installation",
 		"MSI upgrade needs two strictly increasing numeric release versions",
 		"[Runtime.InteropServices.Marshal]::ReleaseComObject($installer)",
+		"$record.platform -cne $platform",
+		"$record.wix_architecture -cne $Architecture",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("missing native safety contract: %s", required)
 		}
+	}
+}
+
+func TestStaticArchitectureAwarePowerShellContracts(t *testing.T) {
+	common := string(readFixture(t, "Common.ps1"))
+	for _, required := range []string{
+		"function Get-NativeWindowsPlatform",
+		"function Assert-WindowsExecutableArchitecture",
+		"[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture",
+		"if ($processArchitecture -ne $osArchitecture)",
+		"Expected native $ExpectedPlatform",
+		"'windows/amd64'",
+		"'windows/arm64'",
+	} {
+		if !strings.Contains(common, required) {
+			t.Fatalf("missing native architecture contract: %s", required)
+		}
+	}
+	for _, file := range []string{
+		"Build-Msi.ps1", "Complete-Msi.ps1", "Install-Portable.ps1",
+		"Restore-Wix.ps1", "Test-Channels.ps1", "Test-Native.ps1",
+	} {
+		if strings.Contains(string(readFixture(t, file)), "Assert-WindowsX64") {
+			t.Fatalf("%s still uses the x64-only native gate", file)
+		}
+	}
+	build := string(readFixture(t, "Build-Msi.ps1"))
+	for _, required := range []string{
+		"'--platform', $platform",
+		"'-arch', $inputMetadata.wix_architecture",
+		"$platform.Replace('/', '-')",
+		`$productSource.Replace('<MajorUpgrade ',`,
+		`'<MajorUpgrade AllowSameVersionUpgrades="yes" ')`,
+	} {
+		if !strings.Contains(build, required) {
+			t.Fatalf("Build-Msi.ps1 missing architecture parameterization: %s", required)
+		}
+	}
+	complete := string(readFixture(t, "Complete-Msi.ps1"))
+	for _, required := range []string{
+		"platform = $inputData.platform",
+		"architecture = $inputData.architecture",
+		"wix_architecture = $inputData.wix_architecture",
+		"MSI filename must be $expectedMsi",
+	} {
+		if !strings.Contains(complete, required) {
+			t.Fatalf("Complete-Msi.ps1 missing architecture evidence: %s", required)
+		}
+	}
+}
+
+func TestPowerShellExecutableArchitectureValidation(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("PowerShell PE validation is Windows-specific")
+	}
+	pwsh, err := exec.LookPath("pwsh")
+	if err != nil {
+		t.Skip("pwsh is not installed")
+	}
+	writePE := func(name string, machine uint16) string {
+		t.Helper()
+		data := make([]byte, 0x86)
+		binary.LittleEndian.PutUint16(data, 0x5A4D)
+		binary.LittleEndian.PutUint32(data[0x3C:], 0x80)
+		binary.LittleEndian.PutUint32(data[0x80:], 0x00004550)
+		binary.LittleEndian.PutUint16(data[0x84:], machine)
+		filename := filepath.Join(t.TempDir(), name)
+		writeFixture(t, filename, data)
+		return filename
+	}
+	x64 := writePE("x64.exe", 0x8664)
+	arm64 := writePE("arm64.exe", 0xAA64)
+	common, err := filepath.Abs("Common.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	quote := func(value string) string {
+		return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+	}
+	script := ". " + quote(common) +
+		"; Assert-WindowsExecutableArchitecture " + quote(x64) + " 'windows/amd64'" +
+		"; Assert-WindowsExecutableArchitecture " + quote(arm64) + " 'windows/arm64'"
+	command := exec.Command(pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", script)
+	if result, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("PowerShell PE architecture validation failed: %v\n%s", err, result)
+	}
+	mismatch := ". " + quote(common) +
+		"; Assert-WindowsExecutableArchitecture " + quote(x64) + " 'windows/arm64'"
+	command = exec.Command(pwsh, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", mismatch)
+	if result, err := command.CombinedOutput(); err == nil {
+		t.Fatalf("PowerShell PE architecture mismatch was accepted:\n%s", result)
 	}
 }
 

@@ -13,17 +13,23 @@ import {
 function fixture(t) {
   const root = mkdtempSync(path.join(tmpdir(), "sodapop-publish-test-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  const entries = [
-    ["platforms/darwin-arm64", { name: "@sodapop-sh/darwin-arm64", version: "1.2.3" }],
-    ["cli", {
-      name: "@sodapop-sh/cli", version: "1.2.3",
-      optionalDependencies: { "@sodapop-sh/darwin-arm64": "1.2.3" }
-    }]
+  const native = [
+    "darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64",
+    "windows-amd64", "windows-arm64"
   ];
+  const dependencies = Object.fromEntries(native.map((id) => [`@sodapop-sh/${id}`, "1.2.3"]));
+  const entries = native.map((id) => [
+    `platforms/${id}`, { name: `@sodapop-sh/${id}`, version: "1.2.3" }
+  ]);
+  entries.push(["cli", {
+    name: "@sodapop-sh/cli", version: "1.2.3", optionalDependencies: dependencies
+  }]);
   for (const [directory, metadata] of entries) {
     mkdirSync(path.join(root, directory), { recursive: true });
     writeFileSync(path.join(root, directory, "package.json"), JSON.stringify(metadata));
-    const executable = metadata.name === "@sodapop-sh/cli" ? "bin/sodapop.js" : "bin/sodapop";
+    const executable = metadata.name === "@sodapop-sh/cli"
+      ? "bin/sodapop.js"
+      : metadata.name.startsWith("@sodapop-sh/windows-") ? "bin/sodapop.exe" : "bin/sodapop";
     mkdirSync(path.join(root, directory, "bin"), { recursive: true });
     writeFileSync(path.join(root, directory, executable), "fixture executable\n", { mode: 0o644 });
     chmodSync(path.join(root, directory, executable), 0o644);
@@ -39,8 +45,12 @@ function registry(mode = "missing") {
   const runner = (args, options = {}) => {
     if (args[0] === "pack") {
       const metadata = JSON.parse(readFileSync(path.join(args.at(-1), "package.json")));
-      const executable = metadata.name === "@sodapop-sh/cli" ? "bin/sodapop.js" : "bin/sodapop";
-      assert.notEqual(statSync(path.join(args.at(-1), executable)).mode & 0o111, 0);
+      const executable = metadata.name === "@sodapop-sh/cli"
+        ? "bin/sodapop.js"
+        : metadata.name.startsWith("@sodapop-sh/windows-") ? "bin/sodapop.exe" : "bin/sodapop";
+      if (process.platform !== "win32") {
+        assert.notEqual(statSync(path.join(args.at(-1), executable)).mode & 0o111, 0);
+      }
       const filename = metadata.name.replace("@", "").replace("/", "-") + "-1.2.3.tgz";
       const destination = args[args.indexOf("--pack-destination") + 1];
       writeFileSync(path.join(destination, filename), data);
@@ -71,8 +81,8 @@ function registry(mode = "missing") {
     }
     if (args[0] === "diff") {
       compared.push(args);
-      assert.ok(options.cwd.endsWith(path.join("platforms", "darwin-arm64")) ||
-        options.cwd.endsWith("cli"));
+      assert.ok(options.cwd.endsWith("cli") ||
+        options.cwd.includes(`${path.sep}platforms${path.sep}`));
       assert.equal(args.filter((arg) => arg.startsWith("--diff=")).length, 1);
       assert.ok(!args.includes("--diff-name-only"));
       if (mode === "comparison-error") return { status: 1, stdout: "", stderr: "registry unavailable" };
@@ -112,7 +122,15 @@ test("publishes platform tarballs before the exact-version launcher", (t) => {
   const directory = fixture(t);
   const { runner, published } = registry();
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, runner, () => {});
-  assert.deepEqual(published, ["sodapop-sh-darwin-arm64-1.2.3.tgz", "sodapop-sh-cli-1.2.3.tgz"]);
+  assert.deepEqual(published, [
+    "sodapop-sh-darwin-amd64-1.2.3.tgz",
+    "sodapop-sh-darwin-arm64-1.2.3.tgz",
+    "sodapop-sh-linux-amd64-1.2.3.tgz",
+    "sodapop-sh-linux-arm64-1.2.3.tgz",
+    "sodapop-sh-windows-amd64-1.2.3.tgz",
+    "sodapop-sh-windows-arm64-1.2.3.tgz",
+    "sodapop-sh-cli-1.2.3.tgz"
+  ]);
 });
 
 test("retry accepts only identical already-published package contents", (t) => {
@@ -120,7 +138,7 @@ test("retry accepts only identical already-published package contents", (t) => {
   const matching = registry("matching");
   publishPackages({ directory, version: "1.2.3", tag: "latest" }, matching.runner, () => {});
   assert.deepEqual(matching.published, []);
-  assert.equal(matching.compared.length, 2);
+  assert.equal(matching.compared.length, 7);
   const modeOnly = registry("mode-only");
   assert.throws(
     () => publishPackages({ directory, version: "1.2.3", tag: "latest" }, modeOnly.runner, () => {}),
@@ -141,7 +159,9 @@ test("retry accepts only identical already-published package contents", (t) => {
   assert.deepEqual(wrongTag.published, []);
 });
 
-test("publication restores executable modes lost during artifact transfer", (t) => {
+test("publication restores executable modes lost during artifact transfer", {
+  skip: process.platform === "win32" && "Windows does not expose POSIX executable mode bits"
+}, (t) => {
   const directory = fixture(t);
   const native = path.join(directory, "platforms/darwin-arm64/bin/sodapop");
   const launcher = path.join(directory, "cli/bin/sodapop.js");
@@ -211,6 +231,18 @@ test("rejects mismatched dependencies and prereleases under latest", (t) => {
   metadata.optionalDependencies["@sodapop-sh/darwin-arm64"] = "^1.2.3";
   writeFileSync(filename, JSON.stringify(metadata));
   assert.throws(() => publishPackages({ directory, version: "1.2.3", tag: "latest" }), /exactly match/);
+});
+
+test("rejects generated native package names outside the six-platform allowlist", (t) => {
+  const directory = fixture(t);
+  const metadata = { name: "@sodapop-sh/windows-ia32", version: "1.2.3" };
+  const packageDirectory = path.join(directory, "platforms", "windows-ia32");
+  mkdirSync(packageDirectory);
+  writeFileSync(path.join(packageDirectory, "package.json"), JSON.stringify(metadata));
+  assert.throws(
+    () => publishPackages({ directory, version: "1.2.3", tag: "latest" }),
+    /Invalid generated package metadata/
+  );
 });
 
 test("requires exact npm-compatible release versions", () => {

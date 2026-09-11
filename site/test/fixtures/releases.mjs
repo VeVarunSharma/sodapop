@@ -11,7 +11,9 @@ export const api = `https://api.github.com/repos/${repository}`;
 export const tapAPI = `https://api.github.com/repos/${tap}`;
 export const registry = 'https://registry.npmjs.org';
 export const version = '1.2.3';
-export const platforms = ['darwin/arm64', 'darwin/amd64', 'linux/arm64', 'linux/amd64', 'windows/amd64'];
+export const platforms = [
+  'darwin/arm64', 'darwin/amd64', 'linux/arm64', 'linux/amd64', 'windows/arm64', 'windows/amd64',
+];
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
 const encodeJSON = (value) => Buffer.from(`${JSON.stringify(value)}\n`);
 
@@ -48,7 +50,7 @@ export async function releaseFixture(t, {
       copilot_runtime_version: '1.0.83', ...(sdk ? { copilot_sdk_version: '1.0.13' } : {}),
       artifacts: platforms.map((platform) => ({
         platform,
-        archive: `sodapop-${releaseVersion}-${platform.replace('/', '-')}${windowsZip && platform === 'windows/amd64' ? '.zip' : '.tar.gz'}`,
+        archive: `sodapop-${releaseVersion}-${platform.replace('/', '-')}${windowsZip && platform.startsWith('windows/') ? '.zip' : '.tar.gz'}`,
         archive_sha256: sha256(`fixture archive ${platform}`),
         binary_sha256: sha256(`fixture binary ${platform}`),
       })),

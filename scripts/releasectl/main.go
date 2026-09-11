@@ -29,7 +29,7 @@ func run(args []string, stdout, stderr io.Writer) error {
 		flags.StringVar(&dir, "dir", "", "release directory (required)")
 		flags.StringVar(&version, "version", "", "SemVer without v prefix (required)")
 		flags.StringVar(&commit, "commit", "", "full Git commit (required)")
-		flags.StringVar(&platforms, "platforms", "", "comma-separated exact platform set; defaults to all five")
+		flags.StringVar(&platforms, "platforms", "", "comma-separated exact platform set; defaults to all six")
 	case "verify", "extract":
 		flags.StringVar(&dir, "dir", "", "release directory (required)")
 		flags.StringVar(&manifest, "manifest", "", "manifest path (required)")

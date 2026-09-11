@@ -18,11 +18,12 @@ test('pre-release has real platform-specific source commands, never invented pac
 
 test('UI and documentation share verified channel commands', () => {
   const catalog = { mode: 'release', channels: channels() };
-  catalog.channels.npm = { status: 'published', command: 'npm install --global @sodapop-sh/cli@latest', platforms: ['darwin/arm64', 'windows/amd64'] };
+  catalog.channels.npm = { status: 'published', command: 'npm install --global @sodapop-sh/cli@latest', platforms: ['darwin/arm64', 'windows/arm64', 'windows/amd64'] };
   const methods = installMethods(catalog);
   assert.equal(methods[0].id, 'npm');
   assert.ok(installationReference(catalog).includes(methods[0].command));
   assert.equal(methods.some(({ id }) => id === 'homebrew'), false);
+  assert.match(methods[0].description, /Windows ARM64/);
   assert.match(methods[0].description, /Windows x64/);
   assert.doesNotMatch(methods[0].description, /Linux/);
   catalog.channels.npm.platforms = [];

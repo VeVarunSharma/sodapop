@@ -9,9 +9,8 @@ import { withBase } from '../lib/urls';
 const catalog = getCatalog();
 const prerelease = catalog.mode === 'pre-release';
 const publishedPreview = catalog.mode === 'release' && catalog.version.includes('-');
-const windowsArtifact = catalog.artifacts.find((artifact) => artifact.platform === 'windows/amd64');
-const windowsFilename = windowsArtifact?.archive ?? null;
-if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) {
+const windowsArtifacts = catalog.artifacts.filter((artifact) => artifact.platform.startsWith('windows/'));
+if (windowsArtifacts.some(({ archive }) => !archive.endsWith('.zip'))) {
   throw new Error('The Windows download catalog must contain a qualified ZIP archive');
 }
 ---
@@ -63,7 +62,9 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
           ))}
         </div>
         <p class="integrity-note">Download the matching checksum sidecar into the same directory. On macOS, use <code>shasum -a 256 -c &lt;archive&gt;.sha256</code>; on Linux, use <code>sha256sum -c &lt;archive&gt;.sha256</code>. Only extract/install after verification succeeds. Hashes establish byte consistency, not publisher identity by themselves; review the release provenance separately. <a class="text-link" href={withBase('docs/installation/')}>Full installation instructions</a>.</p>
-        {windowsFilename && <p class="integrity-note">On Windows, compare <code>{`Get-FileHash -Algorithm SHA256 ".\\${windowsFilename}"`}</code> with the published checksum. After successful verification, use <code>{`Expand-Archive ".\\${windowsFilename}" -DestinationPath ".\\sodapop"`}</code> and follow the guide to put the extracted executable on PATH.</p>}
+        {windowsArtifacts.map(({ label, archive }) => (
+          <p class="integrity-note">On {label}, compare <code>{`Get-FileHash -Algorithm SHA256 ".\\${archive}"`}</code> with the published checksum. After successful verification, use <code>{`Expand-Archive ".\\${archive}" -DestinationPath ".\\sodapop"`}</code> and follow the guide to put the extracted executable on PATH.</p>
+        ))}
         {catalog.manifestUrl && <p class="integrity-note"><a class="text-link" href={catalog.manifestUrl}>Release manifest and binary hashes</a></p>}
       </section>
     )}
@@ -76,11 +77,11 @@ if (windowsArtifact && (!windowsFilename || !windowsFilename.endsWith('.zip'))) 
           <tbody>
             <tr><th scope="row">macOS</th><td>Apple silicon / Intel</td><td>Native archive, Homebrew, npm</td></tr>
             <tr><th scope="row">Linux</th><td>ARM64 / x64, glibc</td><td>Native archive, Homebrew, npm</td></tr>
-            <tr><th scope="row">Windows</th><td>x64</td><td>Native ZIP; npm when included in the published release</td></tr>
+            <tr><th scope="row">Windows</th><td>ARM64 / x64</td><td>Native ZIP; npm when included in the published release</td></tr>
           </tbody>
         </table>
       </div>
-      <p>This table describes supported build targets, not a claim that every channel is published. npm installs only the native platforms declared by that published package version; Windows requires its qualified ZIP payload. Node.js is required for the npm launcher. Native downloads and Homebrew do not require Go or a separate Copilot installation. Windows ARM64 and musl-based Linux are not supported targets.</p>
+      <p>This table describes supported build targets, not a claim that every channel is published. npm installs only the native platforms declared by that published package version; each Windows architecture requires its qualified ZIP payload and matching npm package. Node.js is required for the npm launcher. Native downloads and Homebrew do not require Go or a separate Copilot installation. MSI, WinGet, and Scoop ARM64 delivery remains phase 2 until native qualification is complete. Musl-based Linux is not a supported target.</p>
     </section>
     <section class="faq-section" aria-labelledby="questions-title">
       <h2 id="questions-title">Before your first prompt</h2>

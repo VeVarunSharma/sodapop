@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -16,6 +19,22 @@ import (
 )
 
 const fixtureExecutable = "#!/usr/bin/env bash\nprintf \"fixture Sodapop launched\\n\"\n"
+
+func fixtureBinary(target string) []byte {
+	if !strings.HasPrefix(target, "windows/") {
+		return []byte(fixtureExecutable)
+	}
+	data := make([]byte, 70)
+	copy(data, "MZ")
+	binary.LittleEndian.PutUint32(data[0x3c:], 0x40)
+	copy(data[0x40:], "PE\x00\x00")
+	machine := uint16(0x8664)
+	if target == "windows/arm64" {
+		machine = 0xaa64
+	}
+	binary.LittleEndian.PutUint16(data[0x44:], machine)
+	return data
+}
 
 var (
 	releaseHelperOnce sync.Once
@@ -40,6 +59,9 @@ func releaseHelper(t *testing.T) string {
 			return
 		}
 		releaseHelperPath = filepath.Join(releaseHelperDir, "releasectl")
+		if runtime.GOOS == "windows" {
+			releaseHelperPath += ".exe"
+		}
 		command := exec.Command("go", "build", "-o", releaseHelperPath, "./releasectl")
 		for _, entry := range os.Environ() {
 			name, _, _ := strings.Cut(entry, "=")
@@ -112,7 +134,18 @@ case "$1" in
       printf 'missing go build output\n' >&2
       exit 1
     fi
-    printf '#!/usr/bin/env bash\nprintf "fixture Sodapop launched\\n"\n' > "$output"
+    if [[ "${GOOS:-}" == windows ]]; then
+      printf 'MZ' > "$output"
+      for ((i=2; i<60; i++)); do printf '\0' >> "$output"; done
+      printf '\100\0\0\0PE\0\0' >> "$output"
+      case "${GOARCH:-}" in
+        amd64) printf '\144\206' >> "$output" ;;
+        arm64) printf '\144\252' >> "$output" ;;
+        *) printf 'unexpected Windows architecture\n' >&2; exit 1 ;;
+      esac
+    else
+      printf '#!/usr/bin/env bash\nprintf "fixture Sodapop launched\\n"\n' > "$output"
+    fi
     chmod 0755 "$output"
     ;;
   run)
@@ -170,7 +203,7 @@ func assertFixtureLines(t *testing.T, root, name string, want []string) {
 }
 
 func TestBuildUsesSodapopNamespaceAndSupportedTargets(t *testing.T) {
-	for _, target := range []string{"", "darwin/arm64", "darwin/amd64", "linux/arm64", "linux/amd64", "windows/amd64"} {
+	for _, target := range []string{"", "darwin/arm64", "darwin/amd64", "linux/arm64", "linux/amd64", "windows/amd64", "windows/arm64"} {
 		name := target
 		if name == "" {
 			name = "host defaults"
@@ -207,7 +240,7 @@ func TestBuildUsesSodapopNamespaceAndSupportedTargets(t *testing.T) {
 				t.Fatalf("incorrect build guidance: %s", output)
 			}
 			info, err := os.Stat(filepath.Join(root, outputPath))
-			if err != nil || info.Mode().Perm() != 0755 {
+			if err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0755 {
 				t.Fatalf("missing executable output: %v, %v", info, err)
 			}
 		})
@@ -215,14 +248,19 @@ func TestBuildUsesSodapopNamespaceAndSupportedTargets(t *testing.T) {
 }
 
 func TestWindowsBuildDefaultsToExeOutput(t *testing.T) {
-	root := scriptFixture(t)
-	output, err := runScriptFixture(t, root, []string{"bash", "scripts/build.sh"},
-		"SODAPOP_TARGET=windows/amd64", "SODAPOP_GITHUB_CLIENT_ID=fixture.public-client")
-	if err != nil || !strings.Contains(output, "Built bin/sodapop.exe for windows/amd64") {
-		t.Fatalf("Windows build fixture failed: %s: %v", output, err)
-	}
-	if _, err := os.Stat(filepath.Join(root, "bin", "sodapop.exe")); err != nil {
-		t.Fatalf("Windows build did not create the native executable name: %v", err)
+	for _, target := range []string{"windows/amd64", "windows/arm64"} {
+		t.Run(target, func(t *testing.T) {
+			root := scriptFixture(t)
+			output, err := runScriptFixture(t, root, []string{"bash", "scripts/build.sh"},
+				"SODAPOP_TARGET="+target, "SODAPOP_GITHUB_CLIENT_ID=fixture.public-client")
+			if err != nil || !strings.Contains(output, "Built bin/sodapop.exe for "+target) {
+				t.Fatalf("Windows build fixture failed: %s: %v", output, err)
+			}
+			data, err := os.ReadFile(filepath.Join(root, "bin", "sodapop.exe"))
+			if err != nil || !bytes.Equal(data, fixtureBinary(target)) {
+				t.Fatalf("Windows build did not create the expected PE fixture: %x, %v", data, err)
+			}
+		})
 	}
 }
 

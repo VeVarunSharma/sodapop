@@ -10,14 +10,17 @@ not from a hard-coded list of unpublished packages.
 | darwin/amd64 | `@sodapop-sh/darwin-amd64` | `bin/sodapop` |
 | linux/arm64 | `@sodapop-sh/linux-arm64` | `bin/sodapop` |
 | linux/amd64 | `@sodapop-sh/linux-amd64` | `bin/sodapop` |
+| windows/arm64 | `@sodapop-sh/windows-arm64` | `bin/sodapop.exe` |
 | windows/amd64 | `@sodapop-sh/windows-amd64` | `bin/sodapop.exe` |
 
 Linux packages declare `libc: ["glibc"]`. The launcher rejects musl and
-unidentifiable/conflicting libc evidence rather than guessing. Windows x64 is
-included only when the manifest declares its qualified ZIP artifact; Windows
-arm64 and other unlisted targets are unsupported. A four-Unix release never
-advertises a Windows dependency. Explicit host-only manifests are also useful
-for local installation checks; they do not establish cross-platform readiness.
+unidentifiable/conflicting libc evidence rather than guessing. Windows arm64
+and x64 are included only when the manifest declares each qualified ZIP
+artifact. The launcher selects from `process.arch`, so ARM64 Node uses the
+ARM64 package while x64 Node running on Windows ARM uses the x64 package.
+Other unlisted targets are unsupported. A four-Unix release never advertises
+a Windows dependency. Explicit host-only manifests are also useful for local
+installation checks; they do not establish cross-platform readiness.
 
 There are no install hooks, first-run downloads, registry lookups in the
 launcher, or fallbacks to an installed `copilot`. Node 18 or later is required
@@ -92,7 +95,7 @@ configuration.
 Tests build distinct Go subprocess fixtures per architecture (including an
 actual Windows PE `.exe`) and archive them using Go's standard library. These
 are **fixture tests, not native Sodapop release evidence**. Coverage includes:
-shared verifier failure handling; all five real `npm pack` file allowlists;
+shared verifier failure handling; all six real `npm pack` file allowlists;
 offline local-tarball global installation and generated shims; versions,
 hashes, missing optional packages; argument spaces/stdin/cwd/nonzero exits;
 fixture upgrade/reinstall/uninstall with preserved state/profile sentinels;

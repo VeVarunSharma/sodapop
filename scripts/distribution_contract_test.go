@@ -540,47 +540,56 @@ func TestDistributionContractRejectsUnsafeOrUnexpectedPackageContents(t *testing
 }
 
 func TestDistributionContractSupportsWindowsZipAssets(t *testing.T) {
-	root := t.TempDir()
-	version := "1.2.3"
-	packageRoot := "sodapop-" + version + "-windows-amd64"
-	archive := packageRoot + ".zip"
-	executable := []byte("fixture Windows executable")
-	writeDistributionZip(t, filepath.Join(root, archive), map[string]distributionArchiveEntry{
-		packageRoot + "/sodapop.exe":                      {Mode: 0755, Content: executable},
-		packageRoot + "/README.md":                        {Mode: 0644, Content: []byte("fixture README")},
-		packageRoot + "/LICENSE":                          {Mode: 0644, Content: []byte("fixture license")},
-		packageRoot + "/THIRD_PARTY_NOTICES.md":           {Mode: 0644, Content: []byte("fixture notices")},
-		packageRoot + "/LICENSES/copilot-runtime.license": {Mode: 0644, Content: []byte("runtime terms")},
-		packageRoot + "/LICENSES/dependency.license":      {Mode: 0644, Content: []byte("dependency terms")},
-	})
-	data, err := os.ReadFile(filepath.Join(root, archive))
-	if err != nil {
-		t.Fatal(err)
+	hashes := make(map[string]string)
+	for _, platform := range []string{"windows/amd64", "windows/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			root := t.TempDir()
+			version := "1.2.3"
+			packageRoot := distribution.PackageName(version, platform)
+			archive := distribution.ArchiveName(version, platform)
+			executable := fixtureBinary(platform)
+			writeDistributionZip(t, filepath.Join(root, archive), map[string]distributionArchiveEntry{
+				packageRoot + "/sodapop.exe":                      {Mode: 0755, Content: executable},
+				packageRoot + "/README.md":                        {Mode: 0644, Content: []byte("fixture README")},
+				packageRoot + "/LICENSE":                          {Mode: 0644, Content: []byte("fixture license")},
+				packageRoot + "/THIRD_PARTY_NOTICES.md":           {Mode: 0644, Content: []byte("fixture notices")},
+				packageRoot + "/LICENSES/copilot-runtime.license": {Mode: 0644, Content: []byte("runtime terms")},
+				packageRoot + "/LICENSES/dependency.license":      {Mode: 0644, Content: []byte("dependency terms")},
+			})
+			data, err := os.ReadFile(filepath.Join(root, archive))
+			if err != nil {
+				t.Fatal(err)
+			}
+			archiveDigest := distributionSHA256(data)
+			writeFixtureFile(t, root, archive+".sha256", archiveDigest+"  "+archive+"\n", 0600)
+			hashes[platform] = distributionSHA256(executable)
+			manifest := distributionManifest{
+				SchemaVersion:         1,
+				Version:               version,
+				Commit:                strings.Repeat("b", 40),
+				CopilotRuntimeVersion: "1.0.83",
+				CopilotSDKVersion:     "1.0.13",
+				Artifacts: []distributionArtifact{{
+					Platform:      platform,
+					Archive:       archive,
+					ArchiveSHA256: archiveDigest,
+					BinarySHA256:  hashes[platform],
+				}},
+			}
+			if err := validateDistributionManifest(manifest, []string{platform}); err != nil {
+				t.Fatal(err)
+			}
+			if err := validateDistributionAssets(root, manifest); err != nil {
+				t.Fatal(err)
+			}
+			if err := validateDistributionArchivePayload(filepath.Join(root, archive), packageRoot,
+				[]string{"sodapop.exe", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"}, []string{"LICENSES"}); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
-	archiveDigest := distributionSHA256(data)
-	writeFixtureFile(t, root, archive+".sha256", archiveDigest+"  "+archive+"\n", 0600)
-	manifest := distributionManifest{
-		SchemaVersion:         1,
-		Version:               version,
-		Commit:                strings.Repeat("b", 40),
-		CopilotRuntimeVersion: "1.0.83",
-		CopilotSDKVersion:     "1.0.13",
-		Artifacts: []distributionArtifact{{
-			Platform:      "windows/amd64",
-			Archive:       archive,
-			ArchiveSHA256: archiveDigest,
-			BinarySHA256:  distributionSHA256(executable),
-		}},
-	}
-	if err := validateDistributionManifest(manifest, []string{"windows/amd64"}); err != nil {
-		t.Fatal(err)
-	}
-	if err := validateDistributionAssets(root, manifest); err != nil {
-		t.Fatal(err)
-	}
-	if err := validateDistributionArchivePayload(filepath.Join(root, archive), packageRoot,
-		[]string{"sodapop.exe", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md"}, []string{"LICENSES"}); err != nil {
-		t.Fatal(err)
+	if hashes["windows/amd64"] == hashes["windows/arm64"] {
+		t.Fatal("Windows architecture fixtures must have distinct binary hashes")
 	}
 }
 

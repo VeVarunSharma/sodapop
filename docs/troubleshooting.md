@@ -8,9 +8,12 @@ disappear.
 
 Check the [download page](/download/) before assuming a package-manager channel
 has been published. The [installation guide](installation.md#supported-platforms)
-lists the five native targets. Homebrew is scoped to macOS/Linux. Windows x64
-npm support depends on the exact release manifest including its qualified ZIP
-and the matching `@sodapop-sh/windows-amd64` package version being published.
+lists the six native targets. Homebrew remains scoped to the four macOS/Linux
+targets. Windows npm support depends on the exact release manifest including
+the architecture's qualified ZIP and the matching
+`@sodapop-sh/windows-arm64` or `@sodapop-sh/windows-amd64` package version being
+published. ARM64 MSI, WinGet, and Scoop are still phase-2 channels, not fallbacks
+for the supported ZIP/npm path.
 
 For a manually extracted archive, confirm that the directory on your `PATH`
 contains `sodapop` or, on Windows, `sodapop.exe`. Run the executable by its full
