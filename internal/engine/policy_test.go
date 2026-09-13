@@ -124,7 +124,10 @@ func TestPermissionMetadata(t *testing.T) {
 
 func TestPreToolHookNeverGrantsShellOrWrites(t *testing.T) {
 	project, _ := policyFixture(t)
-	for _, name := range []string{"bash", "write_bash", "read_bash", "edit", "create", "apply_patch", "unknown", "web_fetch"} {
+	for _, name := range []string{
+		"bash", "write_bash", "read_bash", "powershell", "read_powershell",
+		"edit", "create", "apply_patch", "unknown", "web_fetch",
+	} {
 		output := preToolDecision(project, copilot.PreToolUseHookInput{
 			ToolName: name, WorkingDirectory: project, ToolArgs: map[string]any{"path": "file.txt", "command": "true"},
 		})

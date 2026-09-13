@@ -6,6 +6,14 @@ application backed by the official GitHub Copilot SDK.
 After the corresponding packages are published, install with
 `npm install --global @sodapop-sh/cli` and run `sodapop`.
 
+If you work at Microsoft or another organization that redirects npm to a
+private registry, and that registry cannot find the package, use the public npm
+registry directly if your organization permits it:
+
+```sh
+npm install --global @sodapop-sh/cli@latest --registry=https://registry.npmjs.org/
+```
+
 The package installs an exact-version native payload through an
 OS/architecture-specific optional dependency. It does not download executables
 from a release URL at installation or first run. Available targets are declared
