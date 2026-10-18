@@ -98,6 +98,23 @@ success, or publish raw credentials/provider payloads as evidence.
 Progress only when observations meet the gate. Keep failures and unverified
 requirements visible in [evidence](evidence.md).
 
+### Preparation checks observed on 2026-10-18
+
+On Linux amd64 with Go 1.27.1, the preparation changes passed the focused
+sample tests and `make check` with both live flags explicitly `0`. The coverage
+ratchet passed at 85.6% against the unchanged 84.8% baseline, package floors
+passed, and the race suite and `go vet` passed. These are local observations,
+not GitHub Actions or live Copilot qualification.
+
+The draft YAML and request-slide XML parsed, referenced metadata files existed,
+and changed-file secret scanning reported no secrets. This is not catalog-schema
+validation or a historical security audit. The automated review binary was
+unavailable; an independent read-only reviewer found a presenter checkout-path
+portability issue, which was corrected. CodeQL was skipped for the
+documentation/static assets/teaching-fixture change; no production runtime logic
+changed. Keep native installation, interactive sign-in, real model execution,
+live captures, independent rehearsal, and catalog acceptance pending.
+
 ## Support and security handoff
 
 Community support starts with [troubleshooting](../troubleshooting.md).

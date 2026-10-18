@@ -65,12 +65,15 @@ into tax, discounts, currency conversion, or new dependencies.
 ### Create an isolated sample copy
 
 These are **operator-only shell instructions**, not prompts for Sodapop.
-Run from the Sodapop checkout in a POSIX shell on macOS/Linux. Windows presenters
+Run from the root of your Sodapop checkout in a POSIX shell on macOS/Linux.
+`pwd -P` captures its absolute path, rather than assuming the author's checkout
+location. Windows presenters
 should prepare an equivalent disposable directory with their supported shell,
 not paste POSIX paths into PowerShell. The source sample must remain untouched.
 
 ```sh
-SODAPOP_SOURCE="/home/runner/work/sodapop/sodapop"
+SODAPOP_SOURCE="$(pwd -P)"
+test -f "$SODAPOP_SOURCE/docs/accelerator/sample/order.go"
 DEMO_DIR="$(mktemp -d /tmp/sodapop-orders.XXXXXX)"
 cp "$SODAPOP_SOURCE/docs/accelerator/sample/order.go" "$DEMO_DIR/"
 cp "$SODAPOP_SOURCE/docs/accelerator/sample/order_test.go" "$DEMO_DIR/"
@@ -87,7 +90,8 @@ git status --short
 sodapop
 ```
 
-Check each command's result before proceeding; stop on any failure. Confirm the
+Check each command's result before proceeding; stop on any failure, including
+the source-file check before creating a temporary directory. Confirm the
 printed workspace is the new disposable directory, not the Sodapop repository,
 and `git status --short` is empty. The operator explicitly creates this baseline
 commit before launching; Sodapop must **never automatically stage, commit, or
