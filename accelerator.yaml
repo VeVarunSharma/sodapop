@@ -1,0 +1,84 @@
+# Preparation metadata, not a validated Accelerator Catalog submission schema.
+# Catalog lookup returned GitHub 404 on 2026-10-18; eligibility/schema remain pending.
+id: sodapop
+name: "Sodapop — Approval-Aware Terminal Coding Companion"
+summary: >-
+  A reusable terminal coding workflow connecting project context,
+  explicit tool approvals, focused changes, validation evidence,
+  and human review through the GitHub Copilot SDK.
+repository: "https://github.com/VeVarunSharma/sodapop"
+website: "https://sodapop.sh"
+status: draft
+readiness:
+  assessed: demo-foundation
+  target: catalog-ready
+  live_qualification: pending-owner-authorized-evidence
+  catalog_schema_validation: pending
+  catalog_eligibility: unconfirmed
+catalog:
+  requested_url: "https://github.com/mcaps-microsoft/accelerators-catalog"
+  lookup_date: "2026-10-18"
+  lookup_result: github-api-404
+audience:
+  primary: [developer]
+  secondary: [platform-engineer, engineering-lead, solution-architect]
+customer_scope: reusable-cross-industry
+industries: [cross-industry]
+technologies: [Go, GitHub Copilot SDK, Bubble Tea]
+deployment:
+  model: local-terminal-application
+  azure_resources_required: false
+  platforms: [macOS, glibc-based Linux, Windows]
+prerequisites:
+  - Supported native platform and interactive terminal
+  - Git and Go for the synthetic demo project
+  - Network access for GitHub and Copilot services
+  - Eligible GitHub Copilot access under organization policy
+  - Configured Sodapop-owned public OAuth client
+  - Secure credential store or explicit session-only sign-in
+scenario:
+  name: "From maintenance request to reviewed code change"
+  data_classification: synthetic-only
+  outcome: "Focused code change, observed validation, and a human-reviewed diff"
+  automatic_commit_or_push: false
+documentation:
+  overview: "https://github.com/VeVarunSharma/sodapop#readme"
+  preparation: "docs/accelerator/README.md"
+  facilitator: "docs/accelerator/demo.md"
+  sample: "docs/accelerator/sample/README.md"
+  engagement: "docs/accelerator/engagement.md"
+  evidence: "docs/accelerator/evidence.md"
+  architecture: "docs/architecture.md"
+  installation: "docs/installation.md"
+  authentication: "docs/authentication.md"
+  qualification: "docs/live-qualification.md"
+  troubleshooting: "docs/troubleshooting.md"
+demo:
+  existing_media_scope: signed-out-ui-with-prepared-changes
+  live_outcome_recording: pending
+  facilitator_guide: provided-not-independently-rehearsed
+  reusable_sample_project: provided-intentionally-defective-exercise
+security:
+  approval_policy: fail-closed-by-default
+  planning_is_security_boundary: false
+  approved_shell_commands_are_sandboxed: false
+  cancellation_rolls_back_edits: false
+  ambient_credentials_imported: false
+licensing:
+  first_party: MIT
+  bundled_runtime: separate-upstream-terms
+  notices: "THIRD_PARTY_NOTICES.md"
+ownership:
+  maintainer_confirmation_required: true
+  support_model: pending-owner-confirmation
+  security_reporting_route: pending-owner-verification
+engagement:
+  motion: discovery-workshop-followed-by-scoped-pilot
+  measures:
+    - task-completion
+    - review-quality
+    - time-to-reviewed-change
+    - setup-and-approval-friction
+disclaimer: >-
+  Independent application, not the official GitHub Copilot CLI.
+  Catalog submission, acceptance, or Microsoft endorsement is not implied.
