@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">Sodapop synthetic order-total request</title>
+  <desc id="desc">A synthetic maintenance exercise: correct quantities in an order preview. Acceptance totals are 375 cents for three units at 125 cents, 1000 cents for two at 125 plus three at 250, and zero for empty carts or zero quantity. Deliver regression tests, observed checks, and a human-reviewed diff. This is not a live result.</desc>
+  <defs>
+    <linearGradient id="accent" x2="1" y2="1">
+      <stop stop-color="#f9a8d4"/>
+      <stop offset="1" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" rx="24" fill="#10121c"/>
+  <rect x="48" y="48" width="8" height="624" rx="4" fill="url(#accent)"/>
+  <g font-family="ui-monospace, monospace">
+    <text x="88" y="100" font-size="24" fill="#67e8f9">SODAPOP / SYNTHETIC CUSTOMER REQUEST</text>
+    <text x="88" y="174" font-size="42" font-weight="bold" fill="#f9a8d4">Make every unit count.</text>
+    <text x="88" y="226" font-size="25" fill="#f1f5f9">Our order preview ignores item quantities.</text>
+    <text x="88" y="266" font-size="25" fill="#f1f5f9">Explain it. Add regressions. Fix only what matters.</text>
+    <rect x="88" y="308" width="1104" height="218" rx="16" fill="#1e2435"/>
+    <text x="116" y="352" font-size="23" fill="#67e8f9">ACCEPTANCE / INTEGER CENTS</text>
+    <g font-size="25" fill="#f1f5f9">
+      <text x="116" y="402">125 x 3                         = 375</text>
+      <text x="116" y="446">(125 x 2) + (250 x 3)           = 1000</text>
+      <text x="116" y="490">Empty cart or zero quantity     = 0</text>
+    </g>
+    <text x="88" y="580" font-size="24" fill="#f1f5f9">OUTCOME: observed tests + a human-reviewed diff</text>
+    <text x="88" y="624" font-size="21" fill="#c4b5fd">No tax, discounts, dependencies, automatic commit or push.</text>
+    <text x="88" y="670" font-size="19" fill="#cbd5e1">Preparation asset only. Not a live AI result or customer endorsement.</text>
+  </g>
+</svg>

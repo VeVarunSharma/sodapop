@@ -1,3 +1,13 @@
+```text
+                  .  o   .
+                    ___
+                   /___\
+                  | .-. |
+    S O D A P O P | |_| |   A little can of "let's build that."
+                  |_____|
+                   '---'
+```
+
 # Sodapop
 
 <p align="center">
@@ -14,6 +24,73 @@ A little can of "let's build that." Sodapop is an independent terminal coding co
 [Website](https://sodapop.sh) | [Source](https://github.com/VeVarunSharma/sodapop)
 
 Bring a project: run `sodapop` from its directory to explore code, compare approaches, work through a change, and inspect or taste-test the evidence. Type `/` to find every command, or open `/vending-machine` for a curated shelf of workflows and settings. Tool activity streams alongside your conversation; edits and shell commands need approval by default. Sodapop provides its own interface and OAuth onboarding; it does not wrap the Copilot CLI's screen or fork Crush.
+
+## From unfamiliar code to a change you can review
+
+Developers maintaining unfamiliar projects lose time finding context, comparing
+approaches, and establishing whether a change is ready for review. Engineering
+leads need faster delivery without losing visibility into AI-assisted work.
+Sodapop connects project-aware conversation, visible tool activity, approval
+decisions, validation, and Git inspection in one terminal. Measure its benefit
+in your environment rather than assuming productivity gains.
+
+**For:** developers and platform engineers; reusable across industries.
+**Accelerator readiness:** demo foundation, not a qualified customer demo or an
+accepted catalog submission. Existing recordings are signed out with prepared
+changes, not AI outcomes. Live use requires network access, eligible Copilot
+access, Sodapop's configured OAuth client, and applicable organization approval.
+
+[Accelerator preparation pack](docs/accelerator/README.md) |
+[Presenter guide](docs/accelerator/demo.md) |
+[Synthetic scenario](docs/accelerator/sample/README.md) |
+[Workshop and pilot](docs/accelerator/engagement.md) |
+[Draft metadata](accelerator.yaml)
+
+### Quickstart for a presenter or customer
+
+1. Choose a confirmed native release for macOS, glibc-based Linux, or Windows;
+   follow the [installation guide](docs/installation.md). Native archives need
+   neither Go, Node.js, nor an installed Copilot; the npm launcher needs Node.js.
+2. Verify archive integrity and run the installed `sodapop --version` and
+   `sodapop --check-runtime`. The runtime handshake does not establish AI access.
+3. Open an interactive terminal in your project directory and launch `sodapop`.
+   Start with `/help`; local inspection works while signed out.
+4. For AI features, use `/login` privately, confirm Copilot access separately,
+   and select an available model. Never share device codes or tokens.
+5. Start with one bounded task and acceptance criteria. Review tool approvals,
+   run relevant checks, inspect `/diff session`, and decide what to keep.
+   Preparing a commit or PR remains your responsibility.
+
+See [getting started](docs/getting-started.md) for the full user journey or
+[development](docs/development.md) for source-build prerequisites.
+
+### Adapt, validate, and engage
+
+Use the [disposable order-total scenario](docs/accelerator/sample/README.md) to
+practice context discovery → advisory plan → approved change → observed tests →
+reviewed diff. `/taste-test` requests validation; it does not guarantee correctness.
+`/diff session` compares a bounded baseline and does not prove authorship.
+
+The [architecture diagram](docs/architecture.md#trust-boundary-diagram) separates
+local state and credentials from GitHub/Copilot services and optional MCP servers.
+Planning is not a security boundary, approved shell commands are not sandboxed,
+and cancellation does not undo edits. Keep Autopilot off for the primary demo.
+
+Follow the [facilitator preflight](docs/accelerator/demo.md) and
+[evidence checklist](docs/accelerator/evidence.md) before sharing. Credential-free
+tests, native installation, interactive sign-in, and authorized live qualification
+are separate gates. Preserve existing credential and permission boundaries when
+customizing business vocabulary or approved integrations.
+
+**Workshop invitation:** bring one recurring engineering task, an engineering
+sponsor, and a platform/security contact. Agree on scope, access, and measurable
+success before enabling live usage, then decide whether a small pilot is worthwhile.
+See the [discovery questions and pilot scorecard](docs/accelerator/engagement.md).
+
+For help, start with [troubleshooting](docs/troubleshooting.md) and the
+[support and security handoff](docs/accelerator/README.md#support-and-security-handoff).
+Do not post secrets or vulnerability details in public issues. Support ownership
+and a verified private reporting route remain publication gates.
 
 <p align="center">
   <img src="docs/assets/demos/overview.gif" width="800" alt="Sodapop's soda-can welcome animation, command palette, Chat-to-Plan-to-Autopilot mode cycle, and read-only Git diff in a local example project." />

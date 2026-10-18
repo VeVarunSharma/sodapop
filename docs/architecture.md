@@ -4,6 +4,45 @@ Sodapop is a Go terminal application. Bubble Tea owns input and UI state; Bubble
 
 The SDK starts an embedded, explicitly pinned Copilot runtime over a managed stdio connection. Sodapop provides credentials and permission decisions; the runtime owns model orchestration, tools, and conversation persistence. Sodapop does not run another agent loop or scrape terminal output.
 
+## Trust-boundary diagram
+
+```mermaid
+flowchart LR
+    Person["Developer: request, approvals, review"]
+    subgraph Local["Local computer — approved shell commands are not sandboxed"]
+        UI["Terminal UI / Bubble Tea"]
+        Engine["Application engine / Copilot Go SDK"]
+        Runtime["Pinned embedded Copilot runtime"]
+        Credentials["OS secure credential store<br/>or explicit process-only credentials"]
+        State["Private account-scoped session / MCP state<br/>canonical project identity"]
+        Project["Project files and Git working tree"]
+        Skills["Private immutable skills<br/>explicit project activation"]
+        UI --> Engine
+        Engine <-->|managed stdio| Runtime
+        Credentials -->|account-bound token source| Engine
+        Runtime <--> State
+        Engine -->|approved configuration snapshot| Runtime
+        Skills --> Engine
+        Runtime -->|tools: default approval policy| Project
+        UI -->|read-only Git inspection| Project
+    end
+    Person <--> UI
+    GitHub["External GitHub OAuth / identity services"]
+    Copilot["External GitHub Copilot services / models"]
+    MCP["Optional explicitly enabled stdio MCP processes<br/>may contact external services"]
+    Engine <-->|OAuth / identity via auth adapter| GitHub
+    Runtime <-->|authenticated network requests| Copilot
+    Runtime <-->|tool requests use ordinary approval policy| MCP
+```
+
+The diagram is a logical data-flow view, not an OS sandbox or network allowlist.
+Prompts and relevant code/tool context can leave the computer for Copilot
+processing; review customer data policy before use. MCP processes are opt-in and
+may have their own network/data behavior. Planning and skills cannot grant tool
+permissions. Cancellation does not roll back writes. See
+[permissions and privacy](permissions-and-privacy.md) and
+[authentication](authentication.md) for the full contracts.
+
 ## Ownership
 
 | Package | Responsibility |
