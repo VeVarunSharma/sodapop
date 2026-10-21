@@ -70,22 +70,28 @@ func TestModelCatalogMapsFamiliesContextSizesAndEffortOrder(t *testing.T) {
 }
 
 func TestEffectiveToolsAreValidatedNotAssumed(t *testing.T) {
-	valid := []rpc.CurrentToolMetadata{{Name: "view"}, {Name: "rg"}, {Name: "edit"}, {Name: "bash"}, {Name: "ask_user"}}
-	if err := validateTools(valid); err != nil {
-		t.Fatal(err)
+	unix := []rpc.CurrentToolMetadata{{Name: "view"}, {Name: "rg"}, {Name: "edit"}, {Name: "bash"}, {Name: "ask_user"}}
+	windows := []rpc.CurrentToolMetadata{
+		{Name: "view"}, {Name: "rg"}, {Name: "apply_patch"}, {Name: "powershell"},
+		{Name: "read_powershell"}, {Name: "stop_powershell"}, {Name: "list_powershell"}, {Name: "ask_user"},
+	}
+	for _, tools := range [][]rpc.CurrentToolMetadata{unix, windows} {
+		if err := validateTools(tools); err != nil {
+			t.Fatalf("rejected valid tool catalog %+v: %v", tools, err)
+		}
 	}
 	for _, tools := range [][]rpc.CurrentToolMetadata{
 		nil,
 		{{Name: "view"}, {Name: "edit"}, {Name: "ask_user"}},
-		append(append([]rpc.CurrentToolMetadata{}, valid...), rpc.CurrentToolMetadata{Name: "skill"}),
-		append(append([]rpc.CurrentToolMetadata{}, valid...), rpc.CurrentToolMetadata{Name: "web_fetch"}),
+		append(append([]rpc.CurrentToolMetadata{}, unix...), rpc.CurrentToolMetadata{Name: "skill"}),
+		append(append([]rpc.CurrentToolMetadata{}, unix...), rpc.CurrentToolMetadata{Name: "web_fetch"}),
 		{{Name: "view", MCPServerName: copilot.String("unexpected")}, {Name: "edit"}, {Name: "bash"}, {Name: "ask_user"}},
 	} {
 		if err := validateTools(tools); err == nil {
 			t.Fatalf("accepted missing or implicitly imported tools: %+v", tools)
 		}
 	}
-	if err := validateToolsForSkills(append(valid, rpc.CurrentToolMetadata{Name: "skill"}), true); err != nil {
+	if err := validateToolsForSkills(append(unix, rpc.CurrentToolMetadata{Name: "skill"}), true); err != nil {
 		t.Fatalf("rejected explicit skill tool: %v", err)
 	}
 }

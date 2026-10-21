@@ -111,9 +111,24 @@ make start
 
 The build downloads the explicitly pinned Copilot runtime, verifies the upstream asset checksums, and embeds it. End users of the resulting executable do not need Go, Node.js, or an existing Copilot installation.
 
-On Windows ARM64 or x64, run `bash scripts/build.sh` from Git Bash and launch `bin/sodapop.exe`. Windows release packaging likewise uses `bash scripts/package.sh`; `make install` remains the Unix local-install helper.
+On Windows ARM64 or x64, open the repository-local development shell, then use the same
+build and start commands:
 
-`make start` rebuilds and launches Sodapop; `make run` is an alias. Both use `SODAPOP_OUTPUT` when set, otherwise `bin/sodapop`. Run `make help` to list the available development commands. For local OAuth configuration, copy `.sodapop.env.example` to `.sodapop.env` and set only `SODAPOP_GITHUB_CLIENT_ID` to the project's existing public GitHub OAuth Client ID. The ignored `.sodapop.env` file is loaded automatically by the Makefile, not by direct script invocations or the installed executable.
+```text
+.\dev.cmd
+make build
+make start
+```
+
+`dev.cmd` opens a PowerShell session with the repository-local `make` command
+enabled without changing the user profile or system `PATH`. The wrapper finds Go
+and Git Bash in their standard installation locations, loads only
+`SODAPOP_GITHUB_CLIENT_ID` from `.sodapop.env`, and builds `bin\sodapop.exe`.
+`make run` is an alias for `make start`. From Command Prompt, the root `make.cmd`
+launcher can be used directly. Windows release packaging still uses
+`bash scripts/package.sh`; `make install` remains the Unix local-install helper.
+
+`make start` rebuilds and launches Sodapop; `make run` is an alias. Both use `SODAPOP_OUTPUT` when set, otherwise `bin/sodapop`. Run `make help` to list the available development commands. For local OAuth configuration, copy `.sodapop.env.example` to `.sodapop.env` and set only `SODAPOP_GITHUB_CLIENT_ID` to the project's existing public GitHub OAuth Client ID. The ignored `.sodapop.env` file is loaded automatically by the Makefile and Windows development wrapper, not by direct build script invocations or the installed executable.
 
 To install the command into your user bin directory:
 
@@ -148,8 +163,8 @@ installation; the npm launcher does require Node.js. The exact asset, checksum,
 manifest, and installed-command checks are defined in
 [distribution testing](docs/distribution.md). The core Windows ARM64 release ZIP
 and `@sodapop-sh/windows-arm64` npm package are supported. ARM64 MSI, WinGet, and
-Scoop delivery remains separately gated until those installer paths are natively
-qualified; generated installer metadata alone does not mean a public channel is available.
+Scoop delivery remains phase 2 until those installer paths are natively qualified;
+generated installer metadata alone does not mean a public channel is available.
 See [Windows delivery](packaging/windows/README.md) for verified ZIP extraction,
 per-user MSI recipes, and WinGet/Scoop manifests.
 

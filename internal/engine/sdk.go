@@ -468,6 +468,7 @@ func (s *sdkSession) Disconnect() error {
 var codingTools = []string{
 	"view", "glob", "grep", "rg", "edit", "create", "apply_patch", "str_replace_editor",
 	"bash", "read_bash", "write_bash", "stop_bash", "list_bash", "ask_user", "task_complete",
+	"powershell", "read_powershell", "stop_powershell", "list_powershell",
 }
 
 func validateTools(tools []rpc.CurrentToolMetadata) error {
@@ -489,7 +490,7 @@ func validateToolsForSkills(tools []rpc.CurrentToolMetadata, skills bool) error 
 		}
 		found[tool.Name] = true
 	}
-	if !found["view"] || !found["bash"] || !found["ask_user"] ||
+	if !found["view"] || !(found["bash"] || found["powershell"]) || !found["ask_user"] ||
 		!(found["edit"] || found["create"] || found["apply_patch"] || found["str_replace_editor"]) {
 		return errors.New("runtime does not expose the required read, write, shell, and question tools")
 	}

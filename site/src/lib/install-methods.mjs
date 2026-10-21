@@ -13,6 +13,8 @@ const platformLabels = {
   'windows/amd64': 'Windows x64',
 };
 
+const publicNpmRegistryCommand = 'npm install --global @sodapop-sh/cli@latest --registry=https://registry.npmjs.org/';
+
 /**
  * @param {{channels: {npm: InstallChannel, homebrew: InstallChannel}}} catalog
  * @returns {[InstallMethod, ...InstallMethod[]]}
@@ -76,6 +78,19 @@ export function installationReference(catalog) {
       { type: 'paragraph', children: [{ type: 'text', value: method.description }] },
       { type: 'code', lang: 'sh', value: method.command },
     );
+    if (method.id === 'npm') {
+      tree.children.push(
+        { type: 'heading', depth: 4, children: [{ type: 'text', value: 'Organization-managed npm registry' }] },
+        {
+          type: 'paragraph',
+          children: [{
+            type: 'text',
+            value: 'If you work at Microsoft or another organization that redirects npm to a private registry, and that registry cannot find the package, use the public npm registry directly if your organization permits it:',
+          }],
+        },
+        { type: 'code', lang: 'sh', value: publicNpmRegistryCommand },
+      );
+    }
   }
   return unified().use(remarkStringify, { fences: true }).stringify(tree);
 }

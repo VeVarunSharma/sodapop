@@ -33,6 +33,7 @@ When changing root Make targets, also use this guide and the [Makefile](../Makef
 ## Start here
 
 [build.sh](build.sh), [bundle.sh](bundle.sh), [package.sh](package.sh),
+[Windows development wrapper](windows/Make.ps1),
 [scripts_test.go](scripts_test.go), and [package_test.go](package_test.go).
 For demos, use the [isolated recording guide](../docs/vhs/README.md).
 For instruction changes, use [the guidance design](../docs/agent-guidance.md).
